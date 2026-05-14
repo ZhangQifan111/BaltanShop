@@ -777,9 +777,9 @@ async function renderSettings(){
   $('cfg-toy-count').textContent=toys.length+' 件';
   $('cfg-done-count').textContent=st.done_count+' 笔';
   $('cfg-stock-count').textContent=st.stock_count+' 件';
-  $('rules-list').innerHTML=rules.map(function(r){ return '<div class="rule-row"><span class="rule-region">'+r.region_name+'</span><span class="rule-provinces">'+r.provinces+'</span><span class="rule-price">¥'+r.first_price+'/'+r.first_weight+'kg</span></div>'; }).join('');
+  $('rules-list').innerHTML=rules.map(function(r){ return '<div class="rule-row"><span class="rule-region">'+r.region_name+'</span><span class="rule-provinces">'+r.provinces+'</span><span class="rule-price">¥'+r.first_price+'/'+r.first_weight+'kg</span><span style="margin-left:8px;color:#f87171;cursor:pointer" onclick="delRule('+r.id+')">删除</span></div>'; }).join('');
   $('cfg-profit').textContent=(st.total_profit>=0?'+':'')+'¥'+st.total_profit.toFixed(0);
-  if($('supplies-config-list'))$('supplies-config-list').innerHTML=supplies.map(function(s){ return '<div class="rule-row"><span class="rule-region" style="color:var(--text)">'+s.name+'</span><span class="rule-provinces">¥'+s.unit_price.toFixed(2)+'/'+s.unit+' · 阈值'+s.low_stock_threshold+'</span><span class="rule-price">'+s.stock+'</span></div>'; }).join('');
+  if($('supplies-config-list'))$('supplies-config-list').innerHTML=supplies.map(function(s){ return '<div class="rule-row"><span class="rule-region" style="color:var(--text)">'+s.name+'</span><span class="rule-provinces">¥'+s.unit_price.toFixed(2)+'/'+s.unit+' · 阈值'+s.low_stock_threshold+'</span><span class="rule-price">'+s.stock+'</span><span style="margin-left:8px;color:#f87171;cursor:pointer" onclick="delSupply('+s.id+')">删除</span></div>'; }).join('');
   var catDiv = document.getElementById('categories-config');
   if(catDiv) {
     var html = '<div style="margin-bottom:10px"><input type="text" id="new-category" placeholder="新分类名称"><button onclick="addCategory()" class="btn btn-primary" style="margin-left:8px">添加</button></div><div id="categories-list"></div>';
@@ -825,5 +825,5 @@ async function exportJSON(){
 
 loadData().then(function(){ renderHome(); renderStockList(); $('f-date').value=today(); });
 </script>
-<script>async function addRule(){var n=prompt("区域名");if(!n)return;var p=prompt("省份");if(!p)return;await post("/api/shipping-rules",{region_name:n,provinces:p,first_price:5,first_weight:1,additional_price:2,additional_weight:1});toast("已添加");await loadData();renderSettings();}async function addSupply(){var n=prompt("耗材名");if(!n)return;await post("/api/supplies",{name:n,unit_price:0,stock:0,unit:"个",low_stock_threshold:5});toast("已添加");await loadData();renderSettings();}</script></body>
+<script>async function addRule(){var n=prompt("区域名");if(!n)return;var p=prompt("省份");if(!p)return;await post("/api/shipping-rules",{region_name:n,provinces:p,first_price:5,first_weight:1,additional_price:2,additional_weight:1});toast("已添加");await loadData();renderSettings();}async function addSupply(){var n=prompt("耗材名");if(!n)return;await post("/api/supplies",{name:n,unit_price:0,stock:0,unit:"个",low_stock_threshold:5});toast("已添加");await loadData();renderSettings();}</script><script>async function delRule(id){if(!confirm("确定删除该快递区域？"))return;await del("/api/shipping-rules/"+id);toast("已删除");await loadData();renderSettings();}async function delSupply(id){if(!confirm("确定删除该耗材？"))return;await del("/api/supplies/"+id);toast("已删除");await loadData();renderSettings();}</script></body>
 </html>
