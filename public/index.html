@@ -765,8 +765,8 @@ function onCalcType(){$('sf-calc-wrap').style.display=$('calc-type').value==='sh
 
 async function renderSupplyLogs(){
   var logs=await get('/api/supply-logs');
-  $('supply-log-empty').style.display=logs.length===0?'block':'none';
-  $('supply-log-list').innerHTML=logs.slice(0,30).map(function(l){
+  if($('supply-log-empty'))$('supply-log-empty').style.display=logs.length===0?'block':'none';
+  if($('supply-log-list'))$('supply-log-list').innerHTML=logs.slice(0,30).map(function(l){
     var sgn=l.change_amount>=0?'pos':'neg', pre=l.change_amount>=0?'+':'';
     return '<div class="log-item"><span class="log-date">'+l.created_at+'</span><span class="log-text">'+l.supply_name+' · '+(l.reason||'')+'</span><span class="log-amount '+sgn+'">'+pre+l.change_amount+'</span></div>';
   }).join('');
