@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="巴坦杂货铺">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<title>巴坦杂货铺</title>
+<style>
+:root {
+  --bg: #0f1117; --surface: #1a1d27; --surface-hover: #222632;
+  --accent: #f0a030; --accent-dim: #c88820;
+  --green: #4ade80; --green-dim: rgba(74,222,128,0.12);
+  --red: #f87171; --red-dim: rgba(248,113,113,0.12);
+  --blue: #60a5fa; --blue-dim: rgba(96,165,250,0.12);
+  --orange: #fb923c; --orange-dim: rgba(251,146,60,0.12);
+  --purple: #a78bfa; --purple-dim: rgba(167,139,250,0.12);
+  --text: #e8e6e1; --text-muted: #6b7085; --border: #2a2e3a;
+  --radius: 10px; --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { font-family: 'DM Mono', 'Noto Serif SC', monospace; background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: calc(70px + var(--safe-bottom)); -webkit-font-smoothing: antialiased; }
+
+header { padding: calc(16px + var(--safe-top)) 20px 12px; position: sticky; top: 0; z-index: 10; background: var(--bg); }
+header h1 { font-family: 'Noto Serif SC', serif; font-size: 22px; font-weight: 700; color: var(--accent); }
+header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
+
+/* Bottom Nav */
+.nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); display: flex; z-index: 100; padding-bottom: var(--safe-bottom); }
+.nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 10px 4px; gap: 3px; cursor: pointer; transition: all 0.15s; border: none; background: none; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+.nav-item.active { color: var(--accent); }
+.nav-item .nav-icon { font-size: 20px; }
+.nav-item .nav-label { font-size: 10px; }
+
+/* Tabs */
+.tabs { display: flex; gap: 6px; padding: 0 20px 12px; overflow-x: auto; }
+.tab { padding: 7px 14px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; font-family: 'DM Mono', monospace; font-size: 12px; white-space: nowrap; transition: all 0.15s; }
+.tab.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
+/* Sections */
+.section { margin: 0 20px 20px; }
+.section-title { font-family: 'Noto Serif SC', serif; font-size: 15px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* Cards */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+.card + .card { margin-top: 8px; }
+
+/* Stats Grid */
+.stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 0 20px 16px; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+.stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+.stat-value { font-size: 20px; font-weight: 500; }
+.stat-value.green { color: var(--green); }
+.stat-value.red { color: var(--red); }
+.stat-value.orange { color: var(--orange); }
+
+/* Form */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group.full { grid-column: 1 / -1; }
+.form-group label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.form-group input, .form-group select, .form-group textarea {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 14px; outline: none; width: 100%; transition: border-color 0.2s; -webkit-appearance: none; appearance: none;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--accent); }
+.form-group select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' fill='none' stroke='%236b7085' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; }
+.form-group select option { background: var(--surface); }
+
+/* Cost total */
+.cost-total { display: flex; justify-content: space-between; align-items: center; padding: 14px; background: rgba(240,160,48,0.06); border: 1px solid rgba(240,160,48,0.2); border-radius: 8px; margin-top: 12px; font-size: 14px; }
+.cost-total .ct-value { font-size: 22px; font-weight: 500; color: var(--accent); }
+
+/* Buttons */
+.btn { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; padding: 11px 16px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; transition: all 0.15s; text-align: center; -webkit-user-select: none; }
+.btn-primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.btn-primary:active { background: var(--accent-dim); }
+.btn-secondary { background: transparent; color: var(--text-muted); }
+.btn-secondary:active { color: var(--text); background: var(--surface-hover); }
+.btn-row { display: flex; gap: 8px; margin-top: 14px; }
+.btn-row .btn { flex: 1; }
+
+/* Record card */
+.record-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+.record-card + .record-card { margin-top: 8px; }
+.record-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+.record-name { font-size: 14px; font-weight: 500; flex: 1; }
+.record-meta { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+.record-breakdown { font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.6; }
+.record-breakdown strong { color: var(--text); }
+.record-profit { font-size: 15px; font-weight: 500; margin-top: 6px; }
+.record-profit.positive { color: var(--green); }
+.record-profit.negative { color: var(--red); }
+.record-actions { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.record-btn { flex: 1; min-width: 0; padding: 8px 6px; font-family: 'DM Mono', monospace; font-size: 11px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; text-align: center; transition: all 0.15s; white-space: nowrap; }
+.record-btn:active { background: var(--surface-hover); color: var(--text); }
+.record-btn.green { color: var(--green); border-color: rgba(74,222,128,0.3); }
+.record-btn.orange { color: var(--orange); border-color: rgba(251,146,60,0.3); }
+.record-btn.red { color: var(--red); border-color: rgba(248,113,113,0.3); }
+.record-btn.blue { color: var(--blue); border-color: rgba(96,165,250,0.3); }
+
+/* Badge */
+.badge { display: inline-flex; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 500; }
+.badge-stock { background: rgba(240,160,48,0.12); color: var(--accent); }
+.badge-sold { background: var(--blue-dim); color: var(--blue); }
+.badge-done { background: var(--green-dim); color: var(--green); }
+.badge-returned { background: var(--red-dim); color: var(--red); }
+
+/* Supply item */
+.supply-row { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.supply-row:last-child { border-bottom: none; }
+.supply-info { flex: 1; }
+.supply-name { font-size: 13px; font-weight: 500; }
+.supply-stock { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.supply-stock.low { color: var(--red); }
+.supply-stock .num { font-size: 14px; font-weight: 500; color: var(--text); }
+.supply-stock.low .num { color: var(--red); }
+.supply-actions { display: flex; gap: 4px; }
+.supply-btn { padding: 6px 10px; font-size: 11px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; font-family: 'DM Mono', monospace; }
+.supply-btn:active { background: var(--surface-hover); }
+.supply-btn.edit { color: var(--blue); }
+
+/* Shipping rule row */
+.rule-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.rule-row:last-child { border-bottom: none; }
+.rule-region { font-weight: 500; min-width: 50px; }
+.rule-provinces { flex: 1; color: var(--text-muted); }
+.rule-price { color: var(--accent); font-weight: 500; white-space: nowrap; }
+
+/* Toast */
+.toast { position: fixed; bottom: calc(80px + var(--safe-bottom)); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--accent); color: var(--bg); padding: 10px 20px; border-radius: 8px; font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; z-index: 200; opacity: 0; transition: all 0.3s ease; pointer-events: none; white-space: nowrap; }
+.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+/* Modal */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 150; justify-content: center; align-items: flex-end; }
+.modal-overlay.active { display: flex; }
+.modal { background: var(--surface); border: 1px solid var(--border); border-radius: 14px 14px 0 0; padding: 20px; padding-bottom: calc(20px + var(--safe-bottom)); width: 100%; max-width: 500px; max-height: 85vh; overflow-y: auto; animation: slideUp 0.25s ease; }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal-title { font-family: 'Noto Serif SC', serif; font-size: 17px; font-weight: 700; text-align: center; color: var(--accent); margin-bottom: 14px; }
+.modal .form-group.full { margin-bottom: 10px; }
+.modal .form-actions { display: flex; gap: 8px; margin-top: 14px; }
+.modal .form-actions .btn { flex: 1; }
+
+.page { display: none; }
+.page.active { display: block; }
+
+.empty-state { text-align: center; padding: 30px 20px; color: var(--text-muted); font-size: 13px; line-height: 1.8; }
+
+/* Logistics calc */
+.calc-result { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-top: 10px; }
+.calc-result-row { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; }
+.calc-result-row.total { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 8px; font-size: 14px; font-weight: 500; }
+.calc-result-row.total .val { color: var(--accent); font-size: 18px; }
+
+/* Config section */
+.config-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.config-row:last-child { border-bottom: none; }
+.config-label { color: var(--text-muted); }
+.config-value { color: var(--accent); font-weight: 500; }
+
+/* Log item */
+.log-item { display: flex; gap: 8px; font-size: 11px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.log-item:last-child { border-bottom: none; }
+.log-date { color: var(--text-muted); white-space: nowrap; }
+.log-text { flex: 1; color: var(--text); }
+.log-amount { white-space: nowrap; }
+.log-amount.pos { color: var(--green); }
+.log-amount.neg { color: var(--red); }
+
+/* Filter chips */
+.filter-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; margin-bottom: 12px; }
+.filter-chip { padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; font-family: 'DM Mono', monospace; font-size: 11px; white-space: nowrap; transition: all 0.15s; }
+.filter-chip.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<header><h1>巴坦杂货铺</h1><p>进销存 · 耗材管理 · 快递计价</p></header>
+
+<!-- Nav -->
+<nav class="nav">
+  <button class="nav-item active" onclick="switchTab('home',this)">
+    <span class="nav-icon">🏠</span><span class="nav-label">总览</span>
+  </button>
+  <button class="nav-item" onclick="switchTab('toys',this)">
+    <span class="nav-icon">🧸</span><span class="nav-label">进货</span>
+  </button>
+  <button class="nav-item" onclick="switchTab('sold',this)">
+    <span class="nav-icon">📦</span><span class="nav-label">售出</span>
+  </button>
+  <button class="nav-item" onclick="switchTab('supplies',this)">
+    <span class="nav-icon">📦</span><span class="nav-label">耗材</span>
+  </button>
+  <button class="nav-item" onclick="switchTab('settings',this)">
+    <span class="nav-icon">⚙️</span><span class="nav-label">设置</span>
+  </button>
+</nav>
+
+<!-- ========= HOME ========= -->
+<div class="page active" id="page-home">
+  <div class="stats" id="home-stats"></div>
+  <div class="section">
+    <div class="section-title">低库存提醒</div>
+    <div id="low-stock-list"></div>
+    <div class="empty-state" id="low-stock-empty" style="display:none">库存充足</div>
+  </div>
+  <div class="section">
+    <div class="section-title">待处理</div>
+    <div id="home-pending"></div>
+    <div class="empty-state" id="home-pending-empty" style="display:none">没有待处理的订单</div>
+  </div>
+</div>
+
+<!-- ========= TOYS (Add/New) ========= -->
+<div class="page" id="page-toys">
+  <div class="section">
+    <div class="section-title">记一笔进货</div>
+    <div class="card">
+      <div class="form-grid">
+        <div class="form-group"><label>日期</label><input type="date" id="f-date"></div>
+        <div class="form-group"><label>品类</label>
+          <select id="f-category"></select>
+        </div>
+        <div class="form-group full"><label>名称</label><input type="text" id="f-name" placeholder="例: SHF 假面骑士电王"></div>
+        <div class="form-group full"><label>进货方式</label>
+          <select id="f-source" onchange="onSourceChange()">
+            <option value="direct">直购（日本）</option>
+            <option value="proxy">代购</option>
+            <option value="domestic">国内采购</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 直购 -->
+      <div id="cost-direct">
+        <div style="font-size:11px;color:var(--text-muted);margin:10px 0 6px">汇率: 1 JPY = <input type="number" id="f-rate" value="0.048" step="0.001" style="width:70px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:4px 6px;color:var(--accent);font-family:'DM Mono',monospace" oninput="updateCost()"> CNY</div>
+        <div class="form-grid">
+          <div class="form-group full"><label>日本原价 (JPY)</label><input type="number" id="f-jpy" placeholder="0" inputmode="decimal" oninput="updateCost()"></div>
+          <div class="form-group"><label>手续费</label><input type="number" id="f-handling" placeholder="0" inputmode="decimal" oninput="updateCost()"></div>
+          <div class="form-group"><label>日本国内运费</label><input type="number" id="f-jp-ship" placeholder="0" inputmode="decimal" oninput="updateCost()"></div>
+          <div class="form-group"><label>国际运费</label><input type="number" id="f-intl" placeholder="0" inputmode="decimal" oninput="updateCost()"></div>
+          <div class="form-group"><label>税费</label><input type="number" id="f-tax" placeholder="0" inputmode="decimal" oninput="updateCost()"></div>
+        </div>
+      </div>
+
+      <!-- 代购 -->
+      <div id="cost-proxy" style="display:none">
+        <div class="form-grid">
+          <div class="form-group full"><label>代购价</label><input type="number" id="f-proxy-price" placeholder="0" inputmode="decimal" oninput="updateCost()"></div>
+          <div class="form-group"><label>国际运费</label><input type="number" id="f-proxy-intl" placeholder="0" inputmode="decimal" oninput="updateCost()"></div>
+          <div class="form-group"><label>国内运费</label><input type="number" id="f-proxy-dom" placeholder="0" inputmode="decimal" oninput="updateCost()"></div>
+        </div>
+      </div>
+
+      <!-- 国内 -->
+      <div id="cost-domestic" style="display:none">
+        <div class="form-grid">
+          <div class="form-group"><label>购入价</label><input type="number" id="f-dom-price" placeholder="0" inputmode="decimal" oninput="updateCost()"></div>
+          <div class="form-group"><label>运费</label><input type="number" id="f-dom-ship" placeholder="0" inputmode="decimal" oninput="updateCost()"></div>
+        </div>
+      </div>
+
+      <div class="cost-total">
+        <span>总成本</span>
+        <span class="ct-value" id="f-total">¥0</span>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="clearForm()">清空</button>
+        <button class="btn btn-primary" onclick="addToy()">记录进货</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">在手库存 · 点击售出</div>
+    <div id="stock-list"></div>
+    <div class="empty-state" id="stock-empty" style="display:none">没有在手库存</div>
+  </div>
+</div>
+
+<!-- ========= SOLD ========= -->
+<div class="page" id="page-sold">
+  <div class="filter-row">
+    <button class="filter-chip active" onclick="setFilter('all',this)">全部</button>
+    <button class="filter-chip" onclick="setFilter('stock',this)">在手</button>
+    <button class="filter-chip" onclick="setFilter('sold',this)">已发货</button>
+    <button class="filter-chip" onclick="setFilter('done',this)">已完成</button>
+    <button class="filter-chip" onclick="setFilter('returned',this)">已退货</button>
+  </div>
+  <div class="section" id="sold-list"></div>
+  <div class="empty-state" id="sold-empty" style="display:none">没有匹配的记录</div>
+</div>
+
+<!-- ========= SUPPLIES ========= -->
+<div class="page" id="page-supplies">
+  <div class="section">
+    <div class="section-title">耗材库存</div>
+    <div class="card" id="supplies-list"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">快递计价</div>
+    <div class="card">
+      <div class="form-grid">
+        <div class="form-group full"><label>收货省份</label>
+          <select id="calc-province" onchange="calcShipping()">
+            <option value="">— 选择省份 —</option>
+            <option value="江苏">江苏</option><option value="浙江">浙江</option>
+            <option value="上海">上海</option><option value="安徽">安徽</option>
+            <option value="广东">广东</option><option value="福建">福建</option>
+            <option value="江西">江西</option><option value="湖北">湖北</option>
+            <option value="湖南">湖南</option><option value="北京">北京</option>
+            <option value="天津">天津</option><option value="河北">河北</option>
+            <option value="山东">山东</option><option value="河南">河南</option>
+            <option value="山西">山西</option><option value="陕西">陕西</option>
+            <option value="辽宁">辽宁</option><option value="吉林">吉林</option>
+            <option value="黑龙江">黑龙江</option><option value="广西">广西</option>
+            <option value="海南">海南</option><option value="重庆">重庆</option>
+            <option value="四川">四川</option><option value="贵州">贵州</option>
+            <option value="云南">云南</option><option value="内蒙古">内蒙古</option>
+            <option value="甘肃">甘肃</option><option value="青海">青海</option>
+            <option value="宁夏">宁夏</option><option value="新疆">新疆</option>
+            <option value="西藏">西藏</option>
+          </select>
+        </div>
+        <div class="form-group"><label>重量 (kg)</label><input type="number" id="calc-weight" placeholder="0" step="0.01" inputmode="decimal" oninput="calcShipping()"></div>
+        <div class="form-group"><label>快递方式</label>
+          <select id="calc-type" onchange="calcShipping()">
+            <option value="zhongtong">中通</option>
+            <option value="shunfeng">顺丰（手动填）</option>
+          </select>
+        </div>
+        <div class="form-group full" id="shunfeng-input" style="display:none">
+          <label>顺丰实际运费</label><input type="number" id="sf-fee" placeholder="手动填写" inputmode="decimal" oninput="calcShunfeng()">
+        </div>
+      </div>
+      <div class="calc-result" id="calc-result" style="display:none">
+        <div class="calc-result-row"><span>区域</span><span id="cr-region" class="val"></span></div>
+        <div class="calc-result-row"><span>首重 1kg</span><span id="cr-first" class="val"></span></div>
+        <div class="calc-result-row"><span>续重</span><span id="cr-add" class="val"></span></div>
+        <div class="calc-result-row"><span>重量</span><span id="cr-weight" class="val"></span></div>
+        <div class="calc-result-row total"><span>快递费</span><span class="val" id="cr-fee"></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========= SETTINGS ========= -->
+<div class="page" id="page-settings">
+  <div class="section">
+    <div class="section-title">快递区域配置</div>
+    <div class="card" id="rules-list"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">耗材配置</div>
+    <div class="card" id="supplies-config-list"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">分类配置</div>
+    <div class="card" id="categories-config"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">数据管理</div>
+    <div class="card">
+      <div class="config-row"><span class="config-label">玩具记录数</span><span class="config-value" id="cfg-toy-count">-</span></div>
+      <div class="config-row"><span class="config-label">快递费规则</span><span class="config-value">5 条区域</span></div>
+      <div class="config-row"><span class="config-label">数据库</span><span class="config-value">SQLite (本地)</span></div>
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn btn-secondary" onclick="exportCSV()">导出 CSV</button>
+        <button class="btn btn-secondary" onclick="exportJSON()">导出备份</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========= MODALS ========= -->
+
+<!-- Sell Modal -->
+<div class="modal-overlay" id="sell-modal" onclick="closeModal('sell-modal',event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">标记售出</div>
+    <div class="form-grid">
+      <div class="form-group full"><label>玩具名称</label><input type="text" id="m-sell-name" readonly style="opacity:0.5;cursor:not-allowed"></div>
+      <div class="form-group"><label>卖出价 (¥)</label><input type="number" id="m-sell-price" placeholder="0" step="0.01" inputmode="decimal"></div>
+      <div class="form-group"><label>花呗扣费</label><input type="number" id="m-sell-huabei" placeholder="0" step="0.01" value="0" inputmode="decimal"></div>
+      <div class="form-group full"><label>收货省份</label>
+        <select id="m-sell-province" onchange="mCalcShipping()">
+          <option value="">— 选择 —</option>
+          <option value="江苏">江苏</option><option value="浙江">浙江</option>
+          <option value="上海">上海</option><option value="安徽">安徽</option>
+          <option value="广东">广东</option><option value="福建">福建</option>
+          <option value="江西">江西</option><option value="湖北">湖北</option>
+          <option value="湖南">湖南</option><option value="北京">北京</option>
+          <option value="天津">天津</option><option value="河北">河北</option>
+          <option value="山东">山东</option><option value="河南">河南</option>
+          <option value="山西">山西</option><option value="陕西">陕西</option>
+          <option value="辽宁">辽宁</option><option value="吉林">吉林</option>
+          <option value="黑龙江">黑龙江</option><option value="广西">广西</option>
+          <option value="海南">海南</option><option value="重庆">重庆</option>
+          <option value="四川">四川</option><option value="贵州">贵州</option>
+          <option value="云南">云南</option><option value="内蒙古">内蒙古</option>
+          <option value="甘肃">甘肃</option><option value="青海">青海</option>
+          <option value="宁夏">宁夏</option><option value="新疆">新疆</option>
+          <option value="西藏">西藏</option>
+        </select>
+      </div>
+      <div class="form-group"><label>快递费 (¥)</label><input type="number" id="m-logistics-fee" placeholder="自动计算" step="0.01" inputmode="decimal"></div>
+      <div class="form-group"><label>快递方式</label>
+        <select id="m-logistics-type" onchange="onLogisticsTypeChange()">
+          <option value="zhongtong">中通</option>
+          <option value="shunfeng">顺丰</option>
+        </select>
+      </div>
+      <div class="form-group"><label>运单号</label><input type="text" id="m-tracking" placeholder="可选"></div>
+      <div class="form-group"><label>重量 (kg)</label><input type="number" id="m-weight" placeholder="0" step="0.01" inputmode="decimal" oninput="mCalcShipping()"></div>
+      <div class="form-group"><label>纸箱</label>
+        <select id="m-box-size" onchange="mCalcBox()">
+          <option value="">无纸箱</option>
+          <option value="大纸箱">大纸箱</option>
+          <option value="中纸箱">中纸箱</option>
+          <option value="小纸箱">小纸箱</option>
+        </select>
+      </div>
+      <div class="form-group"><label>纸箱费 (¥)</label><input type="number" id="m-box-fee" placeholder="0" step="0.01" inputmode="decimal"></div>
+      <div class="form-group"><label>包装费 (¥)</label><input type="number" id="m-packing-fee" placeholder="气泡垫+胶带" step="0.01" inputmode="decimal" value="0"></div>
+    </div>
+    <div class="cost-total" style="margin-top:10px">
+      <span>快递费</span><span class="ct-value" id="m-logistics-display">¥0</span>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal('sell-modal')">取消</button>
+      <button class="btn btn-primary" onclick="confirmSell()">确认售出</button>
+    </div>
+  </div>
+</div>
+
+<!-- After-sale Modal -->
+<div class="modal-overlay" id="after-modal" onclick="closeModal('after-modal',event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">售后处理</div>
+    <div id="after-step1">
+      <div class="card" onclick="selectAfterAction('partial')" style="cursor:pointer;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:500;color:var(--orange)">到手刀 / 部分退款</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">买家收到后要求退一部分钱，交易仍然完成</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="restock-modal" onclick="closeModal('restock-modal',event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">重新入库</div>
+    <div class="form-group full"><label>退货后新成本 (¥)</label><input type="number" id="m-restock-cost" placeholder="0" step="0.01" inputmode="decimal"></div>
+    <div class="form-actions"><button class="btn btn-secondary" onclick="closeModal('restock-modal')">取消</button><button class="btn btn-primary" onclick="confirmRestock()">确认</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="supply-edit-modal" onclick="closeModal('supply-edit-modal',event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">编辑耗材</div>
+    <div class="form-group full"><label>名称</label><input type="text" id="se-name"></div>
+    <div class="form-grid">
+      <div class="form-group"><label>单价 (¥)</label><input type="number" id="se-price" step="0.01" inputmode="decimal"></div>
+      <div class="form-group"><label>库存</label><input type="number" id="se-stock" inputmode="numeric"></div>
+      <div class="form-group"><label>阈值</label><input type="number" id="se-threshold" inputmode="numeric"></div>
+      <div class="form-group"><label>单位</label><input type="text" id="se-unit" placeholder="个/份"></div>
+    </div>
+    <div class="form-actions"><button class="btn btn-secondary" onclick="closeModal('supply-edit-modal')">取消</button><button class="btn btn-primary" onclick="saveSupplyEdit()">保存</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="restock-log-modal" onclick="closeModal('restock-log-modal',event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">耗材入库</div>
+    <div class="form-group full"><label>入库数量</label><input type="number" id="ml-amount" placeholder="0" inputmode="numeric"></div>
+    <div class="form-group full"><label>备注</label><input type="text" id="ml-reason" placeholder="例: 新采购"></div>
+    <div class="form-actions"><button class="btn btn-secondary" onclick="closeModal('restock-log-modal')">取消</button><button class="btn btn-primary" onclick="confirmRestockLog()">确认</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var toys=[], supplies=[], rules=[], categories=[];
+var curF='all', sellId=null, afterId=null, restockId=null, editSid=null, logSid=null;
+var $ = function(id){ return document.getElementById(id); };
+function post(u,d){ return fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(r=>r.json()); }
+function put(u,d){ return fetch(u,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(r=>r.json()); }
+function del(u){ return fetch(u,{method:'DELETE'}).then(r=>r.json()); }
+function get(u){ return fetch(u).then(r=>r.json()); }
+function toast(m){ var t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2000); }
+function today(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function sl(s){ return {direct:'直购',proxy:'代购',domestic:'国内'}[s]||s; }
+function sb(s){ var m={stock:['在手','badge-stock'],sold:['已发货','badge-sold'],done:['已完成','badge-done'],returned:['已退货','badge-returned']}; var b=m[s]||['未知','badge-stock']; return '<span class="badge '+b[1]+'">'+b[0]+'</span>'; }
+function pf(r){ if(!r.sell||r.sell<=0) return null; return r.sell-(r.refund_amount||0)-(r.huabei||0)-r.cost-(r.logistics_fee||0)-(r.box_fee||0)-(r.packing_fee||0); }
+function ls(r){ return (r.extra_cost||0)+(r.logistics_fee||0)+(r.box_fee||0)+(r.packing_fee||0); }
+
+function switchTab(n,btn){
+  document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  $('page-'+n).classList.add('active');
+  if(n==='home') renderHome();
+  if(n==='toys'){ renderStockList(); $('f-date').value=today(); onSourceChange(); }
+  if(n==='sold') renderSoldList();
+  if(n==='supplies'){ renderSupplies(); renderSupplyLogs(); }
+  if(n==='settings') renderSettings();
+}
+
+function onSourceChange(){
+  var src=$('f-source').value;
+  $('cost-direct').style.display=src==='direct'?'block':'none';
+  $('cost-proxy').style.display=src==='proxy'?'block':'none';
+  $('cost-domestic').style.display=src==='domestic'?'block':'none';
+  updateCost();
+}
+
+function updateCost(){
+  var src=$('f-source').value, total=0;
+  if(src==='direct'){
+    var rate=parseFloat($('f-rate').value)||0.048;
+    total=((parseFloat($('f-jpy').value)||0)*rate)+((parseFloat($('f-handling').value)||0))+((parseFloat($('f-jp-ship').value)||0))+((parseFloat($('f-intl').value)||0))+((parseFloat($('f-tax').value)||0));
+  } else if(src==='proxy'){
+    total=(parseFloat($('f-proxy-price').value)||0)+(parseFloat($('f-proxy-intl').value)||0)+(parseFloat($('f-proxy-dom').value)||0);
+  } else {
+    total=(parseFloat($('f-dom-price').value)||0)+(parseFloat($('f-dom-ship').value)||0);
+  }
+  $('f-total').textContent='¥'+total.toFixed(0);
+  return total;
+}
+
+function clearForm(){
+  ['f-name','f-jpy','f-handling','f-jp-ship','f-intl','f-tax','f-proxy-price','f-proxy-intl','f-proxy-dom','f-dom-price','f-dom-ship'].forEach(function(id){ var el=$(id); if(el)el.value=''; });
+  $('f-date').value=today(); $('f-source').value='direct'; $('f-rate').value='0.048'; onSourceChange(); updateCost();
+}
+
+function rc(t){
+  var m='<div class="record-meta">'+t.date+' · '+sl(t.source)+' · 成本¥'+t.cost.toFixed(0)+'</div>', fin='', pl='', ac='';
+  if(t.status==='stock'){
+    pl='<div class="record-profit" style="color:var(--text-muted)">在手 · ¥'+t.cost.toFixed(0)+'</div>';
+    ac='<div class="record-actions"><button class="record-btn green" onclick="event.stopPropagation();openSell('+t.id+')">标记售出</button><button class="record-btn red" onclick="event.stopPropagation();removeRecord('+t.id+')">删除</button></div>';
+  } else if(t.status==='sold'){
+    fin='<div class="record-meta" style="margin-top:4px">售 ¥'+(t.sell||0)+'</div>';
+    var proj=pf(t);
+    pl='<div class="record-profit" style="color:var(--orange)">预估 '+(proj>=0?'+':'')+'¥'+(proj||0).toFixed(0)+'</div>';
+    ac='<div class="record-actions"><button class="record-btn green" onclick="event.stopPropagation();markDone('+t.id+')">确认完成</button><button class="record-btn orange" onclick="event.stopPropagation();openAfterSale('+t.id+')">售后</button></div>';
+  } else if(t.status==='done'){
+    var p=pf(t);
+    fin='<div class="record-meta" style="margin-top:4px">售 ¥'+(t.sell||0)+(t.refund_amount>0?' · 退款¥'+t.refund_amount:'')+(t.huabei>0?' · 花呗¥'+t.huabei:'')+'</div>';
+    pl='<div class="record-profit '+(p>=0?'positive':'negative')+'">'+(p>=0?'+':'')+'¥'+p.toFixed(0)+'</div>';
+    ac='<div class="record-actions"><button class="record-btn red" onclick="event.stopPropagation();removeRecord('+t.id+')">删除</button></div>';
+  } else if(t.status==='returned'){
+    fin='<div class="record-meta" style="margin-top:4px">原售 ¥'+(t.sell||0)+'</div>';
+    pl='<div class="record-profit negative">损失 -¥'+ls(t).toFixed(0)+'</div>';
+    ac='<div class="record-actions"><button class="record-btn blue" onclick="event.stopPropagation();openRestock('+t.id+')">重新入库</button><button class="record-btn red" onclick="event.stopPropagation();removeRecord('+t.id+')">删除</button></div>';
+  }
+  return '<div class="record-card"><div class="record-header"><div class="record-name">'+t.name+'</div>'+sb(t.status)+'</div>'+m+fin+pl+ac+'</div>';
+}
+
+function renderStockList(){
+  var list=toys.filter(function(t){ return t.status==='stock'; });
+  $('stock-empty').style.display=list.length===0?'block':'none';
+  $('stock-list').innerHTML=list.map(function(t){ return '<div class="record-card" onclick="openSell('+t.id+')"><div class="record-header"><div class="record-name">'+t.name+'</div>'+sb(t.status)+'</div><div class="record-meta">'+t.date+' · '+sl(t.source)+' · ¥'+t.cost.toFixed(0)+'</div></div>'; }).join('');
+}
+
+function renderSoldList(){
+  var list=curF==='all'?toys:toys.filter(function(t){ return t.status===curF; });
+  $('sold-empty').style.display=list.length===0?'block':'none';
+  $('sold-list').innerHTML=list.map(rc).join('');
+}
+
+function setFilter(f,btn){ curF=f; document.querySelectorAll('.filter-chip').forEach(function(e){e.classList.remove('active');}); btn.classList.add('active'); renderSoldList(); }
+
+async function loadData(){ toys=await get('/api/toys'); supplies=await get('/api/supplies'); rules=await get('/api/shipping-rules'); var s=await get('/api/settings'); if(s&&s.categories){ categories=s.categories.split(',').filter(c=>c.trim()); renderCategories(); } }
+
+function renderCategories(list){ if(list) categories=list; var sel=$('f-category'); if(!sel) return; sel.innerHTML=''; categories.forEach(c=>{ var opt=document.createElement('option'); opt.value=c; opt.textContent=c; sel.appendChild(opt); }); }
+
+async function addToy(){
+  var date=$('f-date').value, name=$('f-name').value.trim(), category=$('f-category').value, source=$('f-source').value;
+  if(!date||!name){ toast('请填写日期和名称'); return; }
+  var cost=updateCost();
+  if(cost<=0){ toast('请填写成本'); return; }
+  var toy={date:date,name:name,category:category,source:source,cost:cost,status:'stock',exchange_rate:0,japan_price_jpy:0,japan_price_cny:0,handling_fee:0,japan_domestic_shipping:0,intl_shipping:0,tax:0,proxy_price:0,proxy_intl_shipping:0,proxy_domestic_shipping:0,domestic_price:0,domestic_shipping:0,logistics_type:'',logistics_fee:0,logistics_tracking:'',logistics_weight:0,logistics_region:'',box_size:'',box_fee:0,packing_fee:0};
+  if(source==='direct'){
+    toy.exchange_rate=parseFloat($('f-rate').value)||0.048;
+    toy.japan_price_jpy=parseFloat($('f-jpy').value)||0;
+    toy.japan_price_cny=toy.japan_price_jpy*toy.exchange_rate;
+    toy.handling_fee=parseFloat($('f-handling').value)||0;
+    toy.japan_domestic_shipping=parseFloat($('f-jp-ship').value)||0;
+    toy.intl_shipping=parseFloat($('f-intl').value)||0;
+    toy.tax=parseFloat($('f-tax').value)||0;
+  } else if(source==='proxy'){
+    toy.proxy_price=parseFloat($('f-proxy-price').value)||0;
+    toy.proxy_intl_shipping=parseFloat($('f-proxy-intl').value)||0;
+    toy.proxy_domestic_shipping=parseFloat($('f-proxy-dom').value)||0;
+  } else {
+    toy.domestic_price=parseFloat($('f-dom-price').value)||0;
+    toy.domestic_shipping=parseFloat($('f-dom-ship').value)||0;
+  }
+  await post('/api/toys',toy);
+  toast('已记录 ¥'+cost.toFixed(0)); clearForm(); await loadData(); renderStockList(); renderHome();
+}
+
+function openSell(id){
+  var t=toys.find(function(x){ return x.id===id; });
+  if(!t)return;
+  sellId=id;
+  ['m-sell-name','m-sell-price','m-sell-huabei','m-logistics-fee','m-tracking','m-weight','m-box-size','m-box-fee','m-packing-fee'].forEach(function(i){ var e=$(i); if(e) e.value=''; });
+  $('m-sell-name').value=t.name; $('m-sell-huabei').value='0'; $('m-logistics-type').value='zhongtong'; $('m-packing-fee').value='0'; $('m-logistics-display').textContent='¥0';
+  $('sell-modal').classList.add('active');
+}
+
+function mUpdFee(){
+  var fee=parseFloat($('m-logistics-fee').value)||0, box=parseFloat($('m-box-fee').value)||0, pack=parseFloat($('m-packing-fee').value)||0;
+  $('m-logistics-display').textContent='¥'+(fee+box+pack).toFixed(0);
+}
+
+async function mCalcShip(){
+  var prov=$('m-sell-province').value, w=parseFloat($('m-weight').value)||0, type=$('m-logistics-type').value;
+  if(!prov||type==='shunfeng'){ mUpdFee(); return; }
+  try{ var res=await get('/api/shipping/calculate?province='+encodeURIComponent(prov)+'&weight='+w); $('m-logistics-fee').value=res.fee.toFixed(2); $('m-logistics-region').value=res.region; } catch(e){}
+  mUpdFee();
+}
+
+function mCalcBox(){
+  var bs=$('m-box-size').value, sup=supplies.find(function(s){ return s.name===bs; });
+  if(sup)$('m-box-fee').value=sup.unit_price.toFixed(2);
+  mUpdFee();
+}
+
+function onLogType(){ $('m-logistics-fee').placeholder=$('m-logistics-type').value==='shunfeng'?'手动':'自动'; mUpdFee(); }
+
+async function confirmSell(){
+  var t=toys.find(function(x){ return x.id===sellId; });
+  if(!t)return;
+  var price=parseFloat($('m-sell-price').value)||0;
+  if(price<=0){ toast('请输入卖出价'); return; }
+  t.sell=price; t.huabei=parseFloat($('m-sell-huabei').value)||0;
+  t.logistics_type=$('m-logistics-type').value; t.logistics_fee=parseFloat($('m-logistics-fee').value)||0;
+  t.logistics_tracking=$('m-tracking').value||''; t.logistics_weight=parseFloat($('m-weight').value)||0;
+  t.logistics_region=$('m-logistics-region').value||''; t.box_size=$('m-box-size').value||'';
+  t.box_fee=parseFloat($('m-box-fee').value)||0; t.packing_fee=parseFloat($('m-packing-fee').value)||0;
+  t.status='sold'; t.sold_date=today();
+  await put('/api/toys/'+sellId,t);
+  if(t.box_size){ var sup=supplies.find(function(s){ return s.name===t.box_size; }); if(sup)await post('/api/supplies/'+sup.id+'/consume',{amount:1,reason:'发货',toy_id:t.id}); }
+  toast('已售出 ¥'+price); closeModal('sell-modal'); await loadData(); renderHome(); renderStockList(); renderSoldList();
+}
+
+async function markDone(id){
+  var t=toys.find(function(x){ return x.id===id; });
+  if(!t)return;
+  t.status='done'; t.done_date=today();
+  await put('/api/toys/'+id,t); toast('已完成'); await loadData(); renderHome(); renderSoldList();
+}
+
+function openAfterSale(id){
+  afterId=id;
+  $('after-step1').style.display='block'; $('after-partial').style.display='none'; $('after-return').style.display='none';
+  $('after-modal').classList.add('active');
+}
+
+function selAfter(a){
+  if(a==='partial'){ $('after-step1').style.display='none'; $('after-partial').style.display='block'; }
+  else if(a==='return'){ $('after-step1').style.display='none'; $('after-return').style.display='block'; }
+  else if(a==='resolve'){
+    var t=toys.find(function(x){ return x.id===afterId; });
+    if(t){ t.status='done'; t.done_date=today(); put('/api/toys/'+afterId,t); }
+    closeModal('after-modal'); toast('完成'); loadData().then(function(){ renderHome(); renderSoldList(); });
+  }
+}
+
+function backStep1(){$('after-step1').style.display='block'; $('after-partial').style.display='none'; $('after-return').style.display='none';}
+
+async function confirmPartial(){
+  var t=toys.find(function(x){ return x.id===afterId; });
+  if(!t)return;
+  var amt=parseFloat($('m-partial-amount').value)||0;
+  if(amt<=0){ toast('请输入退款金额'); return; }
+  t.refund_amount=amt; t.status='done'; t.done_date=today();
+  await put('/api/toys/'+afterId,t); closeModal('after-modal'); toast('退款¥'+amt+'完成'); await loadData(); renderHome(); renderSoldList();
+}
+
+async function confirmReturn(){
+  var t=toys.find(function(x){ return x.id===afterId; });
+  if(!t)return;
+  t.extra_cost=parseFloat($('m-return-cost').value)||0; t.status='returned';
+  await put('/api/toys/'+afterId,t); closeModal('after-modal'); toast('已退货'); await loadData(); renderHome(); renderSoldList();
+}
+
+function openRestock(id){
+  var t=toys.find(function(x){ return x.id===id; });
+  if(!t)return;
+  restockId=id; $('m-restock-cost').value=t.cost.toFixed(2); $('restock-modal').classList.add('active');
+}
+
+async function confirmRestock(){
+  var old=toys.find(function(x){ return x.id===restockId; });
+  if(!old)return;
+  var nc=parseFloat($('m-restock-cost').value)||old.cost;
+  await post('/api/toys',{date:today(),name:old.name,category:old.category,source:old.source,cost:nc,status:'stock'});
+  closeModal('restock-modal'); toast('已入库 ¥'+nc.toFixed(0)); await loadData(); renderHome(); renderStockList(); renderSoldList();
+}
+
+async function removeRecord(id){
+  if(!confirm('确定删除？'))return;
+  await del('/api/toys/'+id); toast('已删除'); await loadData(); renderHome(); renderStockList(); renderSoldList();
+}
+
+function closeModal(id,e){ if(e&&e.target!==e.currentTarget)return; $(id).classList.remove('active'); }
+
+async function renderHome(){
+  var st=await get('/api/stats');
+  $('home-stats').innerHTML='<div class="stat-card"><div class="stat-label">在手库存</div><div class="stat-value">'+st.stock_count+' 件</div></div><div class="stat-card"><div class="stat-label">在手价值</div><div class="stat-value orange">¥'+st.stock_value.toFixed(0)+'</div></div><div class="stat-card"><div class="stat-label">已完成</div><div class="stat-value green">'+st.done_count+' 笔</div></div><div class="stat-card"><div class="stat-label">总利润</div><div class="stat-value '+(st.total_profit>=0?'green':'red')+'">'+(st.total_profit>=0?'+':'')+'¥'+st.total_profit.toFixed(0)+'</div></div>';
+  var pend=toys.filter(function(t){ return t.status==='sold'; });
+  $('home-pending-empty').style.display=pend.length===0?'block':'none';
+  $('home-pending').innerHTML=pend.map(rc).join('');
+  var low=supplies.filter(function(s){ return s.stock<=s.low_stock_threshold; });
+  $('low-stock-empty').style.display=low.length===0?'block':'none';
+  $('low-stock-list').innerHTML=low.map(function(s){ return '<div class="card" style="margin-bottom:6px;padding:10px 14px"><div style="font-size:13px;font-weight:500">'+s.name+'</div><div class="supply-stock low">库存 <span class="num">'+s.stock+'</span> '+s.unit+' (阈值:'+s.low_stock_threshold+')</div></div>'; }).join('');
+}
+
+function renderSupplies(){
+  $('supplies-list').innerHTML=supplies.map(function(s){
+    var low=s.stock<=s.low_stock_threshold;
+    return '<div class="supply-row"><div class="supply-info"><div class="supply-name">'+s.name+'</div><div class="supply-stock '+(low?'low':'')+'">库存 <span class="num">'+s.stock+'</span> '+s.unit+' · ¥'+s.unit_price.toFixed(2)+'/'+s.unit+'</div></div><div class="supply-actions"><button class="supply-btn edit" onclick="openSupplyEdit('+s.id+')">编辑</button><button class="supply-btn" onclick="openRestockLog('+s.id+')">入库</button></div></div>';
+  }).join('');
+}
+
+function openSupplyEdit(id){
+  var s=supplies.find(function(x){ return x.id===id; });
+  if(!s)return;
+  editSid=id; $('se-name').value=s.name; $('se-price').value=s.unit_price.toFixed(2); $('se-stock').value=s.stock; $('se-threshold').value=s.low_stock_threshold; $('se-unit').value=s.unit;
+  $('supply-edit-modal').classList.add('active');
+}
+
+async function saveSupplyEdit(){
+  var s={name:$('se-name').value,unit_price:parseFloat($('se-price').value)||0,stock:parseInt($('se-stock').value)||0,unit:$('se-unit').value||'个',low_stock_threshold:parseInt($('se-threshold').value)||5};
+  await put('/api/supplies/'+editSid,s); closeModal('supply-edit-modal'); toast('已保存'); await loadData(); renderSupplies(); renderHome();
+}
+
+function openRestockLog(id){ logSid=id; $('ml-amount').value=''; $('ml-reason').value=''; $('restock-log-modal').classList.add('active'); }
+
+async function confirmRestockLog(){
+  var amt=parseInt($('ml-amount').value)||0;
+  if(amt<=0){ toast('请输入数量'); return; }
+  await post('/api/supplies/'+logSid+'/restock',{amount:amt,reason:$('ml-reason').value||'补货'});
+  closeModal('restock-log-modal'); toast('已入库 +'+amt); await loadData(); renderSupplies(); renderHome();
+}
+
+async function calcShipping(){
+  var prov=$('calc-province').value, w=parseFloat($('calc-weight').value)||0, type=$('calc-type').value;
+  var re=$('calc-result');
+  if(!prov||!w||type==='shunfeng'){ re.style.display='none'; return; }
+  try{ var res=await get('/api/shipping/calculate?province='+encodeURIComponent(prov)+'&weight='+w); re.style.display='block'; $('cr-region').textContent=res.region; $('cr-first').textContent='¥'+res.fee.toFixed(0)+' (首重)'; $('cr-add').textContent='按规则'; $('cr-weight').textContent=w+'kg'; $('cr-fee').textContent='¥'+res.fee.toFixed(0); } catch(e){ re.style.display='none'; }
+}
+
+function onCalcType(){$('sf-calc-wrap').style.display=$('calc-type').value==='shunfeng'?'block':'none'; $('calc-result').style.display=$('calc-type').value==='shunfeng'?'none':'block'; calcShipping();}
+
+async function renderSupplyLogs(){
+  var logs=await get('/api/supply-logs');
+  $('supply-log-empty').style.display=logs.length===0?'block':'none';
+  $('supply-log-list').innerHTML=logs.slice(0,30).map(function(l){
+    var sgn=l.change_amount>=0?'pos':'neg', pre=l.change_amount>=0?'+':'';
+    return '<div class="log-item"><span class="log-date">'+l.created_at+'</span><span class="log-text">'+l.supply_name+' · '+(l.reason||'')+'</span><span class="log-amount '+sgn+'">'+pre+l.change_amount+'</span></div>';
+  }).join('');
+}
+
+async function renderSettings(){
+  var st=await get('/api/stats');
+  $('cfg-toy-count').textContent=toys.length+' 件';
+  $('cfg-done-count').textContent=st.done_count+' 笔';
+  $('cfg-stock-count').textContent=st.stock_count+' 件';
+  $('cfg-profit').textContent=(st.total_profit>=0?'+':'')+'¥'+st.total_profit.toFixed(0);
+  $('supplies-config-list').innerHTML=supplies.map(function(s){ return '<div class="rule-row"><span class="rule-region" style="color:var(--text)">'+s.name+'</span><span class="rule-provinces">¥'+s.unit_price.toFixed(2)+'/'+s.unit+' · 阈值'+s.low_stock_threshold+'</span><span class="rule-price">'+s.stock+'</span></div>'; }).join('');
+  var catDiv = document.getElementById('categories-config');
+  if(catDiv) {
+    var html = '<div style="margin-bottom:10px"><input type="text" id="new-category" placeholder="新分类名称"><button onclick="addCategory()" class="btn btn-primary" style="margin-left:8px">添加</button></div><div id="categories-list"></div>';
+    catDiv.innerHTML = html;
+  }
+  renderCategoriesList();
+}
+
+function renderCategoriesList(){
+  var list=$('categories-list');
+  if(!list) return;
+  list.innerHTML=categories.map(c=>'<div class="rule-row"><span class="rule-region" style="color:var(--text)">'+c+'</span><span class="rule-price" style="cursor:pointer;color:#f87171" onclick="delCategory(\''+c+'\')">删除</span></div>').join('');
+}
+
+async function addCategory(){
+  var n=$('new-category').value.trim();
+  if(!n){ toast('请输入分类名称'); return; }
+  if(categories.includes(n)){ toast('分类已存在'); return; }
+  categories.push(n);
+  await put('/api/settings/categories',categories.join(','));
+  renderCategories(); renderCategoriesList(); toast('已添加');
+}
+
+async function delCategory(c){
+  if(!confirm('确定删除分类「'+c+'」？')) return;
+  categories=categories.filter(x=>x!==c);
+  await put('/api/settings/categories',categories.join(','));
+  renderCategories(); renderCategoriesList(); toast('已删除');
+}
+
+async function exportCSV(){
+  if(toys.length===0){ toast('没有数据'); return; }
+  var sm={stock:'在手',sold:'已发货',done:'已完成',returned:'已退货'};
+  var csv='日期,名称,品类,方式,成本,卖出,快递费,纸箱费,包装费,花呗,退款,利润,状态\n';
+  toys.forEach(function(t){ var p=t.status==='done'?pf(t):''; csv+=[t.date,'"'+t.name+'"',t.category,sl(t.source),t.cost,t.sell||0,t.logistics_fee||0,t.box_fee||0,t.packing_fee||0,t.huabei||0,t.refund_amount||0,typeof p==='number'?p.toFixed(0):'',sm[t.status]||t.status].join(',')+'\n'; });
+  var b=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}), a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='barantan_'+today()+'.csv'; a.click(); toast('CSV 已下载');
+}
+
+async function exportJSON(){
+  if(toys.length===0){ toast('没有数据'); return; }
+  var b=new Blob([JSON.stringify({toys:toys,supplies:supplies,rules:rules},null,2)],{type:'application/json'}), a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='barantan_backup_'+today()+'.json'; a.click(); toast('备份已下载');
+}
+
+loadData().then(function(){ renderHome(); renderStockList(); $('f-date').value=today(); });
+</script>
+</body>
+</html>
