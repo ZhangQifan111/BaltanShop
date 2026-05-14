@@ -799,14 +799,14 @@ async function addCategory(){
   if(!n){ toast('请输入分类名称'); return; }
   if(categories.includes(n)){ toast('分类已存在'); return; }
   categories.push(n);
-  await put('/api/settings/categories',categories.join(','));
+  await put('/api/settings/categories',{value:categories.join(',')});
   renderCategories(); renderCategoriesList(); toast('已添加');
 }
 
 async function delCategory(c){
   if(!confirm('确定删除分类「'+c+'」？')) return;
   categories=categories.filter(x=>x!==c);
-  await put('/api/settings/categories',categories.join(','));
+  await put('/api/settings/categories',{value:categories.join(',')});
   renderCategories(); renderCategoriesList(); toast('已删除');
 }
 
