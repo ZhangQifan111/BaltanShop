@@ -4,11 +4,31 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('crypto');
+const multer = require('multer');
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+
+// ─── Image upload setup ───
+const IMAGES_DIR = path.join(__dirname, 'public/images');
+if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true });
+
+const imageStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, IMAGES_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+    cb(null, `toy_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`);
+  }
+});
+const uploadImage = multer({
+  storage: imageStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Only image files are allowed'));
+  }
+});
 
 const DB_PATH = path.join(__dirname, 'data.db');
 let db;
@@ -60,10 +80,16 @@ async function initDB() {
       box_size TEXT DEFAULT '',
       box_fee REAL DEFAULT 0,
       packing_fee REAL DEFAULT 0,
+      toy_image_path TEXT,
       created_at TEXT DEFAULT (datetime('now','localtime')),
       updated_at TEXT DEFAULT (datetime('now','localtime'))
     )
   `);
+
+  // Migration: add toy_image_path if not exists (existing DBs)
+  try {
+    db.run("ALTER TABLE toys ADD COLUMN toy_image_path TEXT");
+  } catch (e) { /* column already exists, ignore */ }
 
   db.run(`
     CREATE TABLE IF NOT EXISTS supplies (
@@ -222,6 +248,7 @@ app.put('/api/toys/:id', (req, res) => {
     sold_date=?, done_date=?, status=?,
     logistics_type=?, logistics_fee=?, logistics_tracking=?,
     logistics_weight=?, logistics_region=?, box_size=?, box_fee=?, packing_fee=?,
+    toy_image_path=?,
     updated_at=datetime('now','localtime')
     WHERE id=?`, [
     t.date, t.name, t.category, t.source, t.cost||0,
@@ -229,6 +256,7 @@ app.put('/api/toys/:id', (req, res) => {
     t.sold_date, t.done_date, t.status,
     t.logistics_type||'', t.logistics_fee||0, t.logistics_tracking||'',
     t.logistics_weight||0, t.logistics_region||'', t.box_size||'', t.box_fee||0, t.packing_fee||0,
+    t.toy_image_path || null,
     req.params.id
   ]);
   saveDB();
@@ -385,6 +413,45 @@ app.get('/api/stats', (req, res) => {
   res.json({ total_profit: Math.round(totalProfit*100)/100, total_revenue: Math.round(totalRevenue*100)/100, stock_value: Math.round(stockValue*100)/100, pending_count: pending, stock_count: stockCount, done_count: doneCount });
 });
 
+// ─── Static files & fallback (must be AFTER all API routes) ───
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/images', express.static(path.join(__dirname, 'public/images')));
+
+// File upload endpoint
+app.put('/api/upload-index', (req, res) => {
+  const idx = path.join(__dirname, 'public', 'index.html');
+  fs.writeFileSync(idx, req.body);
+  res.json({ ok: true, size: req.body.length });
+});
+
+// Upload / replace toy image
+app.post('/api/upload-toy-image/:id', uploadImage.single('image'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No image file provided' });
+  const toy = queryOne('SELECT * FROM toys WHERE id=?', [req.params.id]);
+  if (!toy) return res.status(404).json({ error: 'Toy not found' });
+  if (toy.toy_image_path) {
+    const oldPath = path.join(__dirname, 'public', toy.toy_image_path);
+    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+  }
+  const relPath = 'images/' + req.file.filename;
+  db.run('UPDATE toys SET toy_image_path=?, updated_at=datetime("now","localtime") WHERE id=?', [relPath, req.params.id]);
+  saveDB();
+  res.json({ ok: true, path: relPath });
+});
+
+// Delete toy image
+app.delete('/api/toy-image/:id', (req, res) => {
+  const toy = queryOne('SELECT * FROM toys WHERE id=?', [req.params.id]);
+  if (!toy) return res.status(404).json({ error: 'Toy not found' });
+  if (toy.toy_image_path) {
+    const fullPath = path.join(__dirname, 'public', toy.toy_image_path);
+    if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+  }
+  db.run('UPDATE toys SET toy_image_path=NULL, updated_at=datetime("now","localtime") WHERE id=?', [req.params.id]);
+  saveDB();
+  res.json({ ok: true });
+});
+
 // Fallback to index.html
 app.use((req, res) => {
   const idx = path.join(__dirname, 'public', 'index.html');
@@ -393,12 +460,6 @@ app.use((req, res) => {
 });
 
 const PORT = process.env.PORT || 4020;
-// File upload endpoint
-app.put('/api/upload-index', (req, res) => {
-  const idx = path.join(__dirname, 'public', 'index.html');
-  fs.writeFileSync(idx, req.body);
-  res.json({ ok: true, size: req.body.length });
-});
 
 initDB().then(() => {
   app.listen(PORT, '0.0.0.0', () => console.log('BuyLedger running on port ' + PORT));
