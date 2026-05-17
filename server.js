@@ -136,6 +136,26 @@ async function initDB() {
     )
   `);
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS purchase_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT '其他',
+      source TEXT NOT NULL DEFAULT 'direct',
+      stage1_date TEXT,
+      stage1_amount REAL DEFAULT 0,
+      stage1_note TEXT,
+      stage2_date TEXT,
+      stage2_amount REAL DEFAULT 0,
+      stage2_note TEXT,
+      stage3_date TEXT,
+      stage3_amount REAL DEFAULT 0,
+      stage3_note TEXT,
+      status TEXT NOT NULL DEFAULT 'stage1',
+      created_at TEXT DEFAULT (datetime('now','localtime'))
+    )
+  `);
+
   // Default categories
   const rc0 = queryOne("SELECT COUNT(*) as c FROM settings WHERE key='categories'"); if (!rc0 || rc0.c === 0) {
     db.run("INSERT INTO settings (key, value) VALUES ('categories', '软胶,模型,手办,盲盒,其他')");
@@ -266,6 +286,66 @@ app.put('/api/toys/:id', (req, res) => {
 
 app.delete('/api/toys/:id', (req, res) => {
   db.run('DELETE FROM toys WHERE id=?', [req.params.id]);
+  saveDB();
+  res.json({ ok: true });
+});
+
+// ─── Purchase Records (进货在途) ───
+
+app.get('/api/purchase-records', (req, res) => {
+  const list = queryAll('SELECT * FROM purchase_records ORDER BY created_at DESC');
+  res.json(list);
+});
+
+app.post('/api/purchase-records', (req, res) => {
+  const p = req.body;
+  db.run(`INSERT INTO purchase_records (name,category,source,stage1_date,stage1_amount,stage1_note,status) VALUES (?,?,?,?,?,?,?)`,
+    [p.name||'', p.category||'其他', p.source||'direct', p.stage1_date||'', p.stage1_amount||0, p.stage1_note||'', 'stage1']);
+  saveDB();
+  const rs = db.exec('SELECT last_insert_rowid()');
+  const lastId = (rs && rs[0] && rs[0].values && rs[0].values[0]) ? rs[0].values[0][0] : 0;
+  const rec = queryOne('SELECT * FROM purchase_records WHERE id=?', [lastId]);
+  res.json(rec);
+});
+
+app.put('/api/purchase-records/:id/stage1', (req, res) => {
+  const p = req.body;
+  db.run(`UPDATE purchase_records SET stage1_date=?, stage1_amount=?, stage1_note=? WHERE id=?`,
+    [p.stage1_date||'', p.stage1_amount||0, p.stage1_note||'', req.params.id]);
+  saveDB();
+  res.json(queryOne('SELECT * FROM purchase_records WHERE id=?', [req.params.id]));
+});
+
+app.put('/api/purchase-records/:id/stage2', (req, res) => {
+  const p = req.body;
+  db.run(`UPDATE purchase_records SET stage2_date=?, stage2_amount=?, stage2_note=?, status='stage2' WHERE id=?`,
+    [p.stage2_date||'', p.stage2_amount||0, p.stage2_note||'', req.params.id]);
+  saveDB();
+  res.json(queryOne('SELECT * FROM purchase_records WHERE id=?', [req.params.id]));
+});
+
+app.put('/api/purchase-records/:id/stage3', (req, res) => {
+  const p = req.body;
+  const rec = queryOne('SELECT * FROM purchase_records WHERE id=?', [req.params.id]);
+  if (!rec) return res.status(404).json({ error: 'Not found' });
+
+  // Finalize the purchase record
+  db.run(`UPDATE purchase_records SET stage3_date=?, stage3_amount=?, stage3_note=?, status='stocked' WHERE id=?`,
+    [p.stage3_date||'', p.stage3_amount||0, p.stage3_note||'', req.params.id]);
+
+  // Create the toy in stock with the total cost
+  const totalCost = (rec.stage1_amount||0) + (rec.stage2_amount||0) + (p.stage3_amount||0);
+  db.run(`INSERT INTO toys (date,name,category,source,cost,status,japan_price_cny,handling_fee,japan_domestic_shipping,intl_shipping,tax)
+    VALUES (?,?,?,?,?,'stock',?,?,?,?,?)`,
+    [p.stage3_date||rec.stage1_date||'', rec.name, rec.category, rec.source, totalCost,
+     rec.stage1_amount||0, rec.stage2_amount||0, 0, p.stage3_amount||0]);
+  saveDB();
+
+  res.json(queryOne('SELECT * FROM purchase_records WHERE id=?', [req.params.id]));
+});
+
+app.delete('/api/purchase-records/:id', (req, res) => {
+  db.run('DELETE FROM purchase_records WHERE id=?', [req.params.id]);
   saveDB();
   res.json({ ok: true });
 });

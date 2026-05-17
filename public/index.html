@@ -241,6 +241,71 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
 </head>
 <body>
 
+<!-- Transit purchase modals -->
+<div class="modal-overlay" id="tr-modal" onclick="closeModal('tr-modal',event)">
+  <div class="modal-box" onclick="event.stopPropagation()" style="background:var(--surface);border-radius:12px;padding:24px;width:100%;max-width:420px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="font-size:15px;font-weight:700;color:var(--accent)" id="tr-modal-title">新增进货</h3>
+      <button onclick="closeModal('tr-modal')" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>
+    </div>
+    <div class="form-grid" style="gap:12px">
+      <div class="form-group full"><label>商品名称</label><input type="text" id="tr-name" placeholder="例: SHF 假面骑士电王"></div>
+      <div class="form-group"><label>品类</label>
+        <select id="tr-category">
+          <option value="软胶">软胶</option><option value="模型">模型</option>
+          <option value="手办">手办</option><option value="盲盒">盲盒</option>
+          <option value="其他">其他</option>
+        </select>
+      </div>
+      <div class="form-group"><label>进货方式</label>
+        <select id="tr-source">
+          <option value="direct">直购（日本）</option>
+          <option value="proxy">代购</option>
+          <option value="domestic">国内采购</option>
+        </select>
+      </div>
+      <div class="form-group"><label>日期</label><input type="date" id="tr-date"></div>
+      <div class="form-group full"><label>阶段① 金额</label><input type="number" id="tr-amount" placeholder="日本价格（RMB）" step="0.01"></div>
+      <div class="form-group full"><label>备注</label><input type="text" id="tr-note" placeholder="可选备注"></div>
+    </div>
+    <div class="btn-row"><button class="btn btn-primary" onclick="submitTransit()">保存</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="tr-stage2-modal" onclick="closeModal('tr-stage2-modal',event)">
+  <div class="modal-box" onclick="event.stopPropagation()" style="background:var(--surface);border-radius:12px;padding:24px;width:100%;max-width:420px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="font-size:15px;font-weight:700;color:var(--blue)">阶段② 到日本仓库</h3>
+      <button onclick="closeModal('tr-stage2-modal')" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">阶段①金额已记录，填写阶段②费用（国内运费+手续费）</div>
+    <div class="form-grid" style="gap:12px">
+      <div class="form-group"><label>日期</label><input type="date" id="tr2-date"></div>
+      <div class="form-group"><label>日本国内运费</label><input type="number" id="tr2-dom-ship" placeholder="日本运费（RMB）" step="0.01"></div>
+      <div class="form-group full"><label>手续费</label><input type="number" id="tr2-handling" placeholder="手续费（RMB）" step="0.01"></div>
+      <div class="form-group full"><label>备注</label><input type="text" id="tr2-note" placeholder="可选备注"></div>
+    </div>
+    <div class="btn-row"><button class="btn btn-primary" onclick="submitTransitStage2()">保存并进入阶段③</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="tr-stage3-modal" onclick="closeModal('tr-stage3-modal',event)">
+  <div class="modal-box" onclick="event.stopPropagation()" style="background:var(--surface);border-radius:12px;padding:24px;width:100%;max-width:420px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="font-size:15px;font-weight:700;color:var(--purple)">阶段③ 到手入库</h3>
+      <button onclick="closeModal('tr-stage3-modal')" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">×</button>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">填写最终费用（国际运费+税费），确认后自动入库</div>
+    <div class="form-grid" style="gap:12px">
+      <div class="form-group"><label>日期</label><input type="date" id="tr3-date"></div>
+      <div class="form-group"><label>国际运费</label><input type="number" id="tr3-intl-ship" placeholder="国际运费（RMB）" step="0.01"></div>
+      <div class="form-group"><label>税费(×0.13)</label><input type="number" id="tr3-tax" placeholder="自动计算" readonly style="opacity:0.6;background:var(--bg)"></div>
+      <div class="form-group full"><label>备注</label><input type="text" id="tr3-note" placeholder="可选备注"></div>
+    </div>
+    <div class="btn-row"><button class="btn btn-primary" onclick="submitTransitStage3()">✅ 确认入库</button></div>
+  </div>
+</div>
+
 <header><h1>巴坦杂货铺</h1><p>进销存 · 耗材管理 · 快递计价</p></header>
 
 <!-- Nav -->
@@ -250,6 +315,9 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
   </button>
   <button class="nav-item" onclick="switchTab('toys',this)">
     <span class="nav-icon">🧸</span><span class="nav-label">进货</span>
+  </button>
+  <button class="nav-item" onclick="switchTab('transit',this)">
+    <span class="nav-icon">🚢</span><span class="nav-label">在途</span>
   </button>
   <button class="nav-item" onclick="switchTab('sold',this)">
     <span class="nav-icon">📦</span><span class="nav-label">售出</span>
@@ -349,6 +417,17 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
     <div id="stock-list"></div>
     <div class="empty-state" id="stock-empty" style="display:none">没有在手库存</div>
   </div>
+</div>
+
+<!-- ========= TRANSIT (进货在途) ========= -->
+<div class="page" id="page-transit">
+  <div class="section">
+    <div class="section-title">
+      进货在途
+      <button class="screenshot-btn" onclick="openTransitModal()">+ 新增</button>
+    </div>
+  </div>
+  <div id="transit-list" class="section"></div>
 </div>
 
 <!-- ========= SOLD ========= -->
@@ -610,6 +689,7 @@ function switchTab(n,btn){
   $('page-'+n).classList.add('active');
   if(n==='home') renderHome();
   if(n==='toys'){ renderStockList(); $('f-date').value=today(); onSourceChange(); }
+  if(n==='transit') renderTransitList();
   if(n==='sold') renderSoldList();
   if(n==='supplies'){ renderSupplies(); renderSupplyLogs(); }
   if(n==='settings') renderSettings();
@@ -810,6 +890,127 @@ function renderSoldList(){
   var list=curF==='all'?toys:toys.filter(function(t){ return t.status===curF; });
   $('sold-empty').style.display=list.length===0?'block':'none';
   $('sold-list').innerHTML=list.map(rc).join('');
+}
+
+// ─── Transit (进货在途) ───
+
+async function renderTransitList() {
+  var recs = await get('/api/purchase-records');
+  var el = $('transit-list');
+  if (!recs || recs.length === 0) {
+    el.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px 0;font-size:13px">暂无进货记录<br><span style="font-size:12px">点击右上角 + 新增</span></div>';
+    return;
+  }
+  el.innerHTML = recs.map(function(r) {
+    var stage = r.status;
+    var total = (r.stage1_amount||0) + (r.stage2_amount||0) + (r.stage3_amount||0);
+    var stageLabel = {stage1:'阶段①',stage2:'阶段②',stage3:'阶段③',stocked:'已入库',cancelled:'已取消'}[stage]||stage;
+    var stageColor = {stage1:'var(--orange)',stage2:'var(--blue)',stage3:'var(--purple)',stocked:'var(--green)',cancelled:'var(--text-muted)'}[stage];
+    var s1 = r.stage1_amount ? '<span>①¥'+r.stage1_amount.toFixed(0)+'</span>' : '';
+    var s2 = r.stage2_amount ? '<span>②¥'+r.stage2_amount.toFixed(0)+'</span>' : '';
+    var s3 = r.stage3_amount ? '<span>③¥'+r.stage3_amount.toFixed(0)+'</span>' : '';
+    var nextBtn = '';
+    if (stage === 'stage1') nextBtn = '<button class="record-btn orange" onclick="openTransitStage2('+r.id+')">→ 阶段②</button>';
+    if (stage === 'stage2') nextBtn = '<button class="record-btn orange" onclick="openTransitStage3('+r.id+')">→ 阶段③</button>';
+    var cancelBtn = stage !== 'stocked' ? '<button class="record-btn red" onclick="deleteTransit('+r.id+')">删除</button>' : '';
+    return '<div class="record-card">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
+      + '<div class="record-name">'+r.name+'</div>'
+      + '<span class="badge" style="background:'+stageColor+'22;color:'+stageColor+'">'+stageLabel+'</span></div>'
+      + '<div class="record-meta">'+(r.stage1_date||'') + (r.category?' · '+r.category:'') + (r.source!=='direct'?' · '+{proxy:'代购',domestic:'国内'}[r.source]:'')+'</div>'
+      + '<div style="display:flex;gap:8px;margin-top:6px;font-size:11px;color:var(--text-muted);flex-wrap:wrap">'+s1+s2+s3+'</div>'
+      + '<div class="record-profit" style="margin-top:6px">合计 ¥'+total.toFixed(0)+'</div>'
+      + '<div class="record-actions">'+nextBtn+cancelBtn+'</div>'
+      + '</div>';
+  }).join('');
+}
+
+var transitEditId = null;
+
+function openTransitModal(rec) {
+  transitEditId = rec ? rec.id : null;
+  $('tr-name').value = rec ? rec.name : '';
+  $('tr-category').value = rec ? rec.category : '其他';
+  $('tr-source').value = rec ? rec.source : 'direct';
+  $('tr-date').value = rec ? (rec.stage1_date||today()) : today();
+  $('tr-amount').value = rec ? rec.stage1_amount : '';
+  $('tr-note').value = rec ? (rec.stage1_note||'') : '';
+  $('tr-modal-title').textContent = transitEditId ? '编辑进货记录' : '新增进货';
+  $('tr-modal').classList.add('active');
+}
+
+function openTransitStage2(id) {
+  transitEditId = id;
+  $('tr2-date').value = today();
+  $('tr2-dom-ship').value = '';
+  $('tr2-handling').value = '';
+  $('tr2-note').value = '';
+  $('tr-stage2-modal').classList.add('active');
+}
+
+async function submitTransitStage2() {
+  var id = transitEditId;
+  var domShip = parseFloat($('tr2-dom-ship').value)||0;
+  var handling = parseFloat($('tr2-handling').value)||0;
+  var p = { stage2_date: $('tr2-date').value, stage2_amount: domShip + handling, stage2_note: $('tr2-note').value };
+  await put('/api/purchase-records/'+id+'/stage2', p);
+  $('tr-stage2-modal').classList.remove('active');
+  renderTransitList();
+}
+
+async function openTransitStage3(id) {
+  transitEditId = id;
+  $('tr3-date').value = today();
+  $('tr3-intl-ship').value = '';
+  $('tr3-note').value = '';
+  // 获取阶段①金额，自动计算税费
+  var recs = await get('/api/purchase-records');
+  var rec = recs.find(function(r){ return r.id == id; });
+  if (rec) {
+    var tax = rec.stage1_amount > 0 ? (rec.stage1_amount * 0.13).toFixed(2) : '';
+    $('tr3-tax').value = tax;
+  }
+  $('tr-stage3-modal').classList.add('active');
+}
+
+async function submitTransitStage3() {
+  var id = transitEditId;
+  var intlShip = parseFloat($('tr3-intl-ship').value)||0;
+  var tax = parseFloat($('tr3-tax').value)||0;
+  var p = { stage3_date: $('tr3-date').value, stage3_amount: intlShip + tax, stage3_note: $('tr3-note').value };
+  await put('/api/purchase-records/'+id+'/stage3', p);
+  $('tr-stage3-modal').classList.remove('active');
+  toast('已入库');
+  await loadData();
+  renderTransitList();
+  renderHome();
+  renderStockList();
+}
+
+async function submitTransit() {
+  var name = $('tr-name').value.trim();
+  if (!name) { toast('请填写名称'); return; }
+  var p = {
+    name: name,
+    category: $('tr-category').value,
+    source: $('tr-source').value,
+    stage1_date: $('tr-date').value,
+    stage1_amount: parseFloat($('tr-amount').value)||0,
+    stage1_note: $('tr-note').value
+  };
+  if (transitEditId) {
+    await put('/api/purchase-records/'+transitEditId+'/stage1', p);
+  } else {
+    await post('/api/purchase-records', p);
+  }
+  $('tr-modal').classList.remove('active');
+  renderTransitList();
+}
+
+async function deleteTransit(id) {
+  if (!confirm('确认删除此进货记录？')) return;
+  await del('/api/purchase-records/'+id);
+  renderTransitList();
 }
 
 function setFilter(f,btn){ curF=f; document.querySelectorAll('.filter-chip').forEach(function(e){e.classList.remove('active');}); btn.classList.add('active'); renderSoldList(); }
