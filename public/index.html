@@ -253,9 +253,7 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
       <div class="form-group full"><label>商品名称</label><input type="text" id="tre-name"></div>
       <div class="form-group"><label>品类</label>
         <select id="tre-category">
-          <option value="软胶">软胶</option><option value="模型">模型</option>
-          <option value="手办">手办</option><option value="盲盒">盲盒</option>
-          <option value="其他">其他</option>
+
         </select>
       </div>
       <div class="form-group"><label>进货方式</label>
@@ -303,9 +301,7 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
       <div class="form-group full"><label>名称</label><input type="text" id="te-name"></div>
       <div class="form-group"><label>品类</label>
         <select id="te-category">
-          <option value="软胶">软胶</option><option value="模型">模型</option>
-          <option value="手办">手办</option><option value="盲盒">盲盒</option>
-          <option value="其他">其他</option>
+
         </select>
       </div>
       <div class="form-group"><label>进货方式</label>
@@ -363,9 +359,7 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
       <div class="form-group full"><label>商品名称</label><input type="text" id="tr-name" placeholder="例: SHF 假面骑士电王"></div>
       <div class="form-group"><label>品类</label>
         <select id="tr-category">
-          <option value="软胶">软胶</option><option value="模型">模型</option>
-          <option value="手办">手办</option><option value="盲盒">盲盒</option>
-          <option value="其他">其他</option>
+
         </select>
       </div>
       <div class="form-group"><label>进货方式</label>
@@ -568,9 +562,7 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
       <div class="form-grid">
         <div class="form-group full"><label>玩具名称</label><input type="text" id="misc-name" placeholder="名称"></div>
         <div class="form-group"><label>品类</label>
-          <select id="misc-category">
-            <option value="其他">其他</option>
-          </select>
+          <select id="misc-category"></select>
         </div>
         <div class="form-group"><label>卖出价 (¥)</label><input type="number" id="misc-sell-price" placeholder="0" step="0.01" inputmode="decimal"></div>
         <div class="form-group"><label>卖出日期</label><input type="date" id="misc-date" value="2026-05-17"></div>
@@ -1341,7 +1333,7 @@ function setFilter(f,btn){ curF=f; document.querySelectorAll('.filter-chip').for
 
 async function loadData(){ toys=await get('/api/toys'); supplies=await get('/api/supplies');  var s=await get('/api/settings'); if(s&&s.categories){ categories=s.categories.split(',').filter(c=>c.trim()); renderCategories(); } }
 
-function renderCategories(list){ if(list) categories=list; var sel=$('f-category'); if(!sel) return; sel.innerHTML=''; categories.forEach(c=>{ var opt=document.createElement('option'); opt.value=c; opt.textContent=c; sel.appendChild(opt); }); }
+function renderCategories(list){ if(list) categories=list; ['f-category','misc-category','te-category','tre-category','tr-category'].forEach(function(id){ var sel=$(id); if(!sel) return; sel.innerHTML=''; categories.forEach(function(c){ var opt=document.createElement('option'); opt.value=c; opt.textContent=c; sel.appendChild(opt); }); }); }
 
 async function addToy(){
   var date=$('f-date').value, name=$('f-name').value.trim(), category=$('f-category').value, source=$('f-source').value;
