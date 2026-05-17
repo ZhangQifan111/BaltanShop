@@ -344,6 +344,26 @@ app.put('/api/purchase-records/:id/stage3', (req, res) => {
   res.json(queryOne('SELECT * FROM purchase_records WHERE id=?', [req.params.id]));
 });
 
+app.put('/api/purchase-records/:id', (req, res) => {
+  const p = req.body;
+  const rec = queryOne('SELECT * FROM purchase_records WHERE id=?', [req.params.id]);
+  if (!rec) return res.status(404).json({ error: 'Not found' });
+  db.run(`UPDATE purchase_records SET
+    name=?, category=?, source=?,
+    stage1_date=?, stage1_amount=?, stage1_note=?,
+    stage2_date=?, stage2_amount=?, stage2_note=?,
+    stage3_date=?, stage3_amount=?, stage3_note=?,
+    status=? WHERE id=?`, [
+    p.name||rec.name, p.category||rec.category, p.source||rec.source,
+    p.stage1_date||rec.stage1_date, p.stage1_amount??rec.stage1_amount, p.stage1_note??rec.stage1_note,
+    p.stage2_date||rec.stage2_date, p.stage2_amount??rec.stage2_amount, p.stage2_note??rec.stage2_note,
+    p.stage3_date||rec.stage3_date, p.stage3_amount??rec.stage3_amount, p.stage3_note??rec.stage3_note,
+    p.status||rec.status, req.params.id
+  ]);
+  saveDB();
+  res.json(queryOne('SELECT * FROM purchase_records WHERE id=?', [req.params.id]));
+});
+
 app.delete('/api/purchase-records/:id', (req, res) => {
   db.run('DELETE FROM purchase_records WHERE id=?', [req.params.id]);
   saveDB();
