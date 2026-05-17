@@ -1069,7 +1069,10 @@ async function renderTransitList() {
     if (stage === 'stage1') nextBtn = '<button class="record-btn orange" onclick="openTransitStage2('+r.id+')">→ 阶段②</button>';
     if (stage === 'stage2') nextBtn = '<button class="record-btn orange" onclick="openTransitStage3('+r.id+')">→ 阶段③</button>';
     var editBtn = '<button class="record-btn blue" onclick="openTransitEdit('+r.id+')">编辑</button>';
-    var cancelBtn = stage !== 'stocked' && stage !== 'cancelled' ? '<button class="record-btn red" onclick="deleteTransit('+r.id+')">删除</button>' : '';
+    var delBtn = '<button class="record-btn red" onclick="deleteTransit('+r.id+')">删除</button>';
+    var nextBtn = '';
+    if (stage === 'stage1') nextBtn = '<button class="record-btn orange" onclick="openTransitStage2('+r.id+')">→ 阶段②</button>';
+    if (stage === 'stage2') nextBtn = '<button class="record-btn orange" onclick="openTransitStage3('+r.id+')">→ 阶段③</button>';
     return '<div class="record-card">'
       + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
       + '<div class="record-name">'+r.name+'</div>'
@@ -1077,7 +1080,8 @@ async function renderTransitList() {
       + '<div class="record-meta">'+(r.stage1_date||'') + (r.category?' · '+r.category:'') + (r.source!=='direct'?' · '+{proxy:'代购',domestic:'国内'}[r.source]:'')+'</div>'
       + '<div style="display:flex;gap:8px;margin-top:6px;font-size:11px;color:var(--text-muted);flex-wrap:wrap">'+s1+s2+s3+'</div>'
       + '<div class="record-profit" style="margin-top:6px">合计 ¥'+total.toFixed(0)+'</div>'
-      + '<div class="record-actions">'+editBtn+nextBtn+cancelBtn+'</div>'
+      + '<div class="record-actions" style="justify-content:space-between">'+editBtn+delBtn+'</div>'
+      + (nextBtn ? '<div class="record-actions" style="margin-top:4px">'+nextBtn+'</div>' : '')
       + '</div>';
   }).join('');
 }
