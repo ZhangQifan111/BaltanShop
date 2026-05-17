@@ -417,7 +417,7 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
   </div>
 </div>
 
-<header><h1>巴坦杂货铺</h1><p>进销存 · 耗材管理 · 快递计价</p></header>
+<header><h1>巴坦杂货铺</h1><p>进销存 · 耗材管理</p></header>
 
 <!-- Nav -->
 <nav class="nav">
@@ -523,11 +523,6 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
     </div>
   </div>
 
-  <div class="section">
-    <div class="section-title">在手库存 · 点击售出</div>
-    <div id="stock-list"></div>
-    <div class="empty-state" id="stock-empty" style="display:none">没有在手库存</div>
-  </div>
 </div>
 
 <!-- ========= TRANSIT (进货在途) ========= -->
@@ -560,60 +555,10 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
     <div class="section-title">耗材库存</div>
     <div class="card" id="supplies-list"></div>
   </div>
-  <div class="section">
-    <div class="section-title">快递计价</div>
-    <div class="card">
-      <div class="form-grid">
-        <div class="form-group full"><label>收货省份</label>
-          <select id="calc-province" onchange="calcShipping()">
-            <option value="">— 选择省份 —</option>
-            <option value="江苏">江苏</option><option value="浙江">浙江</option>
-            <option value="上海">上海</option><option value="安徽">安徽</option>
-            <option value="广东">广东</option><option value="福建">福建</option>
-            <option value="江西">江西</option><option value="湖北">湖北</option>
-            <option value="湖南">湖南</option><option value="北京">北京</option>
-            <option value="天津">天津</option><option value="河北">河北</option>
-            <option value="山东">山东</option><option value="河南">河南</option>
-            <option value="山西">山西</option><option value="陕西">陕西</option>
-            <option value="辽宁">辽宁</option><option value="吉林">吉林</option>
-            <option value="黑龙江">黑龙江</option><option value="广西">广西</option>
-            <option value="海南">海南</option><option value="重庆">重庆</option>
-            <option value="四川">四川</option><option value="贵州">贵州</option>
-            <option value="云南">云南</option><option value="内蒙古">内蒙古</option>
-            <option value="甘肃">甘肃</option><option value="青海">青海</option>
-            <option value="宁夏">宁夏</option><option value="新疆">新疆</option>
-            <option value="西藏">西藏</option>
-          </select>
-        </div>
-        <div class="form-group"><label>重量 (kg)</label><input type="number" id="calc-weight" placeholder="0" step="0.01" inputmode="decimal" oninput="calcShipping()"></div>
-        <div class="form-group"><label>快递方式</label>
-          <select id="calc-type" onchange="calcShipping()">
-            <option value="zhongtong">中通</option>
-            <option value="shunfeng">顺丰（手动填）</option>
-          </select>
-        </div>
-        <div class="form-group full" id="shunfeng-input" style="display:none">
-          <label>顺丰实际运费</label><input type="number" id="sf-fee" placeholder="手动填写" inputmode="decimal" oninput="calcShunfeng()">
-        </div>
-      </div>
-      <div class="calc-result" id="calc-result" style="display:none">
-        <div class="calc-result-row"><span>区域</span><span id="cr-region" class="val"></span></div>
-        <div class="calc-result-row"><span>首重 1kg</span><span id="cr-first" class="val"></span></div>
-        <div class="calc-result-row"><span>续重</span><span id="cr-add" class="val"></span></div>
-        <div class="calc-result-row"><span>重量</span><span id="cr-weight" class="val"></span></div>
-        <div class="calc-result-row total"><span>快递费</span><span class="val" id="cr-fee"></span></div>
-      </div>
-    </div>
-  </div>
 </div>
 
 <!-- ========= SETTINGS ========= -->
 <div class="page" id="page-settings">
-  <div class="section">
-    <div class="section-title">快递区域配置</div>
-    <button onclick="addRule()" class="btn btn-primary" style="margin-bottom:10px">+ 添加</button>
-    <div class="card" id="rules-list"></div>
-  </div>
   <div class="section">
     <div class="section-title">耗材配置</div>
     <button onclick="addSupply()" class="btn btn-primary" style="margin-bottom:10px">+ 添加</button>
@@ -627,7 +572,7 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
     <div class="section-title">数据管理</div>
     <div class="card">
       <div class="config-row"><span class="config-label">玩具记录数</span><span class="config-value" id="cfg-toy-count">-</span></div><div class="config-row"><span class="config-label">已完成</span><span class="config-value" id="cfg-done-count">-</span></div><div class="config-row"><span class="config-label">库存数量</span><span class="config-value" id="cfg-stock-count">-</span></div><div class="config-row"><span class="config-label">总利润</span><span class="config-value" id="cfg-profit">-</span></div>
-      <div class="config-row"><span class="config-label">快递费规则</span><span class="config-value">5 条区域</span></div>
+      
       <div class="config-row"><span class="config-label">数据库</span><span class="config-value">SQLite (本地)</span></div>
       <div class="btn-row" style="margin-top:14px">
         <button class="btn btn-secondary" onclick="exportCSV()">导出 CSV</button>
@@ -653,7 +598,13 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
         </select>
       </div>
       <div class="form-group"><label>扣费金额 (¥)</label><input type="number" id="m-sell-huabei" placeholder="自动计算" step="0.01" value="0" readonly style="opacity:0.7;cursor:not-allowed"></div>
-      <div class="form-group full"><label>收货省份</label>
+      <div class="form-group"><label>快递方式</label>
+        <select id="m-logistics-type" onchange="onLogisticsTypeChange()">
+          <option value="zhongtong">中通</option>
+          <option value="shunfeng">顺丰</option>
+        </select>
+      </div>
+      <div class="form-group"><label>收货省份</label>
         <select id="m-sell-province" onchange="mCalcShipping()">
           <option value="">— 选择 —</option>
           <option value="江苏">江苏</option><option value="浙江">浙江</option>
@@ -674,15 +625,10 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
           <option value="西藏">西藏</option>
         </select>
       </div>
+      <input type="hidden" id="m-logistics-region">
+      <div class="form-group"><label>重量 (kg)</label><input type="number" id="m-weight" placeholder="填重量后自动算" step="0.01" inputmode="decimal" oninput="mCalcShipping()"></input></div>
       <div class="form-group"><label>快递费 (¥)</label><input type="number" id="m-logistics-fee" placeholder="自动计算" step="0.01" inputmode="decimal"></div>
-      <div class="form-group"><label>快递方式</label>
-        <select id="m-logistics-type" onchange="onLogisticsTypeChange()">
-          <option value="zhongtong">中通</option>
-          <option value="shunfeng">顺丰</option>
-        </select>
-      </div>
       <div class="form-group"><label>运单号</label><input type="text" id="m-tracking" placeholder="可选"></div>
-      <div class="form-group"><label>重量 (kg)</label><input type="number" id="m-weight" placeholder="0" step="0.01" inputmode="decimal" oninput="mCalcShipping()"></div>
       <div class="form-group"><label>纸箱</label>
         <select id="m-box-size" onchange="mCalcBox()">
           <option value="">无纸箱</option>
@@ -692,10 +638,10 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
         </select>
       </div>
       <div class="form-group"><label>纸箱费 (¥)</label><input type="number" id="m-box-fee" placeholder="0" step="0.01" inputmode="decimal"></div>
-      <div class="form-group"><label>包装费 (¥)</label><input type="number" id="m-packing-fee" placeholder="气泡垫+胶带" step="0.01" inputmode="decimal" value="0"></div>
+      <div class="form-group"><label>包装费 (¥)</label><input type="number" id="m-packing-fee" placeholder="气泡垫+胶带" step="0.01" inputmode="decimal" value="0" oninput="mUpdFee()"></div>
     </div>
     <div class="cost-total" style="margin-top:10px">
-      <span>快递费</span><span class="ct-value" id="m-logistics-display">¥0</span>
+      <span>杂费总计</span><span class="ct-value" id="m-logistics-display">¥0</span>
     </div>
     <div class="form-actions">
       <button class="btn btn-secondary" onclick="closeModal('sell-modal')">取消</button>
@@ -810,7 +756,7 @@ function switchTab(n,btn){
   if(btn)btn.classList.add('active');
   $('page-'+n).classList.add('active');
   if(n==='home') renderHome();
-  if(n==='toys'){ renderStockList(); $('f-date').value=today(); onSourceChange(); }
+  if(n==='toys'){ $('f-date').value=today(); onSourceChange(); }
   if(n==='transit') renderTransitList();
   if(n==='sold') renderSoldList();
   if(n==='supplies'){ renderSupplies(); renderSupplyLogs(); }
@@ -842,7 +788,7 @@ function updateCost(){
   } else {
     total=(parseFloat($('f-dom-price').value)||0)+(parseFloat($('f-dom-ship').value)||0);
   }
-  $('f-total').textContent='¥'+total.toFixed(0);
+  $('f-total').textContent='¥'+total.toFixed(2);
   return total;
 }
 
@@ -1314,7 +1260,7 @@ async function deleteTransit(id) {
 
 function setFilter(f,btn){ curF=f; document.querySelectorAll('.filter-chip').forEach(function(e){e.classList.remove('active');}); btn.classList.add('active'); renderSoldList(); }
 
-async function loadData(){ toys=await get('/api/toys'); supplies=await get('/api/supplies'); rules=await get('/api/shipping-rules'); var s=await get('/api/settings'); if(s&&s.categories){ categories=s.categories.split(',').filter(c=>c.trim()); renderCategories(); } }
+async function loadData(){ toys=await get('/api/toys'); supplies=await get('/api/supplies');  var s=await get('/api/settings'); if(s&&s.categories){ categories=s.categories.split(',').filter(c=>c.trim()); renderCategories(); } }
 
 function renderCategories(list){ if(list) categories=list; var sel=$('f-category'); if(!sel) return; sel.innerHTML=''; categories.forEach(c=>{ var opt=document.createElement('option'); opt.value=c; opt.textContent=c; sel.appendChild(opt); }); }
 
@@ -1339,21 +1285,21 @@ async function addToy(){
     toy.domestic_shipping=parseFloat($('f-dom-ship').value)||0;
   }
   await post('/api/toys',toy);
-  toast('已记录 ¥'+cost.toFixed(0)); clearForm(); await loadData(); renderStockList(); renderHome();
+  toast('已记录 ¥'+cost.toFixed(0)); clearForm(); await loadData(); renderHome();
 }
 
 function openSell(id){
   var t=toys.find(function(x){ return x.id===id; });
   if(!t)return;
   sellId=id;
-  ['m-sell-name','m-sell-price','m-sell-huabei','m-logistics-fee','m-tracking','m-weight','m-box-size','m-box-fee','m-packing-fee'].forEach(function(i){ var e=$(i); if(e) e.value=''; });
+  ['m-sell-name','m-sell-price','m-sell-huabei','m-logistics-fee','m-tracking','m-weight','m-box-size','m-box-fee'].forEach(function(i){ var e=$(i); if(e) e.value=''; });
   $('m-sell-name').value=t.name; $('m-sell-extra-fee').value='no'; $('m-sell-huabei').value='0'; $('m-logistics-type').value='zhongtong'; $('m-packing-fee').value='0'; $('m-logistics-display').textContent='¥0';
   $('sell-modal').classList.add('active');
 }
 
 function mUpdFee(){
   var fee=parseFloat($('m-logistics-fee').value)||0, box=parseFloat($('m-box-fee').value)||0, pack=parseFloat($('m-packing-fee').value)||0;
-  $('m-logistics-display').textContent='¥'+(fee+box+pack).toFixed(0);
+  $('m-logistics-display').textContent='¥'+(fee+box+pack).toFixed(2);
 }
 
 function calcExtraFee(){
@@ -1363,10 +1309,10 @@ function calcExtraFee(){
   $('m-sell-huabei').value=amt.toFixed(2);
 }
 
-async function mCalcShip(){
+async function mCalcShipping(){
   var prov=$('m-sell-province').value, w=parseFloat($('m-weight').value)||0, type=$('m-logistics-type').value;
   if(!prov||type==='shunfeng'){ mUpdFee(); return; }
-  try{ var res=await get('/api/shipping/calculate?province='+encodeURIComponent(prov)+'&weight='+w); $('m-logistics-fee').value=res.fee.toFixed(2); $('m-logistics-region').value=res.region; } catch(e){}
+  try{ var res=await post('/api/shipping/calculate',{province:prov,weight:w}); $('m-logistics-fee').value=res.fee.toFixed(2); $('m-logistics-region').value=res.region; } catch(e){}
   mUpdFee();
 }
 
@@ -1376,7 +1322,7 @@ function mCalcBox(){
   mUpdFee();
 }
 
-function onLogType(){ $('m-logistics-fee').placeholder=$('m-logistics-type').value==='shunfeng'?'手动':'自动'; mUpdFee(); }
+function onLogisticsTypeChange(){ $('m-logistics-fee').placeholder=$('m-logistics-type').value==='shunfeng'?'手动':'自动'; mUpdFee(); }
 
 async function confirmSell(){
   var t=toys.find(function(x){ return x.id===sellId; });
@@ -1391,7 +1337,7 @@ async function confirmSell(){
   t.status='sold'; t.sold_date=today();
   await put('/api/toys/'+sellId,t);
   if(t.box_size){ var sup=supplies.find(function(s){ return s.name===t.box_size; }); if(sup)await post('/api/supplies/'+sup.id+'/consume',{amount:1,reason:'发货',toy_id:t.id}); }
-  toast('已售出 ¥'+price); closeModal('sell-modal'); await loadData(); renderHome(); renderStockList(); renderSoldList();
+  toast('已售出 ¥'+price); closeModal('sell-modal'); await loadData(); renderHome(); renderSoldList();
 }
 
 async function markDone(id){
@@ -1446,12 +1392,12 @@ async function confirmRestock(){
   if(!old)return;
   var nc=parseFloat($('m-restock-cost').value)||old.cost;
   await post('/api/toys',{date:today(),name:old.name,category:old.category,source:old.source,cost:nc,status:'stock'});
-  closeModal('restock-modal'); toast('已入库 ¥'+nc.toFixed(0)); await loadData(); renderHome(); renderStockList(); renderSoldList();
+  closeModal('restock-modal'); toast('已入库 ¥'+nc.toFixed(0)); await loadData(); renderHome(); renderSoldList();
 }
 
 async function removeRecord(id){
   if(!confirm('确定删除？'))return;
-  await del('/api/toys/'+id); toast('已删除'); await loadData(); renderHome(); renderStockList(); renderSoldList();
+  await del('/api/toys/'+id); toast('已删除'); await loadData(); renderHome(); renderSoldList();
 }
 
 function closeModal(id,e){ if(e&&e.target!==e.currentTarget)return; $(id).classList.remove('active'); }
@@ -1495,14 +1441,6 @@ async function confirmRestockLog(){
   closeModal('restock-log-modal'); toast('已入库 +'+amt); await loadData(); renderSupplies(); renderHome();
 }
 
-async function calcShipping(){
-  var prov=$('calc-province').value, w=parseFloat($('calc-weight').value)||0, type=$('calc-type').value;
-  var re=$('calc-result');
-  if(!prov||!w||type==='shunfeng'){ re.style.display='none'; return; }
-  try{ var res=await get('/api/shipping/calculate?province='+encodeURIComponent(prov)+'&weight='+w); re.style.display='block'; $('cr-region').textContent=res.region; $('cr-first').textContent='¥'+res.fee.toFixed(0)+' (首重)'; $('cr-add').textContent='按规则'; $('cr-weight').textContent=w+'kg'; $('cr-fee').textContent='¥'+res.fee.toFixed(0); } catch(e){ re.style.display='none'; }
-}
-
-function onCalcType(){$('sf-calc-wrap').style.display=$('calc-type').value==='shunfeng'?'block':'none'; $('calc-result').style.display=$('calc-type').value==='shunfeng'?'none':'block'; calcShipping();}
 
 async function renderSupplyLogs(){
   var logs=await get('/api/supply-logs');
@@ -1518,8 +1456,7 @@ async function renderSettings(){
   $('cfg-toy-count').textContent=toys.length+' 件';
   $('cfg-done-count').textContent=st.done_count+' 笔';
   $('cfg-stock-count').textContent=st.stock_count+' 件';
-  $('rules-list').innerHTML=rules.map(function(r){ return '<div class="rule-row"><span class="rule-region">'+r.region_name+'</span><span class="rule-provinces">'+r.provinces+'</span><span class="rule-price">¥'+r.first_price+'/'+r.first_weight+'kg</span><span style="margin-left:8px;color:#f87171;cursor:pointer" onclick="delRule('+r.id+')">删除</span></div>'; }).join('');
-  $('cfg-profit').textContent=(st.total_profit>=0?'+':'')+'¥'+st.total_profit.toFixed(0);
+  $('cfg-profit').textContent=(st.total_profit>=0?'+':'')+'¥'+st.total_profit.toFixed(2);
   if($('supplies-config-list'))$('supplies-config-list').innerHTML=supplies.map(function(s){ return '<div class="rule-row"><span class="rule-region" style="color:var(--text)">'+s.name+'</span><span class="rule-provinces">¥'+s.unit_price.toFixed(2)+'/'+s.unit+' · 阈值'+s.low_stock_threshold+'</span><span class="rule-price">'+s.stock+'</span><span style="margin-left:8px;color:#f87171;cursor:pointer" onclick="delSupply('+s.id+')">删除</span></div>'; }).join('');
   var catDiv = document.getElementById('categories-config');
   if(catDiv) {
@@ -1564,7 +1501,7 @@ async function exportJSON(){
   var b=new Blob([JSON.stringify({toys:toys,supplies:supplies,rules:rules},null,2)],{type:'application/json'}), a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='barantan_backup_'+today()+'.json'; a.click(); toast('备份已下载');
 }
 
-loadData().then(function(){ renderHome(); renderStockList(); $('f-date').value=today(); });
+loadData().then(function(){ renderHome(); $('f-date').value=today(); });
 
 // ─── Screenshot Recognition ───
 var recFiles = [];
@@ -1708,7 +1645,7 @@ async function recSubmit() {
 }
 
 </script>
-<script>async function addRule(){var n=prompt("区域名");if(!n)return;var p=prompt("省份");if(!p)return;await post("/api/shipping-rules",{region_name:n,provinces:p,first_price:5,first_weight:1,additional_price:2,additional_weight:1});toast("已添加");await loadData();renderSettings();}async function addSupply(){var n=prompt("耗材名");if(!n)return;await post("/api/supplies",{name:n,unit_price:0,stock:0,unit:"个",low_stock_threshold:5});toast("已添加");await loadData();renderSettings();}</script><script>async function delRule(id){if(!confirm("确定删除该快递区域？"))return;await del("/api/shipping-rules/"+id);toast("已删除");await loadData();renderSettings();}async function delSupply(id){if(!confirm("确定删除该耗材？"))return;await del("/api/supplies/"+id);toast("已删除");await loadData();renderSettings();}</script><!-- Screenshot Recognition Modal -->
+<script>async function addSupply(){var n=prompt("耗材名");if(!n)return;await post("/api/supplies",{name:n,unit_price:0,stock:0,unit:"个",low_stock_threshold:5});toast("已添加");await loadData();renderSettings();}</script><script>async function delSupply(id){if(!confirm("确定删除该耗材？"))return;await del("/api/supplies/"+id);toast("已删除");await loadData();renderSettings();}</script><!-- Screenshot Recognition Modal -->
 <div class="rec-modal" id="rec-modal">
   <div class="rec-modal-box">
     <div class="rec-modal-header">
