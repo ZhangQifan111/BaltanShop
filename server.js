@@ -240,15 +240,15 @@ app.get('/api/toys', (req, res) => {
 app.post('/api/toys', (req, res) => {
   const t = req.body;
   db.run(`INSERT INTO toys (
-    date, name, category, source, cost, status,
+    date, name, category, source, cost, status, sell,
     exchange_rate, japan_price_jpy, japan_price_cny, handling_fee,
     japan_domestic_shipping, intl_shipping, tax,
     proxy_price, proxy_intl_shipping, proxy_domestic_shipping,
     domestic_price, domestic_shipping,
     logistics_type, logistics_fee, logistics_tracking,
     logistics_weight, logistics_region, box_size, box_fee, packing_fee
-  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
-    t.date, t.name, t.category||'其他', t.source, t.cost||0, t.status||'stock',
+  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
+    t.date, t.name, t.category||'其他', t.source, t.cost||0, t.status||'stock', t.sell||0,
     t.exchange_rate||0, t.japan_price_jpy||0, t.japan_price_cny||0, t.handling_fee||0,
     t.japan_domestic_shipping||0, t.intl_shipping||0, t.tax||0,
     t.proxy_price||0, t.proxy_intl_shipping||0, t.proxy_domestic_shipping||0,
