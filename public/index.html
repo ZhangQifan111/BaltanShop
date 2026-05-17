@@ -436,6 +436,9 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
   <button class="nav-item" onclick="switchTab('supplies',this)">
     <span class="nav-icon">📦</span><span class="nav-label">耗材</span>
   </button>
+  <button class="nav-item" onclick="switchTab('misc',this)">
+    <span class="nav-icon">🏷️</span><span class="nav-label">杂项</span>
+  </button>
   <button class="nav-item" onclick="switchTab('settings',this)">
     <span class="nav-icon">⚙️</span><span class="nav-label">设置</span>
   </button>
@@ -557,6 +560,34 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
   </div>
 </div>
 
+<!-- ========= MISC (杂项/二手) ========= -->
+<div class="page" id="page-misc">
+  <div class="section">
+    <div class="section-title">快速登记卖出</div>
+    <div class="card">
+      <div class="form-grid">
+        <div class="form-group full"><label>玩具名称</label><input type="text" id="misc-name" placeholder="名称"></div>
+        <div class="form-group"><label>品类</label>
+          <select id="misc-category">
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <div class="form-group"><label>卖出价 (¥)</label><input type="number" id="misc-sell-price" placeholder="0" step="0.01" inputmode="decimal"></div>
+        <div class="form-group"><label>卖出日期</label><input type="date" id="misc-date" value="2026-05-17"></div>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:var(--text-muted)">成本暂不填写，后续可在编辑中补充</div>
+      <div class="form-actions" style="margin-top:10px">
+        <button class="btn btn-primary" onclick="submitMiscSale()">记一笔卖出</button>
+      </div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-title">杂项卖出记录</div>
+    <div id="misc-list"></div>
+    <div class="empty-state" id="misc-empty" style="display:none">暂无杂项记录</div>
+  </div>
+</div>
+
 <!-- ========= SETTINGS ========= -->
 <div class="page" id="page-settings">
   <div class="section">
@@ -659,6 +690,20 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
         <div style="font-size:13px;font-weight:500;color:var(--orange)">到手刀 / 部分退款</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px">买家收到后要求退一部分钱，交易仍然完成</div>
       </div>
+      <div class="card" onclick="selectAfterAction('return')" style="cursor:pointer">
+        <div style="font-size:13px;font-weight:500;color:var(--red)">退货退款</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">买家退货退款，交易取消</div>
+      </div>
+    </div>
+    <div id="after-partial" style="display:none">
+      <div class="form-group full"><label>退款金额 (¥)</label><input type="number" id="m-partial-amount" placeholder="0" step="0.01" inputmode="decimal"></div>
+      <div class="form-group full"><label>备注</label><input type="text" id="m-refund-note" placeholder="退款原因"></div>
+      <div class="form-actions"><button class="btn btn-secondary" onclick="backStep1()">返回</button><button class="btn btn-primary" onclick="confirmPartialRefund()">确认退款</button></div>
+    </div>
+    <div id="after-return" style="display:none">
+      <div class="form-group full"><label>退款金额 (¥)</label><input type="number" id="m-return-cost" placeholder="0" step="0.01" inputmode="decimal"></div>
+      <div class="form-group full"><label>备注</label><input type="text" id="m-return-note" placeholder="退货原因"></div>
+      <div class="form-actions"><button class="btn btn-secondary" onclick="backStep1()">返回</button><button class="btn btn-primary" onclick="confirmReturn()">确认退货</button></div>
     </div>
   </div>
 </div>
@@ -747,7 +792,7 @@ function toast(m){ var t=$('toast'); t.textContent=m; t.classList.add('show'); s
 function today(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function sl(s){ return {direct:'直购',proxy:'代购',domestic:'国内'}[s]||s; }
 function sb(s){ var m={stock:['在手','badge-stock'],sold:['已发货','badge-sold'],done:['已完成','badge-done'],returned:['已退货','badge-returned']}; var b=m[s]||['未知','badge-stock']; return '<span class="badge '+b[1]+'">'+b[0]+'</span>'; }
-function pf(r){ if(!r.sell||r.sell<=0) return null; return r.sell-(r.refund_amount||0)-(r.huabei||0)-r.cost-(r.logistics_fee||0)-(r.box_fee||0)-(r.packing_fee||0); }
+function pf(r){ if(!r.sell||r.sell<=0) return null; if(r.cost==null||r.cost===undefined||r.cost==='') return null; return r.sell-(r.refund_amount||0)-(r.huabei||0)-r.cost-(r.logistics_fee||0)-(r.box_fee||0)-(r.packing_fee||0); }
 function ls(r){ return (r.extra_cost||0)+(r.logistics_fee||0)+(r.box_fee||0)+(r.packing_fee||0); }
 
 function switchTab(n,btn){
@@ -760,6 +805,7 @@ function switchTab(n,btn){
   if(n==='transit') renderTransitList();
   if(n==='sold') renderSoldList();
   if(n==='supplies'){ renderSupplies(); renderSupplyLogs(); }
+  if(n==='misc') renderMiscList();
   if(n==='settings') renderSettings();
 }
 
@@ -871,7 +917,6 @@ async function confirmToyAdd(){
     closeModal('confirm-modal');
     clearForm();
     await loadData();
-    renderStockList();
     renderHome();
     toast('已记录 ¥'+cost.toFixed(0));
   } catch(e){
@@ -897,7 +942,6 @@ async function confirmToyImg(){
     closeModal('img-modal');
     imgModalFile=null; imgModalToyId=null; imgModalPreview='';
     await loadData();
-    renderStockList();
     toast('图片已保存');
   } catch(e){ toast('图片上传失败'); }
 }
@@ -955,10 +999,10 @@ function renderStockList(){
 }
 
 function renderSoldList(){
-  var list=curF==='all'?toys:toys.filter(function(t){ return t.status===curF; });
+  var list=curF==='all'?toys.filter(function(t){ return t.source!=='secondhand' && t.cost!=null && t.cost!==''; }):toys.filter(function(t){ return t.status===curF && t.source!=='secondhand'; });
   $('sold-empty').style.display=list.length===0?'block':'none';
   $('sold-list').innerHTML=list.map(function(t){
-    var m='<div class="record-meta">'+t.date+' · '+sl(t.source)+' · 成本¥'+t.cost.toFixed(0)+'</div>';
+    var costStr=t.cost!=null?'成本¥'+Number(t.cost).toFixed(0):'成本—'; var m='<div class="record-meta">'+t.date+' · '+sl(t.source)+' · '+costStr+'</div>';
     var fin='<div class="record-meta" style="margin-top:4px">售 ¥'+(t.sell||0)+'</div>';
     var proj=pf(t), projStr=proj!==null?'¥'+(proj>=0?'+':'')+proj.toFixed(0):'—';
     var pl='<div class="record-profit '+(proj!==null?(proj>=0?'positive':'negative'):'')+'">'+projStr+'</div>';
@@ -970,6 +1014,36 @@ function renderSoldList(){
       imgHtml='<div class="record-card-img empty" onclick="openImgModal('+t.id+')">🧸</div>';
     }
     return '<div class="record-card"><div style="display:flex;gap:10px;align-items:flex-start">'+imgHtml+'<div style="flex:1;min-width:0"><div class="record-header"><div class="record-name">'+t.name+'</div>'+sb(t.status)+'</div>'+m+fin+pl+ac+'</div></div></div>';
+  }).join('');
+}
+
+async function submitMiscSale(){
+  var name=$('misc-name').value.trim();
+  var price=parseFloat($('misc-sell-price').value)||0;
+  var date=$('misc-date').value||today();
+  var category=$('misc-category').value||'其他';
+  if(!name){ toast('请填写名称'); return; }
+  if(price<=0){ toast('请填写卖出价'); return; }
+  var toy={name:name,category:category,source:'secondhand',cost:null,status:'done',sell:price,date:date,sold_date:date};
+  await post('/api/toys',toy);
+  $('misc-name').value=''; $('misc-sell-price').value='';
+  toast('已记为卖出 ¥'+price);
+  await loadData();
+  renderMiscList();
+}
+
+function renderMiscList(){
+  // 杂项商品：source=secondhand 或 cost=null 的已售出记录
+  var list=toys.filter(function(t){ return t.status==='done' && (t.source==='secondhand' || t.cost==null || t.cost===''); });
+  $('misc-empty').style.display=list.length===0?'block':'none';
+  $('misc-list').innerHTML=list.map(function(t){
+    var proj=pf(t), projStr=proj!==null?'¥'+(proj>=0?'+':'')+proj.toFixed(0):'—';
+    var costStr=t.cost!=null?'¥'+Number(t.cost).toFixed(0):'未填';
+    var fin='<div class="record-meta" style="margin-top:4px">售 ¥'+(t.sell||0)+'</div>';
+    var pl='<div class="record-profit '+(proj!==null?(proj>=0?'positive':'negative'):'')+'">'+projStr+'</div>';
+    var ac='<div class="record-actions" style="justify-content:space-between"><button class="record-btn" onclick="openToyEdit('+t.id+')">编辑</button><button class="record-btn red" onclick="removeRecord('+t.id+')">删除</button></div>';
+    var imgHtml='<div class="record-card-img empty">🧸</div>';
+    return '<div class="record-card"><div style="display:flex;gap:10px;align-items:flex-start">'+imgHtml+'<div style="flex:1;min-width:0"><div class="record-header"><div class="record-name">'+t.name+'</div><span class="badge" style="background:var(--orange)22;color:var(--orange)">杂项</span></div><div class="record-meta">'+t.date+' · '+costStr+'</div>'+fin+pl+ac+'</div></div></div>';
   }).join('');
 }
 
@@ -1066,7 +1140,6 @@ async function submitTransitStage3() {
   await loadData();
   renderTransitList();
   renderHome();
-  renderStockList();
 }
 
 async function submitTransit() {
@@ -1152,7 +1225,7 @@ async function submitTransitEdit() {
   $('tr-edit-modal').classList.remove('active');
   toast('已保存');
   renderTransitList();
-  if (rec && rec.status === 'stocked') { await loadData(); renderStockList(); renderHome(); }
+  if (rec && rec.status === 'stocked') { await loadData(); renderHome(); }
 }
 
 var toyEditId = null;
@@ -1185,7 +1258,9 @@ async function openToyEdit(id) {
   if (!t) return;
   $('te-name').value = t.name || '';
   $('te-category').value = t.category || '其他';
-  $('te-source').value = t.source || 'direct';
+  // 杂项商品默认用直购格式补填成本
+  var src = t.source === 'secondhand' ? 'direct' : (t.source || 'direct');
+  $('te-source').value = src;
   $('te-date').value = t.date || '';
   // Direct
   $('te-jpy').value = t.japan_price_cny || '';
@@ -1248,7 +1323,6 @@ async function submitToyEdit() {
   $('toy-edit-modal').classList.remove('active');
   toast('已保存');
   await loadData();
-  renderStockList();
   renderHome();
 }
 
@@ -1353,7 +1427,7 @@ function openAfterSale(id){
   $('after-modal').classList.add('active');
 }
 
-function selAfter(a){
+function selectAfterAction(a){
   if(a==='partial'){ $('after-step1').style.display='none'; $('after-partial').style.display='block'; }
   else if(a==='return'){ $('after-step1').style.display='none'; $('after-return').style.display='block'; }
   else if(a==='resolve'){
@@ -1365,7 +1439,7 @@ function selAfter(a){
 
 function backStep1(){$('after-step1').style.display='block'; $('after-partial').style.display='none'; $('after-return').style.display='none';}
 
-async function confirmPartial(){
+async function confirmPartialRefund(){
   var t=toys.find(function(x){ return x.id===afterId; });
   if(!t)return;
   var amt=parseFloat($('m-partial-amount').value)||0;
@@ -1634,9 +1708,8 @@ async function recSubmit() {
     closeRecModal();
     resetRecModal();
     await loadData();
-    renderStockList();
     renderHome();
-    switchTab('stock', null);
+    switchTab('toys', null);
     toast('已记录: ' + name);
   } catch(e) {
     toast('入库失败: ' + (e.message || '未知错误'));

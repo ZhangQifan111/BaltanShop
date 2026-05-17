@@ -248,7 +248,7 @@ app.post('/api/toys', (req, res) => {
     logistics_type, logistics_fee, logistics_tracking,
     logistics_weight, logistics_region, box_size, box_fee, packing_fee
   ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
-    t.date, t.name, t.category||'其他', t.source, t.cost||0, 'stock',
+    t.date, t.name, t.category||'其他', t.source, t.cost||0, t.status||'stock',
     t.exchange_rate||0, t.japan_price_jpy||0, t.japan_price_cny||0, t.handling_fee||0,
     t.japan_domestic_shipping||0, t.intl_shipping||0, t.tax||0,
     t.proxy_price||0, t.proxy_intl_shipping||0, t.proxy_domestic_shipping||0,
@@ -501,7 +501,7 @@ app.get('/api/stats', (req, res) => {
   const toys = queryAll('SELECT * FROM toys');
   let totalProfit = 0, totalRevenue = 0, stockValue = 0, pending = 0, stockCount = 0, doneCount = 0;
   for (const t of toys) {
-    if (t.status === 'stock') { stockValue += t.cost; stockCount++; }
+    if (t.status === 'stock' && t.source !== 'secondhand') { stockValue += t.cost || 0; stockCount++; }
     else if (t.status === 'sold') { pending++; }
     else if (t.status === 'done') {
       const received = (t.sell||0) - (t.refund_amount||0);
