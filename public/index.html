@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="巴坦杂货铺">
@@ -202,6 +203,40 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
 
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Screenshot recognition modal */
+.rec-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 20px; }
+.rec-modal.active { display: flex; }
+.rec-modal-box { background: var(--surface); border-radius: var(--radius); width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; padding: 24px; }
+.rec-modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.rec-modal-header h3 { font-size: 16px; font-weight: 700; color: var(--accent); }
+.rec-modal-close { background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; padding: 4px 8px; }
+.rec-drop-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 32px 16px; text-align: center; cursor: pointer; transition: all 0.2s; }
+.rec-drop-zone:hover, .rec-drop-zone.drag { border-color: var(--accent); background: rgba(240,160,48,0.06); }
+.rec-drop-zone-icon { font-size: 36px; margin-bottom: 8px; }
+.rec-drop-zone p { font-size: 13px; color: var(--text-muted); margin: 4px 0; }
+.rec-drop-zone .hint { font-size: 11px; color: var(--text-muted); opacity: 0.7; }
+.rec-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.rec-preview img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
+.rec-preview .rec-preview-item { position: relative; }
+.rec-preview .rec-preview-del { position: absolute; top: -6px; right: -6px; background: var(--red); color: white; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.rec-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: var(--accent); color: var(--bg); border: none; border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'DM Mono', monospace; width: 100%; margin-top: 12px; transition: all 0.2s; }
+.rec-btn:hover { background: var(--accent-dim); }
+.rec-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.rec-btn.secondary { background: var(--surface-hover); color: var(--text); border: 1px solid var(--border); }
+.rec-loading { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px; color: var(--text-muted); }
+.rec-spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.rec-error { color: var(--red); font-size: 13px; text-align: center; padding: 12px; background: var(--red-dim); border-radius: 8px; margin-top: 12px; }
+.rec-result { margin-top: 16px; background: var(--bg); border-radius: 8px; padding: 14px; }
+.rec-result-title { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+.rec-result-grid { display: grid; gap: 8px; }
+.rec-result-row { display: flex; gap: 8px; align-items: center; }
+.rec-result-row label { font-size: 12px; color: var(--text-muted); min-width: 60px; }
+.rec-result-row input, .rec-result-row select { flex: 1; background: var(--surface-hover); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text); font-size: 13px; font-family: 'DM Mono', monospace; }
+.screenshot-btn { display: inline-flex; align-items: center; gap: 4px; background: var(--blue-dim); color: var(--blue); border: 1px solid rgba(96,165,250,0.3); border-radius: 20px; padding: 4px 12px; font-size: 11px; cursor: pointer; font-family: 'DM Mono', monospace; white-space: nowrap; transition: all 0.15s; }
+.screenshot-btn:hover { background: rgba(96,165,250,0.2); }
+
 </style>
 </head>
 <body>
@@ -245,7 +280,7 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
 <!-- ========= TOYS (Add/New) ========= -->
 <div class="page" id="page-toys">
   <div class="section">
-    <div class="section-title">记一笔进货</div>
+    <div class="section-title">记一笔进货 <button class="screenshot-btn" onclick="openRecModal()">📸 截图识别</button></div>
     <div class="card">
       <div class="form-grid">
         <div class="form-group"><label>日期</label><input type="date" id="f-date"></div>
@@ -265,11 +300,12 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
       <!-- 直购 -->
       <div id="cost-direct">
         <div class="form-grid">
-          <div class="form-group full"><label>人民币成本 (RMB)</label><input type="number" id="f-rmb" placeholder="0" inputmode="decimal" oninput="updateCost()"></div>
+          <div class="form-group full"><label>日本价格 (RMB)</label><input type="number" id="f-jpy" placeholder="0" inputmode="decimal" oninput="updateDirectCost()"></div>
           <div class="form-group"><label>手续费</label><input type="number" id="f-handling" placeholder="0" inputmode="decimal" oninput="updateCost()"></div>
           <div class="form-group"><label>日本国内运费</label><input type="number" id="f-jp-ship" placeholder="0" inputmode="decimal" oninput="updateCost()"></div>
           <div class="form-group"><label>国际运费</label><input type="number" id="f-intl" placeholder="0" inputmode="decimal" oninput="updateCost()"></div>
-          <div class="form-group"><label>税费</label><input type="number" id="f-tax" placeholder="0" inputmode="decimal" oninput="updateCost()"></div>
+          <div class="form-group"><label>税费(×0.13)</label><input type="number" id="f-tax" placeholder="自动" readonly style="opacity:0.6;background:var(--bg)"></div>
+          <div class="form-group full"><label>人民币成本 (RMB)</label><input type="number" id="f-rmb" placeholder="自动计算" readonly style="opacity:0.6;background:var(--bg)"></div>
         </div>
       </div>
 
@@ -587,10 +623,18 @@ function onSourceChange(){
   updateCost();
 }
 
+function updateDirectCost() {
+  var jpy = parseFloat($('f-jpy').value) || 0;
+  var tax = jpy > 0 ? Math.round(jpy * 0.13 * 100) / 100 : 0;
+  $('f-tax').value = tax.toFixed(2);
+  updateCost();
+}
+
 function updateCost(){
   var src=$('f-source').value, total=0;
   if(src==='direct'){
-    total=((parseFloat($('f-rmb').value)||0))+((parseFloat($('f-handling').value)||0))+((parseFloat($('f-jp-ship').value)||0))+((parseFloat($('f-intl').value)||0))+((parseFloat($('f-tax').value)||0));
+    total=((parseFloat($('f-jpy').value)||0))+((parseFloat($('f-handling').value)||0))+((parseFloat($('f-jp-ship').value)||0))+((parseFloat($('f-intl').value)||0))+((parseFloat($('f-tax').value)||0));
+    $('f-rmb').value = total > 0 ? total.toFixed(2) : '';
   } else if(src==='proxy'){
     total=(parseFloat($('f-proxy-price').value)||0)+(parseFloat($('f-proxy-intl').value)||0)+(parseFloat($('f-proxy-dom').value)||0);
   } else {
@@ -601,8 +645,8 @@ function updateCost(){
 }
 
 function clearForm(){
-  ['f-name','f-rmb','f-handling','f-jp-ship','f-intl','f-tax','f-proxy-price','f-proxy-intl','f-proxy-dom','f-dom-price','f-dom-ship'].forEach(function(id){ var el=$(id); if(el)el.value=''; });
-  $('f-date').value=today(); $('f-source').value='direct'; onSourceChange(); updateCost();
+  ['f-name','f-jpy','f-handling','f-jp-ship','f-intl','f-proxy-price','f-proxy-intl','f-proxy-dom','f-dom-price','f-dom-ship'].forEach(function(id){ var el=$(id); if(el)el.value=''; });
+  $('f-date').value=today(); $('f-source').value='direct'; $('f-rmb').value=''; $('f-tax').value=''; onSourceChange(); updateCost();
   clearToyImage();
 }
 function clearToyImage(){
@@ -663,7 +707,7 @@ async function confirmToyAdd(){
     var cost=updateCost();
     var toy={date:date,name:name,category:category||'其他',source:source,cost:cost,status:'stock',exchange_rate:0,japan_price_jpy:0,japan_price_cny:0,handling_fee:0,japan_domestic_shipping:0,intl_shipping:0,tax:0,proxy_price:0,proxy_intl_shipping:0,proxy_domestic_shipping:0,domestic_price:0,domestic_shipping:0,logistics_type:'',logistics_fee:0,logistics_tracking:'',logistics_weight:0,logistics_region:'',box_size:'',box_fee:0,packing_fee:0};
     if(source==='direct'){
-      toy.japan_price_cny=parseFloat($('f-rmb').value)||0; toy.handling_fee=parseFloat($('f-handling').value)||0;
+      toy.japan_price_jpy=parseFloat($('f-jpy').value)||0; toy.japan_price_cny=parseFloat($('f-rmb').value)||0; toy.handling_fee=parseFloat($('f-handling').value)||0;
       toy.japan_domestic_shipping=parseFloat($('f-jp-ship').value)||0; toy.intl_shipping=parseFloat($('f-intl').value)||0; toy.tax=parseFloat($('f-tax').value)||0;
     } else if(source==='proxy'){
       toy.proxy_price=parseFloat($('f-proxy-price').value)||0; toy.proxy_intl_shipping=parseFloat($('f-proxy-intl').value)||0; toy.proxy_domestic_shipping=parseFloat($('f-proxy-dom').value)||0;
@@ -1014,6 +1058,208 @@ async function exportJSON(){
 }
 
 loadData().then(function(){ renderHome(); renderStockList(); $('f-date').value=today(); });
+
+// ─── Screenshot Recognition ───
+var recFiles = [];
+var recData = null;
+function openRecModal() {
+  recFiles = []; recData = null;
+  $('rec-preview').innerHTML = '';
+  $('rec-error').style.display = 'none';
+  $('rec-result-area').style.display = 'none';
+  $('rec-loading').style.display = 'none';
+  $('rec-start-btn').style.display = 'none';
+  $('rec-drop-zone').style.display = 'block';
+  $('rec-modal').classList.add('active');
+}
+function closeRecModal() { $('rec-modal').classList.remove('active'); }
+function resetRecModal() {
+  recFiles = []; recData = null;
+  $('rec-preview').innerHTML = '';
+  $('rec-error').style.display = 'none';
+  $('rec-result-area').style.display = 'none';
+  $('rec-start-btn').style.display = 'none';
+  $('rec-drop-zone').style.display = 'block';
+  $('rec-file-input').value = '';
+}
+function handleRecFileSelect(files) {
+  if (!files) return;
+  for (var f of files) { if (f.type.startsWith('image/')) recFiles.push(f); }
+  renderRecPreview();
+  $('rec-start-btn').style.display = recFiles.length > 0 ? 'block' : 'none';
+}
+function renderRecPreview() {
+  var html = '';
+  recFiles.forEach(function(f, i) {
+    html += '<div class="rec-preview-item"><img src="' + URL.createObjectURL(f) + '"><button class="rec-preview-del" onclick="removeRecFile(' + i + ')">×</button></div>';
+  });
+  $('rec-preview').innerHTML = html;
+}
+function removeRecFile(i) { recFiles.splice(i, 1); renderRecPreview(); $('rec-start-btn').style.display = recFiles.length > 0 ? 'block' : 'none'; }
+var dropZone = $('rec-drop-zone');
+if (dropZone) {
+  dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('drag'); });
+  dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('drag'); });
+  dropZone.addEventListener('drop', function(e) { e.preventDefault(); dropZone.classList.remove('drag'); handleRecFileSelect(e.dataTransfer.files); });
+}
+async function startRecognition() {
+  if (recFiles.length === 0) return;
+  $('rec-start-btn').style.display = 'none';
+  $('rec-drop-zone').style.display = 'none';
+  $('rec-preview').style.display = 'none';
+  $('rec-loading').style.display = 'flex';
+  $('rec-error').style.display = 'none';
+  $('rec-result-area').style.display = 'none';
+  try {
+    var fd = new FormData();
+    recFiles.forEach(function(f) { fd.append('files', f); });
+    var resp = await fetch('/api/recognize', { method: 'POST', body: fd });
+    var data = await resp.json();
+    $('rec-loading').style.display = 'none';
+    if (!data.success) {
+      $('rec-error').textContent = data.error || '识别失败，请重试';
+      $('rec-error').style.display = 'block';
+      $('rec-start-btn').style.display = 'block';
+      $('rec-drop-zone').style.display = 'block';
+      $('rec-preview').style.display = 'flex';
+      return;
+    }
+    recData = data.data;
+    $('rec-name').value = recData.name || '';
+    $('rec-date').value = recData.date || new Date().toISOString().split('T')[0];
+    $('rec-cost').value = recData.cost || 0;
+    $('rec-notes').value = recData.notes || '';
+    var cat = recData.category || '其他';
+    var catSel = $('rec-category');
+    for (var i = 0; i < catSel.options.length; i++) { if (catSel.options[i].value === cat || catSel.options[i].text === cat) { catSel.selectedIndex = i; break; } }
+    var src = recData.source || 'proxy';
+    var srcSel = $('rec-source');
+    for (var i = 0; i < srcSel.options.length; i++) { if (srcSel.options[i].value === src) { srcSel.selectedIndex = i; break; } }
+    recSourceChange_v2();
+    if (src === 'direct') {
+      $('rec-jpy-price').value = recData.japan_price_cny || recData.japan_price_jpy || 0;
+      $('rec-handling').value = recData.handling_fee || 0;
+      $('rec-jp-ship').value = recData.japan_domestic_shipping || 0;
+      $('rec-intl-ship').value = recData.intl_shipping || 0;
+    } else if (src === 'proxy') {
+      $('rec-proxy-price').value = recData.proxy_price || recData.cost || 0;
+    }
+    $('rec-result-area').style.display = 'block';
+  } catch(e) {
+    $('rec-loading').style.display = 'none';
+    $('rec-error').textContent = '网络错误: ' + e.message;
+    $('rec-error').style.display = 'block';
+    $('rec-start-btn').style.display = 'block';
+    $('rec-drop-zone').style.display = 'block';
+    $('rec-preview').style.display = 'flex';
+  }
+}
+function calcRecTax() {
+  var jpy = parseFloat($('rec-jpy-price').value) || 0;
+  $('rec-tax').value = jpy > 0 ? Math.round(jpy * 0.13 * 100) / 100 : 0;
+}
+
+function recSourceChange_v2() {
+  var src = $('rec-source').value;
+  $('rec-direct-extra').style.display = src === 'direct' ? 'grid' : 'none';
+  $('rec-proxy-extra').style.display = src === 'proxy' ? 'grid' : 'none';
+}
+async function recSubmit() {
+  var name = $('rec-name').value.trim();
+  if (!name) { toast('请填写名称'); return; }
+  var btn = $('rec-submit-btn');
+  btn.disabled = true; btn.textContent = '提交中...';
+  try {
+    var toy = {
+      date: $('rec-date').value, name: name, category: $('rec-category').value,
+      source: $('rec-source').value, cost: parseFloat($('rec-cost').value) || 0,
+      status: 'stock', notes: $('rec-notes').value || ''
+    };
+    var src = toy.source;
+    if (src === 'direct') {
+      toy.japan_price_jpy = parseFloat($('rec-jpy-price').value) || 0;
+      toy.handling_fee = parseFloat($('rec-handling').value) || 0;
+      toy.japan_domestic_shipping = parseFloat($('rec-jp-ship').value) || 0;
+      toy.intl_shipping = parseFloat($('rec-intl-ship').value) || 0;
+      toy.tax = parseFloat($('rec-tax').value) || 0;
+    } else if (src === 'proxy') {
+      toy.proxy_price = parseFloat($('rec-proxy-price').value) || 0;
+      toy.proxy_intl_shipping = parseFloat($('rec-proxy-intl').value) || 0;
+    }
+    await post('/api/toys', toy);
+    closeRecModal();
+    resetRecModal();
+    await loadData();
+    renderStockList();
+    renderHome();
+    switchTab('stock', null);
+    toast('已记录: ' + name);
+  } catch(e) {
+    toast('入库失败: ' + (e.message || '未知错误'));
+    btn.disabled = false; btn.textContent = '✅ 确认入库';
+  }
+}
+
 </script>
-<script>async function addRule(){var n=prompt("区域名");if(!n)return;var p=prompt("省份");if(!p)return;await post("/api/shipping-rules",{region_name:n,provinces:p,first_price:5,first_weight:1,additional_price:2,additional_weight:1});toast("已添加");await loadData();renderSettings();}async function addSupply(){var n=prompt("耗材名");if(!n)return;await post("/api/supplies",{name:n,unit_price:0,stock:0,unit:"个",low_stock_threshold:5});toast("已添加");await loadData();renderSettings();}</script><script>async function delRule(id){if(!confirm("确定删除该快递区域？"))return;await del("/api/shipping-rules/"+id);toast("已删除");await loadData();renderSettings();}async function delSupply(id){if(!confirm("确定删除该耗材？"))return;await del("/api/supplies/"+id);toast("已删除");await loadData();renderSettings();}</script></body>
+<script>async function addRule(){var n=prompt("区域名");if(!n)return;var p=prompt("省份");if(!p)return;await post("/api/shipping-rules",{region_name:n,provinces:p,first_price:5,first_weight:1,additional_price:2,additional_weight:1});toast("已添加");await loadData();renderSettings();}async function addSupply(){var n=prompt("耗材名");if(!n)return;await post("/api/supplies",{name:n,unit_price:0,stock:0,unit:"个",low_stock_threshold:5});toast("已添加");await loadData();renderSettings();}</script><script>async function delRule(id){if(!confirm("确定删除该快递区域？"))return;await del("/api/shipping-rules/"+id);toast("已删除");await loadData();renderSettings();}async function delSupply(id){if(!confirm("确定删除该耗材？"))return;await del("/api/supplies/"+id);toast("已删除");await loadData();renderSettings();}</script><!-- Screenshot Recognition Modal -->
+<div class="rec-modal" id="rec-modal">
+  <div class="rec-modal-box">
+    <div class="rec-modal-header">
+      <h3>📸 截图识别进货</h3>
+      <button class="rec-modal-close" onclick="closeRecModal()">×</button>
+    </div>
+    <div class="rec-drop-zone" id="rec-drop-zone" onclick="$('rec-file-input').click()">
+      <div class="rec-drop-zone-icon" id="rec-drop-icon">🖼️</div>
+      <p id="rec-drop-text">点击选择截图，或拖拽到这里</p>
+      <p class="hint">支持多张截图 · JPG/PNG/WebP · 最大10MB</p>
+      <button class="rec-btn" id="rec-start-btn" style="display:none;margin-top:16px" onclick="event.stopPropagation();event.preventDefault();startRecognition()">🚀 开始识别</button>
+    </div>
+    <input type="file" id="rec-file-input" accept="image/*" multiple style="position:absolute;opacity:0;width:1px;height:1px;z-index:-1" onchange="handleRecFileSelect(this.files)" oninput="handleRecFileSelect(this.files)">
+    <div class="rec-preview" id="rec-preview"></div>
+    <div class="rec-loading" id="rec-loading" style="display:none">
+      <div class="rec-spinner"></div>
+      <p>AI 识别中...</p>
+    </div>
+    <div class="rec-error" id="rec-error" style="display:none"></div>
+    <div id="rec-result-area" style="display:none">
+      <div class="rec-result">
+        <div class="rec-result-title">📋 识别结果 — 确认后入库</div>
+        <div class="rec-result-grid">
+          <div class="rec-result-row"><label>名称</label><input type="text" id="rec-name" placeholder="商品名称"></div>
+          <div class="rec-result-row"><label>品类</label>
+            <select id="rec-category">
+              <option value="软胶">软胶</option><option value="模型">模型</option>
+              <option value="手办">手办</option><option value="盲盒">盲盒</option>
+              <option value="其他">其他</option>
+            </select>
+          </div>
+          <div class="rec-result-row"><label>进货方式</label>
+            <select id="rec-source" onchange="recSourceChange_v2()">
+              <option value="direct">直购（日本）</option>
+              <option value="proxy">代购</option>
+              <option value="domestic">国内采购</option>
+            </select>
+          </div>
+          <div class="rec-result-row"><label>日期</label><input type="date" id="rec-date"></div>
+          <div class="rec-result-row"><label>总成本¥</label><input type="number" id="rec-cost" placeholder="总成本(RMB)" step="0.01"></div>
+          <div id="rec-direct-extra" style="display:none">
+            <div class="rec-result-row"><label>商品¥RMB</label><input type="number" id="rec-jpy-price" placeholder="日本价格RMB" oninput="calcRecTax()"></div>
+            <div class="rec-result-row"><label>手续费¥</label><input type="number" id="rec-handling" placeholder="手续费"></div>
+            <div class="rec-result-row"><label>日本运费¥</label><input type="number" id="rec-jp-ship" placeholder="日本国内运费"></div>
+            <div class="rec-result-row"><label>国际运费¥</label><input type="number" id="rec-intl-ship" placeholder="国际运费"></div>
+            <div class="rec-result-row"><label>税费(×0.13)</label><input type="number" id="rec-tax" placeholder="自动计算" readonly style="opacity:0.6;background:var(--bg)"></div>
+          </div>
+          <div id="rec-proxy-extra" style="display:none">
+            <div class="rec-result-row"><label>代购价¥</label><input type="number" id="rec-proxy-price" placeholder="代购价"></div>
+            <div class="rec-result-row"><label>国际运费¥</label><input type="number" id="rec-proxy-intl" placeholder="国际运费"></div>
+          </div>
+          <div class="rec-result-row"><label>备注</label><input type="text" id="rec-notes" placeholder="备注（可选）"></div>
+        </div>
+      </div>
+      <button class="rec-btn" id="rec-submit-btn" onclick="recSubmit()">✅ 确认入库</button>
+      <button class="rec-btn secondary" style="margin-top:8px" onclick="resetRecModal()">重置</button>
+    </div>
+  </div>
+</div>
+</body>
 </html>

@@ -1,5 +1,6 @@
 const express = require('express');
 const initSqlJs = require('sql.js');
+const Tesseract = require('tesseract.js');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
@@ -411,6 +412,140 @@ app.get('/api/stats', (req, res) => {
     }
   }
   res.json({ total_profit: Math.round(totalProfit*100)/100, total_revenue: Math.round(totalRevenue*100)/100, stock_value: Math.round(stockValue*100)/100, pending_count: pending, stock_count: stockCount, done_count: doneCount });
+});
+
+
+
+// ─── Screenshot recognition (AI vision) ───
+
+// ─── Screenshot OCR recognition (Tesseract.js) ───
+
+/**
+ * Parse OCR text to extract order info.
+ * Handles common Japanese proxy app formats.
+ */
+function parseOcrText(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const result = {
+    name: '',
+    category: '其他',
+    source: 'proxy',
+    date: new Date().toISOString().split('T')[0],
+    cost: 0,
+    japan_price_jpy: 0,
+    handling_fee: 0,
+    intl_shipping: 0,
+    japan_domestic_shipping: 0,
+    tax: 0,
+    currency: 'JPY',
+    notes: ''
+  };
+
+  // Date: 2026/05/06 or 2026-05-06
+  const dateMatch = text.match(/(\d{4})[\/年](\d{1,2})[\/月](\d{1,2})/);
+  if (dateMatch) {
+    result.date = `${dateMatch[1]}-${dateMatch[2].padStart(2,'0')}-${dateMatch[3].padStart(2,'0')}`;
+  }
+
+  // JPY amounts: ¥8,500 / 8,500円 / ¥8500
+  const jpyMatch = text.match(/[¥￥]\s*([\d,]+)\s*(?:円|JPY)/i) ||
+                   text.match(/([\d,]+)\s*円(?!.*[¥￥])/);
+  if (jpyMatch) {
+    result.japan_price_jpy = parseInt(jpyMatch[1].replace(/,/g, ''), 10);
+  }
+
+  // CNY total
+  const cnyMatch = text.match(/(?:≈|人民币|RMB)[\s:]*([\d.]+)/i) ||
+                   text.match(/([\d.]+)\s*元(?!.*円)/);
+  if (cnyMatch) {
+    result.cost = parseFloat(cnyMatch[1]);
+    result.currency = 'CNY';
+  }
+
+  // Tax (消費税込, 税金, tax)
+  const taxMatch = text.match(/(?:消費税込|税込|税金|tax)[\s:]*[¥￥]?([\d,]+)/i) ||
+                  text.match(/tax[\s:]*([\d,]+)/i);
+  if (taxMatch) result.tax = parseFloat(taxMatch[1].replace(/,/g,''));
+
+  // Handling fee
+  const hfMatch = text.match(/(?:手数料|代行|代购费)[\s:]*[¥￥]?([\d,]+)/i);
+  if (hfMatch) result.handling_fee = parseInt(hfMatch[1].replace(/,/g,''), 10);
+
+  // International shipping (国際送料, International, 国際配送)
+  const shipMatch = text.match(/(?:国際送料|国際配送|International|国际运费)[\s:]*[¥￥]?([\d,]+)/i);
+  if (shipMatch) result.intl_shipping = parseFloat(shipMatch[1].replace(/,/g,''));
+
+  // Japan domestic shipping (国内送料)
+  const jpShipMatch = text.match(/(?:国内送料)[\s:]*[¥￥]?([\d,]+)/i);
+  if (jpShipMatch) result.japan_domestic_shipping = parseFloat(jpShipMatch[1].replace(/,/g,''));
+
+  // Cost fallback: use CNY total if available
+  if (!result.cost && result.japan_price_jpy) {
+    result.cost = Math.round(result.japan_price_jpy * 0.046 * 100) / 100;
+  }
+
+  // Category detection
+  if (/ Ultraman|奥特曼|咸蛋|迪迦|杰克|赛文|艾斯/.test(text)) result.category = '软胶';
+  else if (/ SHF|SHF iguarts|假面骑士/.test(text)) result.category = '手办';
+  else if (/ ガレージ|ガシャ|Wonder/.test(text)) result.category = '模型';
+  else if (/ フルミ|盲盒|boys|^L[io]/.test(text)) result.category = '盲盒';
+
+  // Product name (first long line that isn't a price/date)
+  for (const line of lines) {
+    if (line.length > 4 && line.length < 80 &&
+        !/^[¥￥\d,.]/.test(line) &&
+        !/(?:合計|总计|価格|运费|送料)/.test(line) &&
+        !/[\d,]+円/.test(line)) {
+      result.name = line.replace(/[\r\n]/g, '').slice(0, 80);
+      break;
+    }
+  }
+
+  // Order number
+  const orderMatch = text.match(/(?:注文|No\.?)[\s:#]*([A-Z0-9]{6,})/i);
+  if (orderMatch) result.notes = '订单号: ' + orderMatch[1];
+
+  return result;
+}
+
+// Multer for screenshot uploads
+const multerScreenshot = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Only image files allowed'));
+  }
+});
+
+app.post('/api/recognize', multerScreenshot.array('files', 5), async (req, res) => {
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ error: '请上传至少一张截图' });
+  }
+
+  try {
+    const worker = await Tesseract.createWorker('jpn+eng', 1, {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          process.stdout.write('\rOCR: ' + Math.round(m.progress * 100) + '%');
+        }
+      }
+    });
+
+    const file = req.files[0];
+    const { data } = await worker.recognize(file.buffer);
+    const text = data.text;
+    console.log('\nOCR text:', text.slice(0, 300));
+    await worker.terminate();
+
+    const parsed = parseOcrText(text);
+    console.log('Parsed:', JSON.stringify(parsed));
+
+    res.json({ success: true, data: parsed, raw: text });
+  } catch (err) {
+    console.error('OCR error:', err);
+    res.status(500).json({ error: '识别失败: ' + err.message });
+  }
 });
 
 // ─── Static files & fallback (must be AFTER all API routes) ───
