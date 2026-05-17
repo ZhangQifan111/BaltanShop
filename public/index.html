@@ -645,8 +645,14 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
     <div class="modal-title">出售</div>
     <div class="form-grid">
       <div class="form-group full"><label>玩具名称</label><input type="text" id="m-sell-name" readonly style="opacity:0.5;cursor:not-allowed"></div>
-      <div class="form-group"><label>卖出价 (¥)</label><input type="number" id="m-sell-price" placeholder="0" step="0.01" inputmode="decimal"></div>
-      <div class="form-group"><label>花呗扣费</label><input type="number" id="m-sell-huabei" placeholder="0" step="0.01" value="0" inputmode="decimal"></div>
+      <div class="form-group"><label>卖出价 (¥)</label><input type="number" id="m-sell-price" placeholder="0" step="0.01" inputmode="decimal" oninput="calcExtraFee()"></div>
+      <div class="form-group"><label>额外扣费</label>
+        <select id="m-sell-extra-fee" onchange="calcExtraFee()">
+          <option value="no">否</option>
+          <option value="yes">是</option>
+        </select>
+      </div>
+      <div class="form-group"><label>扣费金额 (¥)</label><input type="number" id="m-sell-huabei" placeholder="自动计算" step="0.01" value="0" readonly style="opacity:0.7;cursor:not-allowed"></div>
       <div class="form-group full"><label>收货省份</label>
         <select id="m-sell-province" onchange="mCalcShipping()">
           <option value="">— 选择 —</option>
@@ -971,7 +977,7 @@ function rc(t){
     ac='<div class="record-actions"><button class="record-btn green" onclick="event.stopPropagation();markDone('+t.id+')">确认完成</button><button class="record-btn orange" onclick="event.stopPropagation();openAfterSale('+t.id+')">售后</button></div>';
   } else if(t.status==='done'){
     var p=pf(t);
-    fin='<div class="record-meta" style="margin-top:4px">售 ¥'+(t.sell||0)+(t.refund_amount>0?' · 退款¥'+t.refund_amount:'')+(t.huabei>0?' · 花呗¥'+t.huabei:'')+'</div>';
+    fin='<div class="record-meta" style="margin-top:4px">售 ¥'+(t.sell||0)+(t.refund_amount>0?' · 退款¥'+t.refund_amount:'')+(t.huabei>0?' · 额外扣费¥'+t.huabei:'')+'</div>';
     pl='<div class="record-profit '+(p>=0?'positive':'negative')+'">'+(p>=0?'+':'')+'¥'+p.toFixed(0)+'</div>';
     ac='<div class="record-actions"><button class="record-btn red" onclick="event.stopPropagation();removeRecord('+t.id+')">删除</button></div>';
   } else if(t.status==='returned'){
@@ -1341,13 +1347,20 @@ function openSell(id){
   if(!t)return;
   sellId=id;
   ['m-sell-name','m-sell-price','m-sell-huabei','m-logistics-fee','m-tracking','m-weight','m-box-size','m-box-fee','m-packing-fee'].forEach(function(i){ var e=$(i); if(e) e.value=''; });
-  $('m-sell-name').value=t.name; $('m-sell-huabei').value='0'; $('m-logistics-type').value='zhongtong'; $('m-packing-fee').value='0'; $('m-logistics-display').textContent='¥0';
+  $('m-sell-name').value=t.name; $('m-sell-extra-fee').value='no'; $('m-sell-huabei').value='0'; $('m-logistics-type').value='zhongtong'; $('m-packing-fee').value='0'; $('m-logistics-display').textContent='¥0';
   $('sell-modal').classList.add('active');
 }
 
 function mUpdFee(){
   var fee=parseFloat($('m-logistics-fee').value)||0, box=parseFloat($('m-box-fee').value)||0, pack=parseFloat($('m-packing-fee').value)||0;
   $('m-logistics-display').textContent='¥'+(fee+box+pack).toFixed(0);
+}
+
+function calcExtraFee(){
+  var extra=$('m-sell-extra-fee').value;
+  var price=parseFloat($('m-sell-price').value)||0;
+  var amt=extra==='yes' ? (price*0.016) : 0;
+  $('m-sell-huabei').value=amt.toFixed(2);
 }
 
 async function mCalcShip(){
@@ -1541,7 +1554,7 @@ async function delCategory(c){
 async function exportCSV(){
   if(toys.length===0){ toast('没有数据'); return; }
   var sm={stock:'在手',sold:'已发货',done:'已完成',returned:'已退货'};
-  var csv='日期,名称,品类,方式,成本,卖出,快递费,纸箱费,包装费,花呗,退款,利润,状态\n';
+  var csv='日期,名称,品类,方式,成本,卖出,快递费,纸箱费,包装费,额外扣费,退款,利润,状态\n';
   toys.forEach(function(t){ var p=t.status==='done'?pf(t):''; csv+=[t.date,'"'+t.name+'"',t.category,sl(t.source),t.cost,t.sell||0,t.logistics_fee||0,t.box_fee||0,t.packing_fee||0,t.huabei||0,t.refund_amount||0,typeof p==='number'?p.toFixed(0):'',sm[t.status]||t.status].join(',')+'\n'; });
   var b=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}), a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='barantan_'+today()+'.csv'; a.click(); toast('CSV 已下载');
 }
