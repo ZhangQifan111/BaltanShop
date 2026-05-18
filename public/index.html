@@ -693,6 +693,9 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
     </div>
   </div>
   <div id="transit-list" class="section"></div>
+  <div class="search-row">
+    <input type="text" id="transit-search" class="search-input" placeholder="🔍 搜索商品名或品类" oninput="onTransitSearch(this.value)">
+  </div>
 </div>
 
 <!-- ========= SOLD ========= -->
@@ -1217,6 +1220,8 @@ function renderMiscList(){
 
 // ─── Transit (进货在途) ───
 
+var curTransitSearch='';
+function onTransitSearch(q){curTransitSearch=q.trim().toLowerCase();renderTransitList();}
 async function renderTransitList() {
   var recs = await get('/api/purchase-records');
   var el = $('transit-list');
@@ -1224,6 +1229,7 @@ async function renderTransitList() {
     el.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px 0;font-size:13px">暂无进货记录<br><span style="font-size:12px">点击右上角 + 新增</span></div>';
     return;
   }
+  if(curTransitSearch) recs=recs.filter(function(r){ return (r.name&&r.name.toLowerCase().includes(curTransitSearch))||(r.category&&r.category.toLowerCase().includes(curTransitSearch)); });
   el.innerHTML = recs.map(function(r) {
     var stage = r.status;
     var total = (r.stage1_amount||0) + (r.stage2_amount||0) + (r.stage3_amount||0);
