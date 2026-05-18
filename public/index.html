@@ -1118,7 +1118,7 @@ function rc(t){
     fin='<div class="record-meta" style="margin-top:4px">售 ¥'+(t.sell||0)+'</div>';
     var proj=pf(t);
     pl='<div class="record-profit" style="color:var(--orange)">预估 '+(proj>=0?'+':'')+'¥'+(proj||0).toFixed(0)+'</div>';
-    ac='<div class="card-actions" style="opacity:1;transform:none"><button class="card-btn done" onclick="event.stopPropagation();markDone('+t.id+')">确认完成</button><button class="card-btn aftersale" onclick="event.stopPropagation();openAfterSale('+t.id+')">售后</button><button class="card-btn sell" onclick="event.stopPropagation();openSell('+t.id+')">出售</button><button class="card-btn edit" onclick="event.stopPropagation();openToyEdit('+t.id+')">编辑</button></div>';
+    ac='<div class="card-actions" style="opacity:1;transform:none"><button class="card-btn done" onclick="event.stopPropagation();markDone('+t.id+')">确认完成</button><button class="card-btn aftersale" onclick="event.stopPropagation();openAfterSale('+t.id+')">售后</button><button class="card-btn edit" onclick="event.stopPropagation();openToyEdit('+t.id+')">编辑</button></div>';
   } else if(t.status==='done'){
     var p=pf(t);
     fin='<div class="record-meta" style="margin-top:4px">售 ¥'+(t.sell||0)+(t.refund_amount>0?' · 退款¥'+t.refund_amount:'')+(t.huabei>0?' · 额外扣费¥'+t.huabei:'')+'</div>';
