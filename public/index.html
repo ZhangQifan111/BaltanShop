@@ -661,7 +661,7 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
         </select>
       </div>
       <div class="form-group"><label>纸箱费 (¥)</label><input type="number" id="m-box-fee" placeholder="0" step="0.01" inputmode="decimal"></div>
-      <div class="form-group"><label>包装费 (¥)</label><input type="number" id="m-packing-fee" placeholder="气泡垫+胶带" step="0.01" inputmode="decimal" value="0" oninput="mUpdFee()"></div>
+      <div class="form-group"><label>包装费 (¥)</label><input type="number" id="m-packing-fee" placeholder="气泡垫+胶带" step="0.01" inputmode="decimal" value="0.5" readonly oninput="mUpdFee()"></div>
     </div>
     <div class="cost-total" style="margin-top:10px">
       <span>杂费总计</span><span class="ct-value" id="m-logistics-display">¥0</span>
@@ -1364,7 +1364,7 @@ function openSell(id){
   if(!t)return;
   sellId=id;
   ['m-sell-name','m-sell-price','m-sell-huabei','m-logistics-fee','m-tracking','m-weight','m-box-size','m-box-fee'].forEach(function(i){ var e=$(i); if(e) e.value=''; });
-  $('m-sell-name').value=t.name; $('m-sell-price').value=t.sell||''; $('m-sell-extra-fee').value='no'; $('m-sell-huabei').value=t.huabei?'yes':'no'; calcExtraFee(); $('m-logistics-type').value=t.logistics_type||'zhongtong'; $('m-packing-fee').value=t.packing_fee||'0'; $('m-logistics-display').textContent='¥0';
+  $('m-sell-name').value=t.name; $('m-sell-price').value=t.sell||''; $('m-sell-extra-fee').value='no'; $('m-sell-huabei').value=t.huabei?'yes':'no'; calcExtraFee(); $('m-logistics-type').value=t.logistics_type||'zhongtong'; $('m-logistics-display').textContent='¥0';
   $('sell-modal').classList.add('active');
 }
 
