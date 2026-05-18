@@ -361,7 +361,7 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
 /* Filter chips */
 .filter-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; margin-bottom: 12px; }
 .filter-chip { padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; font-family: 'DM Mono', monospace; font-size: 11px; white-space: nowrap; transition: all 0.15s; }
-.filter-chip.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.filter-chip.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }.search-row{padding:10px 16px 0}.search-input{width:100%;padding:9px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;outline:none;box-sizing:border-box}.search-input:focus{border-color:var(--accent)}.search-input::placeholder{color:var(--text-muted)}
 
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
@@ -697,6 +697,9 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
 
 <!-- ========= SOLD ========= -->
 <div class="page" id="page-sold">
+  <div class="search-row">
+    <input type="text" id="sold-search" class="search-input" placeholder="🔍 搜索商品名或品类" oninput="onSoldSearch(this.value)">
+  </div>
   <div class="filter-row">
     <button class="filter-chip active" onclick="setFilter('all',this)">全部</button>
     <button class="filter-chip" onclick="setFilter('stock',this)">在手</button>
@@ -1172,8 +1175,11 @@ function pc(t){
   return '<div class="premium-card">'+imgHtml+'<div class="card-name" onclick="openToyEdit('+t.id+')">'+t.name+'</div>'+badge+'<div class="card-profit '+profitClass+'">'+profitStr+'</div><div class="card-info-row"><span class="card-info-label">成本</span><span class="card-info-value">'+costStr+'</span></div><div class="card-info-row"><span class="card-info-label">售价</span><span class="card-info-value">'+sellStr+'</span></div><div class="card-info-row"><span class="card-info-label">'+t.date+'</span><span class="card-info-value">'+sl(t.source)+'</span></div><div class="card-actions">'+actions+'</div></div>';
 }
 
+var curSearch='';
+function onSoldSearch(q){curSearch=q.trim().toLowerCase();renderSoldList();}
 function renderSoldList(){
   var list=curF==='all'?toys.filter(function(t){ return (t.source!=='secondhand' || t.cost!=null) && t.cost!==''; }):toys.filter(function(t){ return t.status===curF && t.source!=='secondhand'; });
+  if(curSearch) list=list.filter(function(t){ return (t.name&&t.name.toLowerCase().includes(curSearch))||(t.category&&t.category.toLowerCase().includes(curSearch)); });
   $('sold-empty').style.display=list.length===0?'block':'none';
   $('sold-list').innerHTML=list.map(pc).join('');
 }
