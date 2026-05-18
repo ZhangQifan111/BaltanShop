@@ -1364,7 +1364,7 @@ function openSell(id){
   if(!t)return;
   sellId=id;
   ['m-sell-name','m-sell-price','m-sell-huabei','m-logistics-fee','m-tracking','m-weight','m-box-size','m-box-fee'].forEach(function(i){ var e=$(i); if(e) e.value=''; });
-  $('m-sell-name').value=t.name; $('m-sell-price').value=t.sell||''; $('m-sell-extra-fee').value='no'; $('m-sell-huabei').value=t.huabei?'yes':'no'; calcExtraFee(); $('m-logistics-type').value=t.logistics_type||'zhongtong'; $('m-logistics-display').textContent='¥0';
+  $('m-sell-name').value=t.name; $('m-sell-price').value=t.sell||''; $('m-sell-extra-fee').value='no'; $('m-sell-huabei').value=t.huabei?'yes':'no'; calcExtraFee(); $('m-logistics-type').value=t.logistics_type||'zhongtong'; $('m-logistics-display').textContent='¥0'; mUpdFee();
   $('sell-modal').classList.add('active');
 }
 
