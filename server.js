@@ -499,19 +499,44 @@ app.put('/api/settings/:key', (req, res) => {
 // Stats
 app.get('/api/stats', (req, res) => {
   const toys = queryAll('SELECT * FROM toys');
-  let totalProfit = 0, totalRevenue = 0, stockValue = 0, pending = 0, stockCount = 0, doneCount = 0;
+  const recs = queryAll("SELECT * FROM purchase_records WHERE status NOT IN ('stocked','cancelled')");
+  let transitCost = 0;
+  for (const r of recs) { transitCost += (r.stage1_amount||0) + (r.stage2_amount||0) + (r.stage3_amount||0); }
+  let totalCost = 0, totalSell = 0, totalProfit = 0, totalRevenue = 0, stockValue = 0, pending = 0, stockCount = 0, doneCount = 0;
   for (const t of toys) {
     if (t.status === 'stock' && t.source !== 'secondhand') { stockValue += t.cost || 0; stockCount++; }
     else if (t.status === 'sold') { pending++; }
     else if (t.status === 'done') {
-      const received = (t.sell||0) - (t.refund_amount||0);
+      const sell = t.sell || 0;
+      const refund = t.refund_amount || 0;
+      const received = sell - refund;
+      const cost = t.cost || 0;
+      const huabei = t.huabei || 0;
+      const logisticFee = t.logistics_fee || 0;
+      const boxFee = t.box_fee || 0;
+      const packingFee = t.packing_fee || 0;
+      const profit = received - huabei - cost - logisticFee - boxFee - packingFee;
+      totalSell += sell;
+      totalCost += cost;
       totalRevenue += received;
-      const profit = received - (t.huabei||0) - t.cost - (t.logistics_fee||0) - (t.box_fee||0) - (t.packing_fee||0);
       totalProfit += profit;
       doneCount++;
     }
   }
-  res.json({ total_profit: Math.round(totalProfit*100)/100, total_revenue: Math.round(totalRevenue*100)/100, stock_value: Math.round(stockValue*100)/100, pending_count: pending, stock_count: stockCount, done_count: doneCount });
+  const marginRate = totalSell > 0 ? (totalProfit / totalSell * 100) : 0;
+  res.json({
+    total_cost: Math.round((totalCost+transitCost)*100)/100,
+    total_cost_done: Math.round(totalCost*100)/100,
+    total_cost_transit: Math.round(transitCost*100)/100,
+    total_sell: Math.round(totalSell*100)/100,
+    total_profit: Math.round(totalProfit*100)/100,
+    margin_rate: Math.round(marginRate*100)/100,
+    total_revenue: Math.round(totalRevenue*100)/100,
+    stock_value: Math.round(stockValue*100)/100,
+    pending_count: pending,
+    stock_count: stockCount,
+    done_count: doneCount
+  });
 });
 
 

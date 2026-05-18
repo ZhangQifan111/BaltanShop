@@ -1475,7 +1475,7 @@ function closeModal(id,e){ if(e&&e.target!==e.currentTarget)return; $(id).classL
 
 async function renderHome(){
   var st=await get('/api/stats');
-  $('home-stats').innerHTML='<div class="stat-card"><div class="stat-label">在手库存</div><div class="stat-value">'+st.stock_count+' 件</div></div><div class="stat-card"><div class="stat-label">在手价值</div><div class="stat-value orange">¥'+st.stock_value.toFixed(0)+'</div></div><div class="stat-card"><div class="stat-label">已完成</div><div class="stat-value green">'+st.done_count+' 笔</div></div><div class="stat-card"><div class="stat-label">总利润</div><div class="stat-value '+(st.total_profit>=0?'green':'red')+'">'+(st.total_profit>=0?'+':'')+'¥'+st.total_profit.toFixed(0)+'</div></div>';
+  $('home-stats').innerHTML='<div class="stat-card"><div class="stat-label">成本</div><div class="stat-value orange">¥'+st.total_cost.toFixed(0)+'</div></div><div class="stat-card"><div class="stat-label">售价</div><div class="stat-value">¥'+st.total_sell.toFixed(0)+'</div></div><div class="stat-card"><div class="stat-label">利润</div><div class="stat-value '+(st.total_profit>=0?'green':'red')+'">'+(st.total_profit>=0?'+':'')+'¥'+st.total_profit.toFixed(0)+'</div></div><div class="stat-card"><div class="stat-label">毛利率</div><div class="stat-value '+(st.margin_rate>=0?'green':'red')+'">'+(st.margin_rate>=0?'+':'')+st.margin_rate.toFixed(1)+'%</div></div>';
   var pend=toys.filter(function(t){ return t.status==='sold'; });
   $('home-pending-empty').style.display=pend.length===0?'block':'none';
   $('home-pending').innerHTML=pend.map(rc).join('');
