@@ -1369,15 +1369,15 @@ function openSell(id){
 }
 
 function mUpdFee(){
-  var fee=parseFloat($('m-logistics-fee').value)||0, box=parseFloat($('m-box-fee').value)||0, pack=parseFloat($('m-packing-fee').value)||0;
-  $('m-logistics-display').textContent='¥'+(fee+box+pack).toFixed(2);
+  var fee=parseFloat($('m-logistics-fee').value)||0, box=parseFloat($('m-box-fee').value)||0, pack=parseFloat($('m-packing-fee').value)||0, huabei=parseFloat($('m-sell-huabei').value)||0;
+  $('m-logistics-display').textContent='¥'+(fee+box+pack+huabei).toFixed(2);
 }
 
 function calcExtraFee(){
   var extra=$('m-sell-extra-fee').value;
   var price=parseFloat($('m-sell-price').value)||0;
   var amt=extra==='yes' ? (price*0.016) : 0;
-  $('m-sell-huabei').value=amt.toFixed(2);
+  $('m-sell-huabei').value=amt.toFixed(2); mUpdFee();
 }
 
 async function mCalcShipping(){
