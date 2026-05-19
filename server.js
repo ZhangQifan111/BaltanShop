@@ -525,8 +525,8 @@ app.get('/api/stats', (req, res) => {
   }
   const marginRate = totalSell > 0 ? (totalProfit / totalSell * 100) : 0;
   res.json({
-    total_cost: Math.round((totalCost+transitCost)*100)/100,
-    total_cost_done: Math.round(totalCost*100)/100,
+    total_cost: Math.round((stockValue+transitCost)*100)/100,
+    total_cost_done: Math.round(stockValue*100)/100,
     total_cost_transit: Math.round(transitCost*100)/100,
     total_sell: Math.round(totalSell*100)/100,
     total_profit: Math.round(totalProfit*100)/100,
