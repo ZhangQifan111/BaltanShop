@@ -1288,6 +1288,7 @@ async function submitTransitStage2() {
   await put('/api/purchase-records/'+id+'/stage2', p);
   $('tr-stage2-modal').classList.remove('active');
   renderTransitList();
+  renderHome();
 }
 
 async function openTransitStage3(id) {
@@ -1336,6 +1337,7 @@ async function submitTransit() {
   }
   $('tr-modal').classList.remove('active');
   renderTransitList();
+  renderHome();
 }
 
 var transitEditTargetId = null;
@@ -1401,7 +1403,8 @@ async function submitTransitEdit() {
   $('tr-edit-modal').classList.remove('active');
   toast('已保存');
   renderTransitList();
-  if (rec && rec.status === 'stocked') { await loadData(); renderHome(); }
+  await loadData();
+  renderHome();
 }
 
 var toyEditId = null;
