@@ -734,6 +734,12 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
         </div>
         <div class="form-group"><label>卖出价 (¥)</label><input type="number" id="misc-sell-price" placeholder="0" step="0.01" inputmode="decimal"></div>
         <div class="form-group"><label>卖出日期</label><input type="date" id="misc-date" value="2026-05-17"></div>
+        <div class="form-group"><label>额外扣费</label>
+          <select id="misc-extra-fee">
+            <option value="yes">是 (1.6%)</option>
+            <option value="no" selected>否</option>
+          </select>
+        </div>
       </div>
       <div style="margin-top:10px;font-size:11px;color:var(--text-muted)">成本暂不填写，后续可在编辑中补充</div>
       <div class="form-actions" style="margin-top:10px">
@@ -1195,10 +1201,12 @@ async function submitMiscSale(){
   var category=$('misc-category').value||'其他';
   if(!name){ toast('请填写名称'); return; }
   if(!priceVal || isNaN(price) || price <= 0){ toast('请填写正确的卖出价'); return; }
-  var toy={name:name,category:category,source:'secondhand',cost:null,status:'done',sell:price,date:date,sold_date:date};
+  var extraFee=$('misc-extra-fee').value;
+  var huabei=extraFee==='yes' ? (price*0.016) : 0;
+  var toy={name:name,category:category,source:'secondhand',cost:null,status:'done',sell:price,huabei:huabei,date:date,sold_date:date};
   await post('/api/toys',toy);
-  $('misc-name').value=''; $('misc-sell-price').value='';
-  toast('已记为卖出 ¥'+price);
+  $('misc-name').value=''; $('misc-sell-price').value=''; $('misc-extra-fee').value='no';
+  toast('已记为卖出 ¥'+price+(huabei>0?' (额外扣费 ¥'+huabei.toFixed(2)+')':''));
   await loadData();
   renderMiscList();
 }
