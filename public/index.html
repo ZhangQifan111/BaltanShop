@@ -433,27 +433,31 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
       </div>
     </div>
     <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
-      <div style="font-size:12px;font-weight:500;color:var(--orange);margin-bottom:8px">阶段①</div>
-      <div class="form-grid" style="gap:8px">
-        <div class="form-group"><label>日期</label><input type="date" id="tre-s1-date"></div>
-        <div class="form-group"><label>金额</label><input type="number" id="tre-s1-amount" step="0.01"></div>
-        <div class="form-group full"><label>备注</label><input type="text" id="tre-s1-note"></div>
+      <div style="font-size:12px;font-weight:500;color:var(--orange);margin-bottom:8px">阶段① 日本站</div>
+      <div class="form-grid" style="gap:6px;grid-template-columns:1fr 1fr 1fr">
+        <div class="form-group"><label style="font-size:9px">购入价</label><input type="number" id="tre-s1-jpy" step="0.01" inputmode="decimal" placeholder="日本购入"></div>
+        <div class="form-group"><label style="font-size:9px">手续费</label><input type="number" id="tre-s1-handling" step="0.01" inputmode="decimal" placeholder="手续费"></div>
+        <div class="form-group"><label style="font-size:9px">日本运费</label><input type="number" id="tre-s1-dom-ship" step="0.01" inputmode="decimal" placeholder="日本运费"></div>
+        <div class="form-group"><label style="font-size:9px">日期</label><input type="date" id="tre-s1-date"></div>
+        <div class="form-group full" style="grid-column:2/-1"><label style="font-size:9px">备注</label><input type="text" id="tre-s1-note" placeholder="可选备注"></div>
       </div>
     </div>
     <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
-      <div style="font-size:12px;font-weight:500;color:var(--blue);margin-bottom:8px">阶段②</div>
-      <div class="form-grid" style="gap:8px">
-        <div class="form-group"><label>日期</label><input type="date" id="tre-s2-date"></div>
-        <div class="form-group"><label>金额</label><input type="number" id="tre-s2-amount" step="0.01"></div>
-        <div class="form-group full"><label>备注</label><input type="text" id="tre-s2-note"></div>
+      <div style="font-size:12px;font-weight:500;color:var(--blue);margin-bottom:8px">阶段② 日本仓库</div>
+      <div class="form-grid" style="gap:6px;grid-template-columns:1fr 1fr 1fr">
+        <div class="form-group"><label style="font-size:9px">日本国内运费</label><input type="number" id="tre-s2-dom-ship" step="0.01" inputmode="decimal" placeholder="日本运费"></div>
+        <div class="form-group"><label style="font-size:9px">手续费</label><input type="number" id="tre-s2-handling" step="0.01" inputmode="decimal" placeholder="代购费"></div>
+        <div class="form-group"><label style="font-size:9px">日期</label><input type="date" id="tre-s2-date"></div>
+        <div class="form-group full" style="grid-column:2/-1"><label style="font-size:9px">备注</label><input type="text" id="tre-s2-note" placeholder="可选备注"></div>
       </div>
     </div>
     <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
-      <div style="font-size:12px;font-weight:500;color:var(--purple);margin-bottom:8px">阶段③</div>
-      <div class="form-grid" style="gap:8px">
-        <div class="form-group"><label>日期</label><input type="date" id="tre-s3-date"></div>
-        <div class="form-group"><label>金额</label><input type="number" id="tre-s3-amount" step="0.01"></div>
-        <div class="form-group full"><label>备注</label><input type="text" id="tre-s3-note"></div>
+      <div style="font-size:12px;font-weight:500;color:var(--purple);margin-bottom:8px">阶段③ 出境入库</div>
+      <div class="form-grid" style="gap:6px;grid-template-columns:1fr 1fr 1fr">
+        <div class="form-group"><label style="font-size:9px">国际运费</label><input type="number" id="tre-s3-intl-ship" step="0.01" inputmode="decimal" placeholder="国际运费"></div>
+        <div class="form-group"><label style="font-size:9px">税费</label><input type="number" id="tre-s3-tax" step="0.01" inputmode="decimal" placeholder="海关税费"></div>
+        <div class="form-group"><label style="font-size:9px">日期</label><input type="date" id="tre-s3-date"></div>
+        <div class="form-group full" style="grid-column:2/-1"><label style="font-size:9px">备注</label><input type="text" id="tre-s3-note" placeholder="可选备注"></div>
       </div>
     </div>
     <div class="btn-row" style="margin-top:16px"><button class="btn btn-primary" onclick="submitTransitEdit()">保存修改</button></div>
@@ -538,7 +542,14 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
         </select>
       </div>
       <div class="form-group"><label>日期</label><input type="date" id="tr-date"></div>
-      <div class="form-group full"><label>阶段① 金额</label><input type="number" id="tr-amount" placeholder="日本价格（RMB）" step="0.01"></div>
+      <div class="form-group full"><label>阶段① 日本站费用</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:4px">
+          <input type="number" id="tr-s1-jpy" placeholder="购入价" step="0.01" inputmode="decimal" oninput="calcTrS1Total()">
+          <input type="number" id="tr-s1-handling" placeholder="手续费" step="0.01" inputmode="decimal" oninput="calcTrS1Total()">
+          <input type="number" id="tr-s1-dom-ship" placeholder="日本运费" step="0.01" inputmode="decimal" oninput="calcTrS1Total()">
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);text-align:right">合计：¥<span id="tr-s1-total">0</span></div>
+      </div>
       <div class="form-group full"><label>备注</label><input type="text" id="tr-note" placeholder="可选备注"></div>
     </div>
     <div class="btn-row"><button class="btn btn-primary" onclick="submitTransit()">保存</button></div>
@@ -1259,9 +1270,16 @@ async function renderTransitList() {
     var stageLabel = {stage1:'阶段①',stage2:'阶段②',stage3:'阶段③',stocked:'已入库',cancelled:'已取消'}[stage]||stage;
     var stageColor = {stage1:'var(--orange)',stage2:'var(--blue)',stage3:'var(--purple)',stocked:'var(--green)',cancelled:'var(--text-muted)'}[stage];
     var stageBg = {stage1:'rgba(240,160,48,0.12)',stage2:'rgba(96,165,250,0.12)',stage3:'rgba(168,85,247,0.12)',stocked:'rgba(74,222,128,0.12)',cancelled:'rgba(107,112,133,0.12)'}[stage];
-    var s1 = r.stage1_amount ? '<span>①¥'+r.stage1_amount.toFixed(0)+'</span>' : '';
-    var s2 = r.stage2_amount ? '<span>②¥'+r.stage2_amount.toFixed(0)+'</span>' : '';
-    var s3 = r.stage3_amount ? '<span>③¥'+r.stage3_amount.toFixed(0)+'</span>' : '';
+    var s1jpy = r.stage1_jpy ? r.stage1_jpy.toFixed(0) : '';
+    var s1h = r.stage1_handling ? r.stage1_handling.toFixed(0) : '';
+    var s1ds = r.stage1_domestic_ship ? r.stage1_domestic_ship.toFixed(0) : '';
+    var s1 = '<span class="stage-chip">①' + (s1jpy?'买'+s1jpy:'') + (s1h?'费'+s1h:'') + (s1ds?'运'+s1ds:'') + (r.stage1_amount?'¥'+r.stage1_amount.toFixed(0):'') + '</span>';
+    var s2ds = r.stage2_domestic_ship ? r.stage2_domestic_ship.toFixed(0) : '';
+    var s2h = r.stage2_handling ? r.stage2_handling.toFixed(0) : '';
+    var s2 = r.stage2_amount ? '<span class="stage-chip">②' + (s2ds?'运'+s2ds:'') + (s2h?'费'+s2h:'') + '¥'+r.stage2_amount.toFixed(0) + '</span>' : '';
+    var s3i = r.stage3_intl_ship ? r.stage3_intl_ship.toFixed(0) : '';
+    var s3t = r.stage3_tax ? r.stage3_tax.toFixed(0) : '';
+    var s3 = r.stage3_amount ? '<span class="stage-chip">③' + (s3i?'国'+s3i:'') + (s3t?'税'+s3t:'') + '¥'+r.stage3_amount.toFixed(0) + '</span>' : '';
     var nextBtn = '';
     if (stage === 'stage1') nextBtn = '<button class="card-btn advance" onclick="openTransitStage2('+r.id+')">推进阶段②</button>';
     if (stage === 'stage2') nextBtn = '<button class="card-btn advance" onclick="openTransitStage3('+r.id+')">推进阶段③</button>';
@@ -1282,14 +1300,24 @@ async function renderTransitList() {
 
 var transitEditId = null;
 
+function calcTrS1Total() {
+  var jpy = parseFloat($('tr-s1-jpy').value)||0;
+  var handling = parseFloat($('tr-s1-handling').value)||0;
+  var domShip = parseFloat($('tr-s1-dom-ship').value)||0;
+  $('tr-s1-total').textContent = (jpy + handling + domShip).toFixed(2);
+}
+
 function openTransitModal(rec) {
   transitEditId = rec ? rec.id : null;
   $('tr-name').value = rec ? rec.name : '';
   $('tr-category').value = rec ? rec.category : '其他';
   $('tr-source').value = rec ? rec.source : 'direct';
   $('tr-date').value = rec ? (rec.stage1_date||today()) : today();
-  $('tr-amount').value = rec ? rec.stage1_amount : '';
+  $('tr-s1-jpy').value = rec ? (rec.stage1_jpy||'') : '';
+  $('tr-s1-handling').value = rec ? (rec.stage1_handling||'') : '';
+  $('tr-s1-dom-ship').value = rec ? (rec.stage1_domestic_ship||'') : '';
   $('tr-note').value = rec ? (rec.stage1_note||'') : '';
+  calcTrS1Total();
   $('tr-modal-title').textContent = transitEditId ? '编辑进货记录' : '新增进货';
   $('tr-modal').classList.add('active');
 }
@@ -1307,7 +1335,7 @@ async function submitTransitStage2() {
   var id = transitEditId;
   var domShip = parseFloat($('tr2-dom-ship').value)||0;
   var handling = parseFloat($('tr2-handling').value)||0;
-  var p = { stage2_date: $('tr2-date').value, stage2_amount: domShip + handling, stage2_note: $('tr2-note').value };
+  var p = { stage2_date: $('tr2-date').value, stage2_domestic_ship: domShip, stage2_handling: handling, stage2_amount: domShip + handling, stage2_note: $('tr2-note').value };
   await put('/api/purchase-records/'+id+'/stage2', p);
   $('tr-stage2-modal').classList.remove('active');
   renderTransitList();
@@ -1323,7 +1351,8 @@ async function openTransitStage3(id) {
   var recs = await get('/api/purchase-records');
   var rec = recs.find(function(r){ return r.id == id; });
   if (rec) {
-    var tax = rec.stage1_amount > 0 ? (rec.stage1_amount * 0.13).toFixed(2) : '';
+    var jpy = rec.stage1_jpy || 0;
+    var tax = jpy > 0 ? (jpy * 0.13).toFixed(2) : '';
     $('tr3-tax').value = tax;
   }
   $('tr-stage3-modal').classList.add('active');
@@ -1333,7 +1362,7 @@ async function submitTransitStage3() {
   var id = transitEditId;
   var intlShip = parseFloat($('tr3-intl-ship').value)||0;
   var tax = parseFloat($('tr3-tax').value)||0;
-  var p = { stage3_date: $('tr3-date').value, stage3_amount: intlShip + tax, stage3_note: $('tr3-note').value };
+  var p = { stage3_date: $('tr3-date').value, stage3_intl_ship: intlShip, stage3_tax: tax, stage3_amount: intlShip + tax, stage3_note: $('tr3-note').value };
   await put('/api/purchase-records/'+id+'/stage3', p);
   $('tr-stage3-modal').classList.remove('active');
   toast('已入库');
@@ -1345,12 +1374,18 @@ async function submitTransitStage3() {
 async function submitTransit() {
   var name = $('tr-name').value.trim();
   if (!name) { toast('请填写名称'); return; }
+  var jpy = parseFloat($('tr-s1-jpy').value)||0;
+  var handling = parseFloat($('tr-s1-handling').value)||0;
+  var domShip = parseFloat($('tr-s1-dom-ship').value)||0;
   var p = {
     name: name,
     category: $('tr-category').value,
     source: $('tr-source').value,
     stage1_date: $('tr-date').value,
-    stage1_amount: parseFloat($('tr-amount').value)||0,
+    stage1_jpy: jpy,
+    stage1_handling: handling,
+    stage1_domestic_ship: domShip,
+    stage1_amount: jpy + handling + domShip,
     stage1_note: $('tr-note').value
   };
   if (transitEditId) {
@@ -1373,14 +1408,21 @@ async function openTransitEdit(id) {
   $('tre-name').value = r.name || '';
   $('tre-category').value = r.category || '其他';
   $('tre-source').value = r.source || 'direct';
+  // Stage 1
+  $('tre-s1-jpy').value = r.stage1_jpy || '';
+  $('tre-s1-handling').value = r.stage1_handling || '';
+  $('tre-s1-dom-ship').value = r.stage1_domestic_ship || '';
   $('tre-s1-date').value = r.stage1_date || '';
-  $('tre-s1-amount').value = r.stage1_amount || '';
   $('tre-s1-note').value = r.stage1_note || '';
+  // Stage 2
+  $('tre-s2-dom-ship').value = r.stage2_domestic_ship || '';
+  $('tre-s2-handling').value = r.stage2_handling || '';
   $('tre-s2-date').value = r.stage2_date || '';
-  $('tre-s2-amount').value = r.stage2_amount || '';
   $('tre-s2-note').value = r.stage2_note || '';
+  // Stage 3
+  $('tre-s3-intl-ship').value = r.stage3_intl_ship || '';
+  $('tre-s3-tax').value = r.stage3_tax || '';
   $('tre-s3-date').value = r.stage3_date || '';
-  $('tre-s3-amount').value = r.stage3_amount || '';
   $('tre-s3-note').value = r.stage3_note || '';
   $('tr-edit-modal').classList.add('active');
 }
@@ -1389,18 +1431,32 @@ async function submitTransitEdit() {
   var id = transitEditTargetId;
   var name = $('tre-name').value.trim();
   if (!name) { toast('请填写名称'); return; }
+  var s1jpy = parseFloat($('tre-s1-jpy').value)||0;
+  var s1h = parseFloat($('tre-s1-handling').value)||0;
+  var s1ds = parseFloat($('tre-s1-dom-ship').value)||0;
+  var s2ds = parseFloat($('tre-s2-dom-ship').value)||0;
+  var s2h = parseFloat($('tre-s2-handling').value)||0;
+  var s3i = parseFloat($('tre-s3-intl-ship').value)||0;
+  var s3t = parseFloat($('tre-s3-tax').value)||0;
   var p = {
     name: name,
     category: $('tre-category').value,
     source: $('tre-source').value,
     stage1_date: $('tre-s1-date').value,
-    stage1_amount: parseFloat($('tre-s1-amount').value)||0,
+    stage1_jpy: s1jpy,
+    stage1_handling: s1h,
+    stage1_domestic_ship: s1ds,
+    stage1_amount: s1jpy + s1h + s1ds,
     stage1_note: $('tre-s1-note').value,
     stage2_date: $('tre-s2-date').value,
-    stage2_amount: parseFloat($('tre-s2-amount').value)||0,
+    stage2_domestic_ship: s2ds,
+    stage2_handling: s2h,
+    stage2_amount: s2ds + s2h,
     stage2_note: $('tre-s2-note').value,
     stage3_date: $('tre-s3-date').value,
-    stage3_amount: parseFloat($('tre-s3-amount').value)||0,
+    stage3_intl_ship: s3i,
+    stage3_tax: s3t,
+    stage3_amount: s3i + s3t,
     stage3_note: $('tre-s3-note').value
   };
   await put('/api/purchase-records/'+id, p);

@@ -144,17 +144,33 @@ async function initDB() {
       source TEXT NOT NULL DEFAULT 'direct',
       stage1_date TEXT,
       stage1_amount REAL DEFAULT 0,
+      stage1_jpy REAL DEFAULT 0,
+      stage1_handling REAL DEFAULT 0,
+      stage1_domestic_ship REAL DEFAULT 0,
       stage1_note TEXT,
       stage2_date TEXT,
       stage2_amount REAL DEFAULT 0,
+      stage2_domestic_ship REAL DEFAULT 0,
+      stage2_handling REAL DEFAULT 0,
       stage2_note TEXT,
       stage3_date TEXT,
       stage3_amount REAL DEFAULT 0,
+      stage3_intl_ship REAL DEFAULT 0,
+      stage3_tax REAL DEFAULT 0,
       stage3_note TEXT,
       status TEXT NOT NULL DEFAULT 'stage1',
       created_at TEXT DEFAULT (datetime('now','localtime'))
     )
   `);
+
+  // Migration: add per-stage fee breakdown columns to purchase_records (existing DBs)
+  try { db.run("ALTER TABLE purchase_records ADD COLUMN stage1_jpy REAL DEFAULT 0"); } catch (e) { /* col exists */ }
+  try { db.run("ALTER TABLE purchase_records ADD COLUMN stage1_handling REAL DEFAULT 0"); } catch (e) { /* col exists */ }
+  try { db.run("ALTER TABLE purchase_records ADD COLUMN stage1_domestic_ship REAL DEFAULT 0"); } catch (e) { /* col exists */ }
+  try { db.run("ALTER TABLE purchase_records ADD COLUMN stage2_domestic_ship REAL DEFAULT 0"); } catch (e) { /* col exists */ }
+  try { db.run("ALTER TABLE purchase_records ADD COLUMN stage2_handling REAL DEFAULT 0"); } catch (e) { /* col exists */ }
+  try { db.run("ALTER TABLE purchase_records ADD COLUMN stage3_intl_ship REAL DEFAULT 0"); } catch (e) { /* col exists */ }
+  try { db.run("ALTER TABLE purchase_records ADD COLUMN stage3_tax REAL DEFAULT 0"); } catch (e) { /* col exists */ }
 
   // Default categories
   const rc0 = queryOne("SELECT COUNT(*) as c FROM settings WHERE key='categories'"); if (!rc0 || rc0.c === 0) {
@@ -343,16 +359,23 @@ app.post('/api/purchase-records', (req, res) => {
 
 app.put('/api/purchase-records/:id/stage1', (req, res) => {
   const p = req.body;
-  db.run(`UPDATE purchase_records SET stage1_date=?, stage1_amount=?, stage1_note=? WHERE id=?`,
-    [p.stage1_date||'', p.stage1_amount||0, p.stage1_note||'', req.params.id]);
+  const jpy = parseFloat(p.stage1_jpy)||0;
+  const handling = parseFloat(p.stage1_handling)||0;
+  const domShip = parseFloat(p.stage1_domestic_ship)||0;
+  const stage1_amount = jpy + handling + domShip;
+  db.run(`UPDATE purchase_records SET stage1_date=?, stage1_amount=?, stage1_jpy=?, stage1_handling=?, stage1_domestic_ship=?, stage1_note=? WHERE id=?`,
+    [p.stage1_date||'', stage1_amount, jpy, handling, domShip, p.stage1_note||'', req.params.id]);
   saveDB();
   res.json(queryOne('SELECT * FROM purchase_records WHERE id=?', [req.params.id]));
 });
 
 app.put('/api/purchase-records/:id/stage2', (req, res) => {
   const p = req.body;
-  db.run(`UPDATE purchase_records SET stage2_date=?, stage2_amount=?, stage2_note=?, status='stage2' WHERE id=?`,
-    [p.stage2_date||'', p.stage2_amount||0, p.stage2_note||'', req.params.id]);
+  const domShip = parseFloat(p.stage2_domestic_ship)||0;
+  const handling = parseFloat(p.stage2_handling)||0;
+  const stage2_amount = domShip + handling;
+  db.run(`UPDATE purchase_records SET stage2_date=?, stage2_amount=?, stage2_domestic_ship=?, stage2_handling=?, stage2_note=?, status='stage2' WHERE id=?`,
+    [p.stage2_date||'', stage2_amount, domShip, handling, p.stage2_note||'', req.params.id]);
   saveDB();
   res.json(queryOne('SELECT * FROM purchase_records WHERE id=?', [req.params.id]));
 });
@@ -362,16 +385,25 @@ app.put('/api/purchase-records/:id/stage3', (req, res) => {
   const rec = queryOne('SELECT * FROM purchase_records WHERE id=?', [req.params.id]);
   if (!rec) return res.status(404).json({ error: 'Not found' });
 
-  // Finalize the purchase record
-  db.run(`UPDATE purchase_records SET stage3_date=?, stage3_amount=?, stage3_note=?, status='stocked' WHERE id=?`,
-    [p.stage3_date||'', p.stage3_amount||0, p.stage3_note||'', req.params.id]);
+  const intlShip = parseFloat(p.stage3_intl_ship)||0;
+  const tax = parseFloat(p.stage3_tax)||0;
+  const stage3_amount = intlShip + tax;
 
-  // Create the toy in stock with the total cost
-  const totalCost = (rec.stage1_amount||0) + (rec.stage2_amount||0) + (p.stage3_amount||0);
+  // Finalize the purchase record
+  db.run(`UPDATE purchase_records SET stage3_date=?, stage3_amount=?, stage3_intl_ship=?, stage3_tax=?, stage3_note=?, status='stocked' WHERE id=?`,
+    [p.stage3_date||'', stage3_amount, intlShip, tax, p.stage3_note||'', req.params.id]);
+
+  // Sum all stage amounts
+  const totalCost = (rec.stage1_amount||0) + (rec.stage2_amount||0) + stage3_amount;
+  // Map fee breakdown to toys table fields
+  const japan_price_cny = rec.stage1_jpy || 0;
+  const handling_fee = (rec.stage1_handling||0) + (rec.stage2_handling||0);
+  const japan_domestic_shipping = (rec.stage1_domestic_ship||0) + (rec.stage2_domestic_ship||0);
+
   db.run(`INSERT INTO toys (date,name,category,source,cost,status,japan_price_cny,handling_fee,japan_domestic_shipping,intl_shipping,tax)
     VALUES (?,?,?,?,?,'stock',?,?,?,?,?)`,
     [p.stage3_date||rec.stage1_date||'', rec.name, rec.category, rec.source, totalCost,
-     rec.stage1_amount||0, rec.stage2_amount||0, 0, p.stage3_amount||0]);
+     japan_price_cny, handling_fee, japan_domestic_shipping, intlShip, tax]);
   saveDB();
 
   res.json(queryOne('SELECT * FROM purchase_records WHERE id=?', [req.params.id]));
@@ -383,14 +415,18 @@ app.put('/api/purchase-records/:id', (req, res) => {
   if (!rec) return res.status(404).json({ error: 'Not found' });
   db.run(`UPDATE purchase_records SET
     name=?, category=?, source=?,
-    stage1_date=?, stage1_amount=?, stage1_note=?,
-    stage2_date=?, stage2_amount=?, stage2_note=?,
-    stage3_date=?, stage3_amount=?, stage3_note=?,
+    stage1_date=?, stage1_amount=?, stage1_jpy=?, stage1_handling=?, stage1_domestic_ship=?, stage1_note=?,
+    stage2_date=?, stage2_amount=?, stage2_domestic_ship=?, stage2_handling=?, stage2_note=?,
+    stage3_date=?, stage3_amount=?, stage3_intl_ship=?, stage3_tax=?, stage3_note=?,
     status=? WHERE id=?`, [
     p.name||rec.name, p.category||rec.category, p.source||rec.source,
-    p.stage1_date||rec.stage1_date, p.stage1_amount??rec.stage1_amount, p.stage1_note??rec.stage1_note,
-    p.stage2_date||rec.stage2_date, p.stage2_amount??rec.stage2_amount, p.stage2_note??rec.stage2_note,
-    p.stage3_date||rec.stage3_date, p.stage3_amount??rec.stage3_amount, p.stage3_note??rec.stage3_note,
+    p.stage1_date||rec.stage1_date, p.stage1_amount??rec.stage1_amount,
+    parseFloat(p.stage1_jpy)||rec.stage1_jpy||0, parseFloat(p.stage1_handling)||rec.stage1_handling||0,
+    parseFloat(p.stage1_domestic_ship)||rec.stage1_domestic_ship||0, p.stage1_note??rec.stage1_note,
+    p.stage2_date||rec.stage2_date, p.stage2_amount??rec.stage2_amount,
+    parseFloat(p.stage2_domestic_ship)||rec.stage2_domestic_ship||0, parseFloat(p.stage2_handling)||rec.stage2_handling||0, p.stage2_note??rec.stage2_note,
+    p.stage3_date||rec.stage3_date, p.stage3_amount??rec.stage3_amount,
+    parseFloat(p.stage3_intl_ship)||rec.stage3_intl_ship||0, parseFloat(p.stage3_tax)||rec.stage3_tax||0, p.stage3_note??rec.stage3_note,
     p.status||rec.status, req.params.id
   ]);
   saveDB();
