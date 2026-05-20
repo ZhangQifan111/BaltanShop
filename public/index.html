@@ -1937,7 +1937,6 @@ async function renderFeeRules() {
     '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">内运费</th>' +
     '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">箱费</th>' +
     '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">咸鱼%</th>' +
-    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">利润率</th>' +
     '<th style="padding:8px 6px"></th>' +
     '</tr>' +
     rules.map(function(r) {
@@ -1951,7 +1950,6 @@ async function renderFeeRules() {
         '<td style="padding:8px 6px;text-align:right">¥' + (r.domestic_shipping||0) + '</td>' +
         '<td style="padding:8px 6px;text-align:right">¥' + ((r.box_fee||0)+(r.packing_fee||0)) + '</td>' +
         '<td style="padding:8px 6px;text-align:right">' + (r.handling_fee_percent||0) + '%</td>' +
-        '<td style="padding:8px 6px;text-align:right;color:var(--green)">' + (r.profit_margin_percent||15) + '%</td>' +
         '<td style="padding:8px 6px;text-align:right">' +
           '<button onclick="editFeeRule(' + r.id + ')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:2px 6px">编辑</button>' +
           '<button onclick="deleteFeeRule(' + r.id + ')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;padding:2px 4px">删</button>' +
@@ -1993,8 +1991,6 @@ function showFeeRuleForm(rule) {
     '</div></div>' +
     '<div class="form-row" style="margin-top:10px"><div class="form-group">' +
       '<label>箱费+包装 (¥)</label><input type="number" id="rfc-box" value="' + (rule ? (rule.box_fee||'') : '') + '" inputmode="decimal" placeholder="0">' +
-    '</div><div class="form-group">' +
-      '<label>默认利润率 (%)</label><input type="number" id="rfc-margin" value="' + (rule ? rule.profit_margin_percent : '15') + '" inputmode="decimal" placeholder="15">' +
     '</div></div>' +
     '<div style="display:flex;gap:8px;margin-top:14px">' +
       '<button onclick="saveFeeRule()" class="btn btn-primary" style="flex:1">保存</button>' +
@@ -2026,7 +2022,7 @@ async function saveFeeRule() {
     domestic_shipping: parseFloat($('rfc-dom').value) || 0,
     box_fee: parseFloat($('rfc-box').value) || 0,
     packing_fee: 0,
-    profit_margin_percent: parseFloat($('rfc-margin').value) || 15
+    profit_margin_percent: 15
   };
   if (editingFeeRuleId) {
     await put('/api/fee-rules/' + editingFeeRuleId, data);
