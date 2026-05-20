@@ -967,6 +967,7 @@ function put(u,d){ return fetch(u,{method:'PUT',headers:{'Content-Type':'applica
 function del(u){ return fetch(u,{method:'DELETE'}).then(r=>r.json()); }
 function get(u){ return fetch(u).then(r=>r.json()); }
 function toast(m){ var t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2000); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function today(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function sl(s){ return {direct:'直购',proxy:'代购',domestic:'国内'}[s]||s; }
 function sb(s){ var m={stock:['在手','badge-stock'],sold:['已发货','badge-sold'],done:['已完成','badge-done'],returned:['已退货','badge-returned']}; var b=m[s]||['未知','badge-stock']; return '<span class="badge '+b[1]+'">'+b[0]+'</span>'; }
