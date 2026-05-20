@@ -1464,15 +1464,18 @@ async function submitTransitEdit() {
   };
   await put('/api/purchase-records/'+id, p);
 
-  // 如果是已入库状态，同步更新对应库存记录的成本
+  // 如果是已入库状态，同步更新对应库存记录的金额和分项
   var recs = await get('/api/purchase-records');
   var rec = recs.find(function(r){ return r.id == id; });
   if (rec && rec.status === 'stocked') {
     var newCost = (rec.stage1_amount||0) + (rec.stage2_amount||0) + (rec.stage3_amount||0);
     var toys = await get('/api/toys');
-    var toy = toys.find(function(t){ return t.name === rec.name && t.cost === newCost; });
-    // 如果找不到精确匹配的，尝试按名称找最新的
-    if (!toy) toy = toys.find(function(t){ return t.name === rec.name && t.status === 'stock'; });
+    // 优先：同名称 + 在库状态的记录
+    var toy = toys.find(function(t){ return t.name === rec.name && t.status === 'stock'; });
+    // 次选：同名称 + cost相同的记录（可能是之前入库的）
+    if (!toy) toy = toys.find(function(t){ return t.name === rec.name && t.cost === newCost; });
+    // 最后：同名称的任意记录
+    if (!toy) toy = toys.find(function(t){ return t.name === rec.name; });
     if (toy) {
       toy.cost = newCost;
       toy.japan_price_cny = rec.stage1_jpy||0;
@@ -1481,6 +1484,7 @@ async function submitTransitEdit() {
       toy.intl_shipping = rec.stage3_intl_ship||0;
       toy.tax = rec.stage3_tax||0;
       await put('/api/toys/'+toy.id, toy);
+      toast('已同步更新库存记录');
     }
   }
 
