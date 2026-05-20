@@ -399,6 +399,12 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
 .screenshot-btn { display: inline-flex; align-items: center; gap: 4px; background: var(--blue-dim); color: var(--blue); border: 1px solid rgba(96,165,250,0.3); border-radius: 20px; padding: 4px 12px; font-size: 11px; cursor: pointer; font-family: 'DM Mono', monospace; white-space: nowrap; transition: all 0.15s; }
 .screenshot-btn:hover { background: rgba(96,165,250,0.2); }
 
+/* Calc detail rows */
+.calc-detail-row { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; color: var(--text-secondary); }
+
+/* Form row (2 columns) */
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
 </style>
 </head>
 <body>
@@ -594,6 +600,12 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
   </button>
   <button class="nav-item" onclick="switchTab('misc',this)">
     <span class="nav-icon">🏷️</span><span class="nav-label">杂项</span>
+  </button>
+  <button class="nav-item" onclick="switchTab('feerules',this)">
+    <span class="nav-icon">📐</span><span class="nav-label">费用规则</span>
+  </button>
+  <button class="nav-item" onclick="switchTab('calc',this)">
+    <span class="nav-icon">🧮</span><span class="nav-label">买入估算</span>
   </button>
   <button class="nav-item" onclick="switchTab('settings',this)">
     <span class="nav-icon">⚙️</span><span class="nav-label">设置</span>
@@ -973,6 +985,8 @@ function switchTab(n,btn){
   if(n==='supplies'){ renderSupplies(); renderSupplyLogs(); }
   if(n==='misc') renderMiscList();
   if(n==='settings') renderSettings();
+  if(n==='feerules') renderFeeRules();
+  if(n==='calc') renderCalculator();
 }
 
 function onSourceChange(){
@@ -1521,7 +1535,7 @@ async function deleteTransit(id) {
 
 function setFilter(f,btn){ curF=f; document.querySelectorAll('.filter-chip').forEach(function(e){e.classList.remove('active');}); btn.classList.add('active'); renderSoldList(); }
 
-async function loadData(){ toys=await get('/api/toys'); supplies=await get('/api/supplies');  var s=await get('/api/settings'); if(s&&s.categories){ categories=s.categories.split(',').filter(c=>c.trim()); renderCategories(); } }
+async function loadData(){ toys=await get('/api/toys'); supplies=await get('/api/supplies');  var s=await get('/api/settings'); if(s&&s.categories){ categories=s.categories.split(',').filter(c=>c.trim()); renderCategories(); } await loadBoxSizes(); }
 
 function renderCategories(list){ if(list) categories=list; ['f-category','misc-category','te-category','tre-category','tr-category'].forEach(function(id){ var sel=$(id); if(!sel) return; sel.innerHTML=''; categories.forEach(function(c){ var opt=document.createElement('option'); opt.value=c; opt.textContent=c; sel.appendChild(opt); }); }); }
 
@@ -1904,6 +1918,172 @@ async function recSubmit() {
   }
 }
 
+// ─── Fee Rules ───
+async function renderFeeRules() {
+  var rules = await get('/api/fee-rules');
+  var list = $('feerules-list');
+  var empty = $('feerules-empty');
+  if (!rules || rules.length === 0) { list.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  list.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+    '<tr style="background:var(--bg-secondary)">' +
+    '<th style="padding:8px 6px;text-align:left;font-size:10px;color:var(--text-muted)">品类</th>' +
+    '<th style="padding:8px 6px;text-align:left;font-size:10px;color:var(--text-muted)">箱规</th>' +
+    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">手续费%</th>' +
+    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">日本运费</th>' +
+    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">国际运费</th>' +
+    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">税费</th>' +
+    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">国内运费</th>' +
+    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">利润率%</th>' +
+    '<th style="padding:8px 6px"></th>' +
+    '</tr>' +
+    rules.map(function(r) {
+      return '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:8px 6px">' + esc(r.category) + '</td>' +
+        '<td style="padding:8px 6px;color:var(--text-muted)">' + (r.box_size || '通用') + '</td>' +
+        '<td style="padding:8px 6px;text-align:right">' + (r.handling_fee_percent||0) + '%</td>' +
+        '<td style="padding:8px 6px;text-align:right">¥' + (r.japan_domestic_shipping||0) + '</td>' +
+        '<td style="padding:8px 6px;text-align:right">¥' + (r.intl_shipping||0) + '</td>' +
+        '<td style="padding:8px 6px;text-align:right">¥' + (r.tax||0) + '</td>' +
+        '<td style="padding:8px 6px;text-align:right">¥' + (r.domestic_shipping||0) + '</td>' +
+        '<td style="padding:8px 6px;text-align:right;color:var(--green)">' + (r.profit_margin_percent||15) + '%</td>' +
+        '<td style="padding:8px 6px;text-align:right">' +
+          '<button onclick="editFeeRule(' + r.id + ')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:2px 6px">编辑</button>' +
+          '<button onclick="deleteFeeRule(' + r.id + ')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;padding:2px 4px">删</button>' +
+        '</td></tr>';
+    }).join('') + '</table>';
+}
+
+var editingFeeRuleId = null;
+
+function showFeeRuleForm(rule) {
+  editingFeeRuleId = rule ? rule.id : null;
+  var cats = categories;
+  var boxes = window.boxSizes || [];
+  var html = '<div class="card" style="margin-top:12px">' +
+    '<div style="font-size:13px;font-weight:600;margin-bottom:12px">' + (rule ? '编辑规则' : '添加规则') + '</div>' +
+    '<div class="form-row"><div class="form-group">' +
+      '<label>品类 *</label>' +
+      '<select id="rfc-category">' + cats.map(function(c){ return '<option value="'+esc(c)+'">' + esc(c) + '</option>'; }).join('') + '</select>' +
+    '</div><div class="form-group">' +
+      '<label>箱规（留空=通用）</label>' +
+      '<select id="rfc-box-size"><option value="">通用</option>' + boxes.map(function(b){ return '<option value="'+esc(b)+'">' + esc(b) + '</option>'; }).join('') + '</select>' +
+    '</div></div>' +
+    '<div class="form-row" style="margin-top:10px"><div class="form-group">' +
+      '<label>手续费 (%)</label><input type="number" id="rfc-hf" value="' + (rule ? rule.handling_fee_percent : '') + '" inputmode="decimal" placeholder="0">' +
+    '</div><div class="form-group">' +
+      '<label>日本运费 (¥)</label><input type="number" id="rfc-jp" value="' + (rule ? rule.japan_domestic_shipping : '') + '" inputmode="decimal" placeholder="0">' +
+    '</div></div>' +
+    '<div class="form-row" style="margin-top:10px"><div class="form-group">' +
+      '<label>国际运费 (¥)</label><input type="number" id="rfc-intl" value="' + (rule ? rule.intl_shipping : '') + '" inputmode="decimal" placeholder="0">' +
+    '</div><div class="form-group">' +
+      '<label>税费 (¥)</label><input type="number" id="rfc-tax" value="' + (rule ? rule.tax : '') + '" inputmode="decimal" placeholder="0">' +
+    '</div></div>' +
+    '<div class="form-row" style="margin-top:10px"><div class="form-group">' +
+      '<label>国内运费 (¥)</label><input type="number" id="rfc-dom" value="' + (rule ? rule.domestic_shipping : '') + '" inputmode="decimal" placeholder="0">' +
+    '</div><div class="form-group">' +
+      '<label>箱费+包装 (¥)</label><input type="number" id="rfc-box" value="' + (rule ? (rule.box_fee||'') : '') + '" inputmode="decimal" placeholder="0">' +
+    '</div></div>' +
+    '<div class="form-group" style="margin-top:10px">' +
+      '<label>默认利润率 (%)</label><input type="number" id="rfc-margin" value="' + (rule ? rule.profit_margin_percent : '15') + '" inputmode="decimal" placeholder="15">' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:14px">' +
+      '<button onclick="saveFeeRule()" class="btn btn-primary" style="flex:1">保存</button>' +
+      '<button onclick="renderFeeRules()" class="btn" style="flex:1">取消</button>' +
+    '</div>' +
+  '</div>';
+  $('feerules-list').innerHTML = html;
+  if (rule) {
+    $('rfc-category').value = rule.category || '';
+    $('rfc-box-size').value = rule.box_size || '';
+  }
+}
+
+async function editFeeRule(id) {
+  var rules = await get('/api/fee-rules');
+  var rule = rules.find(function(r){ return r.id === id; });
+  if (rule) showFeeRuleForm(rule);
+}
+
+async function saveFeeRule() {
+  var data = {
+    category: $('rfc-category').value,
+    box_size: $('rfc-box-size').value,
+    handling_fee_percent: parseFloat($('rfc-hf').value) || 0,
+    japan_domestic_shipping: parseFloat($('rfc-jp').value) || 0,
+    intl_shipping: parseFloat($('rfc-intl').value) || 0,
+    tax: parseFloat($('rfc-tax').value) || 0,
+    domestic_shipping: parseFloat($('rfc-dom').value) || 0,
+    box_fee: parseFloat($('rfc-box').value) || 0,
+    packing_fee: 0,
+    profit_margin_percent: parseFloat($('rfc-margin').value) || 15
+  };
+  if (editingFeeRuleId) {
+    await put('/api/fee-rules/' + editingFeeRuleId, data);
+    toast('已更新');
+  } else {
+    await post('/api/fee-rules', data);
+    toast('已添加');
+  }
+  await renderFeeRules();
+}
+
+async function deleteFeeRule(id) {
+  if (!confirm('确定删除该规则？')) return;
+  await del('/api/fee-rules/' + id);
+  toast('已删除');
+  await renderFeeRules();
+}
+
+// ─── Calculator ───
+async function renderCalculator() {
+  var cats = categories;
+  var sel = $('calc-category');
+  sel.innerHTML = '<option value="">— 选择品类 —</option>' + cats.map(function(c){ return '<option value="'+esc(c)+'">' + esc(c) + '</option>'; }).join('');
+  var boxes = window.boxSizes || [];
+  var boxSel = $('calc-box-size');
+  boxSel.innerHTML = '<option value="">— 选择箱规 —</option>' + boxes.map(function(b){ return '<option value="'+esc(b)+'">' + esc(b) + '</option>'; }).join('');
+  var settings = await get('/api/settings');
+  $('calc-margin').value = settings && settings.default_profit_margin || '15';
+  $('calc-result').style.display = 'none';
+}
+
+function onCalcCategoryChange() {
+  doCalc();
+}
+
+async function doCalc() {
+  var sell = parseFloat($('calc-sell').value) || 0;
+  var cat = $('calc-category').value;
+  var box = $('calc-box-size').value;
+  if (sell <= 0) { $('calc-result').style.display = 'none'; return; }
+  var margin = parseFloat($('calc-margin').value) || 15;
+  var body = { sell_price: sell, category: cat, box_size: box, custom_fees: { profit_margin_percent: margin } };
+  var res = await post('/api/calc-buy-price', body);
+  $('calc-result').style.display = 'block';
+  $('calc-buy-price').textContent = res.buy_price_max.toFixed(2);
+  $('calc-detail-sell').textContent = '¥' + res.sell_price.toFixed(2);
+  $('calc-detail-hf-pct').textContent = res.fees.handling_fee_percent;
+  $('calc-detail-hf').textContent = res.fees.handling_fee.toFixed(2);
+  $('calc-detail-jp').textContent = res.fees.japan_domestic_shipping.toFixed(2);
+  $('calc-detail-intl').textContent = res.fees.intl_shipping.toFixed(2);
+  $('calc-detail-tax').textContent = res.fees.tax.toFixed(2);
+  $('calc-detail-dom').textContent = res.fees.domestic_shipping.toFixed(2);
+  $('calc-detail-box').textContent = (res.fees.box_fee + res.fees.packing_fee).toFixed(2);
+  $('calc-detail-margin-pct').textContent = res.target_profit_margin;
+  $('calc-detail-margin').textContent = res.target_profit.toFixed(2);
+  $('calc-detail-buy').textContent = res.buy_price_max.toFixed(2);
+  $('calc-detail-breakeven').textContent = res.break_even.toFixed(2);
+}
+
+// ─── Load box sizes on startup ───
+async function loadBoxSizes() {
+  try {
+    var boxes = await get('/api/box-sizes');
+    window.boxSizes = boxes || [];
+  } catch(e) { window.boxSizes = []; }
+}
+
 </script>
 <script>async function addSupply(){var n=prompt("耗材名");if(!n)return;await post("/api/supplies",{name:n,unit_price:0,stock:0,unit:"个",low_stock_threshold:5});toast("已添加");await loadData();renderSettings();}</script><script>async function delSupply(id){if(!confirm("确定删除该耗材？"))return;await del("/api/supplies/"+id);toast("已删除");await loadData();renderSettings();}</script><!-- Screenshot Recognition Modal -->
 <div class="rec-modal" id="rec-modal">
@@ -1965,5 +2145,57 @@ async function recSubmit() {
     </div>
   </div>
 </div>
+
+<!-- ========= FEE RULES ========= -->
+<div class="page" id="page-feerules">
+  <div class="section">
+    <div class="section-title">费用规则 <span style="font-weight:400;color:var(--text-muted);font-size:12px">按【品类×箱规】定义费用默认值</span></div>
+    <button onclick="showFeeRuleForm()" class="btn btn-primary" style="margin-bottom:12px">+ 添加规则</button>
+    <div id="feerules-list"></div>
+    <div class="empty-state" id="feerules-empty" style="display:none">暂无规则，点击上方添加</div>
+  </div>
+</div>
+
+<!-- ========= CALCULATOR ========= -->
+<div class="page" id="page-calc">
+  <div class="section">
+    <div class="section-title">买入价估算</div>
+    <div class="card" style="padding:16px">
+      <div class="form-group"><label>咸鱼售价 (¥)</label><input type="number" id="calc-sell" placeholder="例如: 1000" inputmode="decimal" oninput="doCalc()"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>品类</label>
+          <select id="calc-category" onchange="onCalcCategoryChange()"><option value="">— 选择品类 —</option></select>
+        </div>
+        <div class="form-group">
+          <label>箱规</label>
+          <select id="calc-box-size" onchange="doCalc()"><option value="">— 选择箱规 —</option></select>
+        </div>
+      </div>
+      <div class="form-group"><label>目标利润率 (%)</label><input type="number" id="calc-margin" placeholder="默认来自规则" inputmode="decimal" oninput="doCalc()"></div>
+      <button onclick="doCalc()" class="btn btn-primary" style="width:100%;margin-top:8px">计算买入价</button>
+    </div>
+    <div id="calc-result" style="margin-top:16px;display:none">
+      <div class="card" style="background:var(--bg-secondary);padding:16px">
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:10px">估算结果</div>
+        <div style="font-size:32px;font-weight:700;color:var(--accent);margin-bottom:12px">¥<span id="calc-buy-price">0</span></div>
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:4px">买入价上限（超过即亏损）</div>
+        <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px">
+          <div class="calc-detail-row"><span>咸鱼售价</span><span id="calc-detail-sell">-</span></div>
+          <div class="calc-detail-row"><span>手续费 (<span id="calc-detail-hf-pct">0</span>%)</span><span>-¥<span id="calc-detail-hf">0</span></span></div>
+          <div class="calc-detail-row"><span>日本运费</span><span>-¥<span id="calc-detail-jp">0</span></span></div>
+          <div class="calc-detail-row"><span>国际运费</span><span>-¥<span id="calc-detail-intl">0</span></span></div>
+          <div class="calc-detail-row"><span>税费</span><span>-¥<span id="calc-detail-tax">0</span></span></div>
+          <div class="calc-detail-row"><span>国内运费</span><span>-¥<span id="calc-detail-dom">0</span></span></div>
+          <div class="calc-detail-row"><span>箱费+包装</span><span>-¥<span id="calc-detail-box">0</span></span></div>
+          <div class="calc-detail-row"><span>目标利润 (<span id="calc-detail-margin-pct">0</span>%)</span><span>-¥<span id="calc-detail-margin">0</span></span></div>
+          <div class="calc-detail-row" style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px;font-weight:600"><span>买入价上限</span><span style="color:var(--accent)">¥<span id="calc-detail-buy">0</span></span></div>
+          <div class="calc-detail-row"><span>盈亏平衡点（不计利润）</span><span>¥<span id="calc-detail-breakeven">0</span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

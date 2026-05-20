@@ -161,6 +161,29 @@ async function initDB() {
     db.run("INSERT INTO settings (key, value) VALUES ('categories', '软胶,模型,手办,盲盒,其他')");
   }
 
+  // Default profit margin
+  const rcPM = queryOne("SELECT COUNT(*) as c FROM settings WHERE key='default_profit_margin'"); if (!rcPM || rcPM.c === 0) {
+    db.run("INSERT INTO settings (key, value) VALUES ('default_profit_margin', '15')");
+  }
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS fee_rules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category TEXT NOT NULL,
+      box_size TEXT DEFAULT '',
+      handling_fee_percent REAL DEFAULT 0,
+      japan_domestic_shipping REAL DEFAULT 0,
+      intl_shipping REAL DEFAULT 0,
+      tax REAL DEFAULT 0,
+      domestic_shipping REAL DEFAULT 0,
+      box_fee REAL DEFAULT 0,
+      packing_fee REAL DEFAULT 0,
+      profit_margin_percent REAL DEFAULT 15,
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      updated_at TEXT DEFAULT (datetime('now','localtime'))
+    )
+  `);
+
   // Default shipping rules
   const rc1 = queryOne("SELECT COUNT(*) as c FROM shipping_rules"); if (!rc1 || rc1.c === 0) {
     const defaultRules = [
@@ -671,6 +694,96 @@ app.post('/api/recognize', multerScreenshot.array('files', 5), async (req, res) 
     console.error('OCR error:', err);
     res.status(500).json({ error: '识别失败: ' + err.message });
   }
+});
+
+// ─── Fee Rules (买入价估算费用规则) ───
+app.get('/api/fee-rules', (req, res) => {
+  res.json(queryAll('SELECT * FROM fee_rules ORDER BY category, box_size'));
+});
+
+app.post('/api/fee-rules', (req, res) => {
+  const r = req.body;
+  db.run(`INSERT INTO fee_rules (category, box_size, handling_fee_percent, japan_domestic_shipping, intl_shipping, tax, domestic_shipping, box_fee, packing_fee, profit_margin_percent) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    [r.category||'', r.box_size||'', r.handling_fee_percent||0, r.japan_domestic_shipping||0, r.intl_shipping||0, r.tax||0, r.domestic_shipping||0, r.box_fee||0, r.packing_fee||0, r.profit_margin_percent||15]);
+  saveDB();
+  const rs = db.exec('SELECT last_insert_rowid()');
+  const lastId = (rs && rs[0] && rs[0].values && rs[0].values[0]) ? rs[0].values[0][0] : 0;
+  res.json(queryOne('SELECT * FROM fee_rules WHERE id=?', [lastId]));
+});
+
+app.put('/api/fee-rules/:id', (req, res) => {
+  const r = req.body;
+  db.run(`UPDATE fee_rules SET category=?, box_size=?, handling_fee_percent=?, japan_domestic_shipping=?, intl_shipping=?, tax=?, domestic_shipping=?, box_fee=?, packing_fee=?, profit_margin_percent=?, updated_at=datetime('now','localtime') WHERE id=?`,
+    [r.category||'', r.box_size||'', r.handling_fee_percent||0, r.japan_domestic_shipping||0, r.intl_shipping||0, r.tax||0, r.domestic_shipping||0, r.box_fee||0, r.packing_fee||0, r.profit_margin_percent||15, req.params.id]);
+  saveDB();
+  res.json(queryOne('SELECT * FROM fee_rules WHERE id=?', [req.params.id]));
+});
+
+app.delete('/api/fee-rules/:id', (req, res) => {
+  db.run('DELETE FROM fee_rules WHERE id=?', [req.params.id]);
+  saveDB();
+  res.json({ ok: true });
+});
+
+// ─── Buy Price Calculator ───
+app.post('/api/calc-buy-price', (req, res) => {
+  const { sell_price, category, box_size, custom_fees } = req.body;
+  const sell = parseFloat(sell_price) || 0;
+  if (sell <= 0) return res.status(400).json({ error: '请输入有效的咸鱼售价' });
+
+  // Find matching fee rule
+  let rule = null;
+  if (category) {
+    const rules = queryAll('SELECT * FROM fee_rules WHERE category=? ORDER BY box_size DESC', [category]);
+    // Prefer exact box_size match, fall back to empty box_size (generic)
+    rule = rules.find(r => r.box_size === box_size) || rules.find(r => !r.box_size) || rules[0] || null;
+  }
+
+  const profit_margin = custom_fees?.profit_margin_percent ?? rule?.profit_margin_percent ?? 15;
+  const handling_pct = custom_fees?.handling_fee_percent ?? rule?.handling_fee_percent ?? 0;
+  const japan_domestic = custom_fees?.japan_domestic_shipping ?? rule?.japan_domestic_shipping ?? 0;
+  const intl = custom_fees?.intl_shipping ?? rule?.intl_shipping ?? 0;
+  const tax = custom_fees?.tax ?? rule?.tax ?? 0;
+  const domestic = custom_fees?.domestic_shipping ?? rule?.domestic_shipping ?? 0;
+  const box_fee = custom_fees?.box_fee ?? rule?.box_fee ?? 0;
+  const packing = custom_fees?.packing_fee ?? rule?.packing_fee ?? 0;
+
+  const total_fees = japan_domestic + intl + tax + domestic + box_fee + packing;
+  const handling_fee = sell * (handling_pct / 100);
+  const target_profit = sell * (profit_margin / 100);
+  const buy_price_max = sell - handling_fee - total_fees - target_profit;
+
+  res.json({
+    sell_price: sell,
+    fee_rule: rule ? { category: rule.category, box_size: rule.box_size } : null,
+    fees: {
+      handling_fee: Math.round(handling_fee * 100) / 100,
+      handling_fee_percent: handling_pct,
+      japan_domestic_shipping: japan_domestic,
+      intl_shipping: intl,
+      tax: tax,
+      domestic_shipping: domestic,
+      box_fee: box_fee,
+      packing_fee: packing,
+      total_fixed_fees: Math.round(total_fees * 100) / 100
+    },
+    target_profit: Math.round(target_profit * 100) / 100,
+    target_profit_margin: profit_margin,
+    buy_price_max: Math.round(buy_price_max * 100) / 100,
+    break_even: Math.round((sell - handling_fee - total_fees) * 100) / 100
+  });
+});
+
+// ─── Categories & Box Sizes helpers ───
+app.get('/api/categories', (req, res) => {
+  const row = queryOne("SELECT value FROM settings WHERE key='categories'");
+  const cats = row ? row.value.split(',').filter(Boolean) : ['其他'];
+  res.json(cats);
+});
+
+app.get('/api/box-sizes', (req, res) => {
+  const boxes = queryAll("SELECT DISTINCT name FROM supplies WHERE category='box' ORDER BY id");
+  res.json(boxes.map(b => b.name));
 });
 
 // ─── Static files & fallback (must be AFTER all API routes) ───

@@ -48,6 +48,30 @@
 
 ---
 
-## 历史记录
+## 2026-05-20 10:47 — 巴尔坦（买入价估算功能）
 
-（更多历史记录待补）
+### 完成功能
+- **买入价估算器**：按品类×箱规定义费用规则，输入咸鱼售价+目标利润率，反推最高买入价
+- **数据库改动**：
+  - 新建 `fee_rules` 表（品类/箱规/手续费%/日本运费/国际运费/税费/国内运费/箱费/包装费/默认利润率）
+  - `settings` 表新增 `default_profit_margin` 配置项
+- **后端 API**:
+  - `GET /api/fee-rules` — 查所有规则
+  - `POST /api/fee-rules` — 新增规则
+  - `PUT /api/fee-rules/:id` — 更新规则
+  - `DELETE /api/fee-rules/:id` — 删除规则
+  - `POST /api/calc-buy-price` — 买入价估算
+  - `GET /api/categories` — 查品类列表（含箱规选项）
+  - `GET /api/box-sizes` — 查箱规列表
+- **前端**：
+  - 新增「费用规则」页面（规则管理）
+  - 新增「买入价估算器」页面（计算器）
+  - 新增商品时费用字段自动填入对应规则值
+
+### 部署
+- server.js 重启（kill -9 458360 然后 nohup node server.js &）
+- 规则值需用户自行配置
+
+### 待办
+- [ ] 配置 systemd service
+- [ ] 浏览器完整测试流程
