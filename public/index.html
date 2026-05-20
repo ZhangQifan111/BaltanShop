@@ -2068,7 +2068,6 @@ async function doCalc() {
   // 日本站
   $('calc-detail-jp').textContent = (f.japan_domestic_shipping || 0).toFixed(2);
   $('calc-detail-proxy').textContent = (f.proxy_fee || 0).toFixed(2);
-  $('calc-detail-tax').textContent = (f.tax || 0).toFixed(2);
   $('calc-detail-jp-sub').textContent = '¥' + (f.japan_subtotal || 0).toFixed(2);
   // 出境
   $('calc-detail-intl').textContent = (f.intl_shipping || 0).toFixed(2);
