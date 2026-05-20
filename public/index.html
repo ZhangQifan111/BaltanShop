@@ -861,6 +861,9 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
       <div class="form-group"><label>包装费 (¥)</label><input type="number" id="m-packing-fee" placeholder="气泡垫+胶带" step="0.01" inputmode="decimal" value="0.5" readonly oninput="mUpdFee()"></div>
     </div>
     <div class="cost-total" style="margin-top:10px">
+      <span>咸鱼手续费</span><span class="ct-value" id="m-xianyu-fee-display">¥0</span>
+    </div>
+    <div class="cost-total" style="margin-top:10px">
       <span>杂费总计</span><span class="ct-value" id="m-logistics-display">¥0</span>
     </div>
     <div class="form-actions">
@@ -982,7 +985,7 @@ function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 function today(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function sl(s){ return {direct:'直购',proxy:'代购',domestic:'国内'}[s]||s; }
 function sb(s){ var m={stock:['在手','badge-stock'],sold:['已发货','badge-sold'],done:['已完成','badge-done'],returned:['已退货','badge-returned']}; var b=m[s]||['未知','badge-stock']; return '<span class="badge '+b[1]+'">'+b[0]+'</span>'; }
-function pf(r){ if(!r.sell||r.sell<=0) return null; if(r.cost==null||r.cost===undefined||r.cost==='') return null; return r.sell-(r.refund_amount||0)-(r.huabei||0)-r.cost-(r.logistics_fee||0)-(r.box_fee||0)-(r.packing_fee||0); }
+function pf(r,xFee){ if(!r.sell||r.sell<=0) return null; if(r.cost==null||r.cost===undefined||r.cost==='') return null; return r.sell-(r.refund_amount||0)-(r.huabei||0)-r.cost-(r.logistics_fee||0)-(r.box_fee||0)-(r.packing_fee||0)-(xFee||0); }
 function ls(r){ return (r.extra_cost||0)+(r.logistics_fee||0)+(r.box_fee||0)+(r.packing_fee||0); }
 
 function switchTab(n,btn){
@@ -1154,11 +1157,11 @@ function rc(t){
     ac='<div class="record-actions"><button class="record-btn" onclick="event.stopPropagation();openToyEdit('+t.id+')">编辑</button><button class="record-btn green" onclick="event.stopPropagation();openSell('+t.id+')">出售</button><button class="record-btn red" onclick="event.stopPropagation();removeRecord('+t.id+')">删除</button></div>';
   } else if(t.status==='sold'){
     fin='<div class="record-meta" style="margin-top:4px">售 ¥'+(t.sell||0)+'</div>';
-    var proj=pf(t);
+    var proj=pf(t,getXFee(t));
     pl='<div class="record-profit" style="color:var(--orange)">预估 '+(proj>=0?'+':'')+'¥'+(proj||0).toFixed(0)+'</div>';
     ac='<div class="card-actions" style="opacity:1;transform:none"><button class="card-btn done" onclick="event.stopPropagation();markDone('+t.id+')">确认完成</button><button class="card-btn aftersale" onclick="event.stopPropagation();openAfterSale('+t.id+')">售后</button><button class="card-btn edit" onclick="event.stopPropagation();openToyEdit('+t.id+')">编辑</button></div>';
   } else if(t.status==='done'){
-    var p=pf(t);
+    var p=pf(t,getXFee(t));
     fin='<div class="record-meta" style="margin-top:4px">售 ¥'+(t.sell||0)+(t.refund_amount>0?' · 退款¥'+t.refund_amount:'')+(t.huabei>0?' · 额外扣费¥'+t.huabei:'')+'</div>';
     pl='<div class="record-profit '+(p>=0?'positive':'negative')+'">'+(p>=0?'+':'')+'¥'+p.toFixed(0)+'</div>';
     ac='<div class="record-actions"><button class="record-btn red" onclick="event.stopPropagation();removeRecord('+t.id+')">删除</button></div>';
@@ -1193,7 +1196,7 @@ function renderStockList(){
 function pc(t){
   var s=t.status;
   var badge={'stock':'<span class="card-badge stock">在库</span>','sold':'<span class="card-badge sold">已发货</span>','done':'<span class="card-badge done">已完成</span>','returned':'<span class="card-badge returned">已退货</span>'}[s]||'<span class="card-badge">'+s+'</span>';
-  var profit=pf(t);
+  var profit=pf(t,getXFee(t));
   var profitClass='zero';
   if(profit!==null){ profitClass=profit>=0?'positive':'negative'; }
   var profitStr=profit!==null?'¥'+(profit>=0?'+':'')+profit.toFixed(0):'—';
@@ -1242,7 +1245,7 @@ function renderMiscList(){
   var list=toys.filter(function(t){ return t.status==='done' && (t.source==='secondhand' || t.cost==null || t.cost===''); });
   $('misc-empty').style.display=list.length===0?'block':'none';
   $('misc-list').innerHTML=list.map(function(t){
-    var proj=pf(t), projStr=proj!==null?'¥'+(proj>=0?'+':'')+proj.toFixed(0):'—';
+    var proj=pf(t,getXFee(t)), projStr=proj!==null?'¥'+(proj>=0?'+':'')+proj.toFixed(0):'—';
     var costStr=t.cost!=null?'¥'+Number(t.cost).toFixed(0):'未填';
     var fin='<div class="record-meta" style="margin-top:4px">售 ¥'+(t.sell||0)+'</div>';
     var pl='<div class="record-profit '+(proj!==null?(proj>=0?'positive':'negative'):'')+'">'+projStr+'</div>';
@@ -1601,7 +1604,9 @@ async function deleteTransit(id) {
 
 function setFilter(f,btn){ curF=f; document.querySelectorAll('.filter-chip').forEach(function(e){e.classList.remove('active');}); btn.classList.add('active'); renderSoldList(); }
 
-async function loadData(){ toys=await get('/api/toys'); supplies=await get('/api/supplies');  var s=await get('/api/settings'); if(s&&s.categories){ categories=s.categories.split(',').filter(c=>c.trim()); renderCategories(); } await loadBoxSizes(); }
+async function loadData(){ toys=await get('/api/toys'); supplies=await get('/api/supplies'); rules=await get('/api/fee-rules'); var s=await get('/api/settings'); if(s&&s.categories){ categories=s.categories.split(',').filter(c=>c.trim()); renderCategories(); } await loadBoxSizes(); }
+
+function getXFee(t){ if(!t.sell||t.sell<=0||!rules||rules.length===0) return 0; var pt=t.source==='proxy'?'代购':'直购'; var rule=rules.find(function(r){ return r.category===t.category&&(r.box_size===t.box_size||!r.box_size)&&r.purchase_type===pt; }); if(!rule) rule=rules.find(function(r){ return r.category===t.category&&r.purchase_type===pt; }); if(!rule) rule=rules.find(function(r){ return r.category===t.category; }); if(rule&&rule.handling_fee_percent>0) return t.sell*rule.handling_fee_percent/100; return 0; }
 
 function renderCategories(list){ if(list) categories=list; ['f-category','misc-category','te-category','tre-category','tr-category'].forEach(function(id){ var sel=$(id); if(!sel) return; sel.innerHTML=''; categories.forEach(function(c){ var opt=document.createElement('option'); opt.value=c; opt.textContent=c; sel.appendChild(opt); }); }); }
 
@@ -1640,10 +1645,19 @@ function openSell(id){
 
 function mUpdFee(){
   var fee=parseFloat($('m-logistics-fee').value)||0, box=parseFloat($('m-box-fee').value)||0, pack=parseFloat($('m-packing-fee').value)||0, huabei=parseFloat($('m-sell-huabei').value)||0;
-  $('m-logistics-display').textContent='¥'+(fee+box+pack+huabei).toFixed(2);
+  var xFee=parseFloat($('m-xianyu-fee-display').textContent.replace('¥',''))||0;
+  $('m-logistics-display').textContent='¥'+(fee+box+pack+huabei+xFee).toFixed(2);
 }
 
+function calcXianyuFee(){
+  var t=toys.find(function(x){ return x.id===sellId; });
+  var price=parseFloat($('m-sell-price').value)||0;
+  var xFee=getXFee({sell:price,category:t?t.category:'',source:t?t.source:'',box_size:t?t.box_size:''});
+  $('m-xianyu-fee-display').textContent='¥'+(xFee||0).toFixed(2);
+  return xFee||0;
+}
 function calcExtraFee(){
+  calcXianyuFee();
   var extra=$('m-sell-extra-fee').value;
   var price=parseFloat($('m-sell-price').value)||0;
   var amt=extra==='yes' ? (price*0.016) : 0;
