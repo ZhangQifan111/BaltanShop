@@ -171,6 +171,7 @@ async function initDB() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       category TEXT NOT NULL,
       box_size TEXT DEFAULT '',
+      purchase_type TEXT NOT NULL DEFAULT 'direct',
       handling_fee_percent REAL DEFAULT 0,
       japan_domestic_shipping REAL DEFAULT 0,
       intl_shipping REAL DEFAULT 0,
@@ -190,6 +191,8 @@ async function initDB() {
   try { db.run("ALTER TABLE fee_rules ADD COLUMN proxy_fee REAL DEFAULT 0"); } catch (e) { /* already exists */ }
   // Migration: add customs_tax_percent if not exists (existing DBs)
   try { db.run("ALTER TABLE fee_rules ADD COLUMN customs_tax_percent REAL DEFAULT 13"); } catch (e) { /* already exists */ }
+  // Migration: add purchase_type if not exists (existing DBs)
+  try { db.run("ALTER TABLE fee_rules ADD COLUMN purchase_type TEXT DEFAULT 'direct'"); } catch (e) { /* already exists */ }
 
   // Default shipping rules
   const rc1 = queryOne("SELECT COUNT(*) as c FROM shipping_rules"); if (!rc1 || rc1.c === 0) {
@@ -710,8 +713,8 @@ app.get('/api/fee-rules', (req, res) => {
 
 app.post('/api/fee-rules', (req, res) => {
   const r = req.body;
-  db.run(`INSERT INTO fee_rules (category, box_size, handling_fee_percent, japan_domestic_shipping, intl_shipping, tax, domestic_shipping, box_fee, packing_fee, profit_margin_percent) VALUES (?,?,?,?,?,?,?,?,?,?)`,
-    [r.category||'', r.box_size||'', r.handling_fee_percent||0, r.japan_domestic_shipping||0, r.intl_shipping||0, r.tax||0, r.domestic_shipping||0, r.box_fee||0, r.packing_fee||0, r.profit_margin_percent||15]);
+  db.run(`INSERT INTO fee_rules (category, box_size, purchase_type, handling_fee_percent, japan_domestic_shipping, intl_shipping, tax, domestic_shipping, box_fee, packing_fee, profit_margin_percent, proxy_fee, customs_tax_percent) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [r.category||'', r.box_size||'', r.purchase_type||'direct', r.handling_fee_percent||0, r.japan_domestic_shipping||0, r.intl_shipping||0, r.tax||0, r.domestic_shipping||0, r.box_fee||0, r.packing_fee||0, r.profit_margin_percent||15, r.proxy_fee||0, r.customs_tax_percent||13]);
   saveDB();
   const rs = db.exec('SELECT last_insert_rowid()');
   const lastId = (rs && rs[0] && rs[0].values && rs[0].values[0]) ? rs[0].values[0][0] : 0;
@@ -720,8 +723,8 @@ app.post('/api/fee-rules', (req, res) => {
 
 app.put('/api/fee-rules/:id', (req, res) => {
   const r = req.body;
-  db.run(`UPDATE fee_rules SET category=?, box_size=?, handling_fee_percent=?, japan_domestic_shipping=?, intl_shipping=?, tax=?, domestic_shipping=?, box_fee=?, packing_fee=?, profit_margin_percent=?, updated_at=datetime('now','localtime') WHERE id=?`,
-    [r.category||'', r.box_size||'', r.handling_fee_percent||0, r.japan_domestic_shipping||0, r.intl_shipping||0, r.tax||0, r.domestic_shipping||0, r.box_fee||0, r.packing_fee||0, r.profit_margin_percent||15, req.params.id]);
+  db.run(`UPDATE fee_rules SET category=?, box_size=?, purchase_type=?, handling_fee_percent=?, japan_domestic_shipping=?, intl_shipping=?, tax=?, domestic_shipping=?, box_fee=?, packing_fee=?, profit_margin_percent=?, proxy_fee=?, customs_tax_percent=?, updated_at=datetime('now','localtime') WHERE id=?`,
+    [r.category||'', r.box_size||'', r.purchase_type||'direct', r.handling_fee_percent||0, r.japan_domestic_shipping||0, r.intl_shipping||0, r.tax||0, r.domestic_shipping||0, r.box_fee||0, r.packing_fee||0, r.profit_margin_percent||15, r.proxy_fee||0, r.customs_tax_percent||13, req.params.id]);
   saveDB();
   res.json(queryOne('SELECT * FROM fee_rules WHERE id=?', [req.params.id]));
 });
@@ -735,15 +738,21 @@ app.delete('/api/fee-rules/:id', (req, res) => {
 // ─── Buy Price Calculator ───
 // 费用按购入现金流顺序排列：日本站付费 → 出境 → 到中国仓库 → 咸鱼平台扣费
 app.post('/api/calc-buy-price', (req, res) => {
-  const { sell_price, category, box_size, custom_fees } = req.body;
+  const { sell_price, category, box_size, purchase_type, custom_fees } = req.body;
   const sell = parseFloat(sell_price) || 0;
   if (sell <= 0) return res.status(400).json({ error: '请输入有效的咸鱼售价' });
 
-  // Find matching fee rule
+  // Find matching fee rule: filter by category + purchase_type, prefer exact box_size match
   let rule = null;
   if (category) {
-    const rules = queryAll('SELECT * FROM fee_rules WHERE category=? ORDER BY box_size DESC', [category]);
+    const pt = purchase_type || 'direct';
+    const rules = queryAll('SELECT * FROM fee_rules WHERE category=? AND purchase_type=? ORDER BY box_size DESC', [category, pt]);
     rule = rules.find(r => r.box_size === box_size) || rules.find(r => !r.box_size) || rules[0] || null;
+    // Fall back to other purchase_type if no rule found
+    if (!rule) {
+      const altRules = queryAll('SELECT * FROM fee_rules WHERE category=? ORDER BY box_size DESC', [category]);
+      rule = altRules.find(r => r.box_size === box_size) || altRules.find(r => !r.box_size) || altRules[0] || null;
+    }
   }
 
   const profit_margin = custom_fees?.profit_margin_percent ?? rule?.profit_margin_percent ?? 15;

@@ -1930,6 +1930,7 @@ async function renderFeeRules() {
     '<tr style="background:var(--bg-secondary)">' +
     '<th style="padding:8px 6px;text-align:left;font-size:10px;color:var(--text-muted)">品类</th>' +
     '<th style="padding:8px 6px;text-align:left;font-size:10px;color:var(--text-muted)">箱规</th>' +
+    '<th style="padding:8px 6px;text-align:left;font-size:10px;color:var(--text-muted)">方式</th>' +
     '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">日运费</th>' +
     '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">代购费</th>' +
     '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">海关%</th>' +
@@ -1943,6 +1944,7 @@ async function renderFeeRules() {
       return '<tr style="border-bottom:1px solid var(--border)">' +
         '<td style="padding:8px 6px">' + esc(r.category) + '</td>' +
         '<td style="padding:8px 6px;color:var(--text-muted)">' + (r.box_size || '通用') + '</td>' +
+        '<td style="padding:8px 6px;font-size:11px">' + (r.purchase_type === 'proxy' ? '代购' : '直购') + '</td>' +
         '<td style="padding:8px 6px;text-align:right">¥' + (r.japan_domestic_shipping||0) + '</td>' +
         '<td style="padding:8px 6px;text-align:right">¥' + (r.proxy_fee||0) + '</td>' +
         '<td style="padding:8px 6px;text-align:right">' + (r.customs_tax_percent||13) + '%</td>' +
@@ -1971,6 +1973,9 @@ function showFeeRuleForm(rule) {
     '</div><div class="form-group">' +
       '<label>箱规（留空=通用）</label>' +
       '<select id="rfc-box-size"><option value="">通用</option>' + boxes.map(function(b){ return '<option value="'+esc(b)+'">' + esc(b) + '</option>'; }).join('') + '</select>' +
+    '</div><div class="form-group">' +
+      '<label>购入方式</label>' +
+      '<select id="rfc-pt"><option value="direct">直购</option><option value="proxy">代购</option></select>' +
     '</div></div>' +
     '<div style="font-size:11px;color:var(--text-muted);padding:8px 0 4px;font-weight:600">日本站</div>' +
     '<div class="form-row"><div class="form-group">' +
@@ -2001,6 +2006,7 @@ function showFeeRuleForm(rule) {
   if (rule) {
     $('rfc-category').value = rule.category || '';
     $('rfc-box-size').value = rule.box_size || '';
+    $('rfc-pt').value = rule.purchase_type || 'direct';
   }
 }
 
@@ -2014,6 +2020,7 @@ async function saveFeeRule() {
   var data = {
     category: $('rfc-category').value,
     box_size: $('rfc-box-size').value,
+    purchase_type: $('rfc-pt').value,
     japan_domestic_shipping: parseFloat($('rfc-jp').value) || 0,
     proxy_fee: parseFloat($('rfc-proxy').value) || 0,
     customs_tax_percent: parseFloat($('rfc-ct').value) || 13,
@@ -2058,13 +2065,17 @@ function onCalcCategoryChange() {
   doCalc();
 }
 
+function onCalcPtChange() {
+  doCalc();
+}
+
 async function doCalc() {
   var sell = parseFloat($('calc-sell').value) || 0;
   var cat = $('calc-category').value;
   var box = $('calc-box-size').value;
   if (sell <= 0) { $('calc-result').style.display = 'none'; return; }
   var margin = parseFloat($('calc-margin').value) || 15;
-  var body = { sell_price: sell, category: cat, box_size: box, custom_fees: { profit_margin_percent: margin } };
+  var pt = $('calc-pt').value; var body = { sell_price: sell, category: cat, box_size: box, purchase_type: pt, custom_fees: { profit_margin_percent: margin } };
   var res = await post('/api/calc-buy-price', body);
   var f = res.fees;
   $('calc-result').style.display = 'block';
@@ -2188,6 +2199,13 @@ async function loadBoxSizes() {
           <label>箱规</label>
           <select id="calc-box-size" onchange="doCalc()"><option value="">— 选择箱规 —</option></select>
         </div>
+      </div>
+      <div class="form-group">
+        <label>购入方式</label>
+        <select id="calc-pt" onchange="onCalcPtChange()">
+          <option value="direct">直购</option>
+          <option value="proxy">代购</option>
+        </select>
       </div>
       <div class="form-group"><label>目标利润率 (%)</label><input type="number" id="calc-margin" placeholder="默认来自规则" inputmode="decimal" oninput="doCalc()"></div>
       <button onclick="doCalc()" class="btn btn-primary" style="width:100%;margin-top:8px">计算买入价</button>
