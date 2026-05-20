@@ -1530,15 +1530,15 @@ async function openToyEdit(id) {
   $('te-source').value = src;
   $('te-date').value = t.date || '';
   // Direct
-  $('te-jpy').value = t.japan_price_cny || '';
+  $('te-jpy').value = (t.japan_price_cny ?? '') === 0 ? '0' : (t.japan_price_cny ?? '');
   $('te-jpy').oninput = teUpdateCost;
-  $('te-handling').value = t.handling_fee || '';
+  $('te-handling').value = (t.handling_fee ?? '') === 0 ? '0' : (t.handling_fee ?? '');
   $('te-handling').oninput = teUpdateCost;
-  $('te-jp-ship').value = t.japan_domestic_shipping || '';
+  $('te-jp-ship').value = (t.japan_domestic_shipping ?? '') === 0 ? '0' : (t.japan_domestic_shipping ?? '');
   $('te-jp-ship').oninput = teUpdateCost;
-  $('te-intl').value = t.intl_shipping || '';
+  $('te-intl').value = (t.intl_shipping ?? '') === 0 ? '0' : (t.intl_shipping ?? '');
   $('te-intl').oninput = teUpdateCost;
-  $('te-tax').value = t.tax || '';
+  $('te-tax').value = (t.tax ?? '') === 0 ? '0' : (t.tax ?? '');
   $('te-tax').oninput = teUpdateCost;
   // Proxy
   $('te-proxy-price').value = t.proxy_price || '';
