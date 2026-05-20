@@ -1932,6 +1932,7 @@ async function renderFeeRules() {
     '<th style="padding:8px 6px;text-align:left;font-size:10px;color:var(--text-muted)">箱规</th>' +
     '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">日运费</th>' +
     '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">代购费</th>' +
+    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">海关%</th>' +
     '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">国运费</th>' +
     '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">内运费</th>' +
     '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">箱费</th>' +
@@ -1944,6 +1945,7 @@ async function renderFeeRules() {
         '<td style="padding:8px 6px;color:var(--text-muted)">' + (r.box_size || '通用') + '</td>' +
         '<td style="padding:8px 6px;text-align:right">¥' + (r.japan_domestic_shipping||0) + '</td>' +
         '<td style="padding:8px 6px;text-align:right">¥' + (r.proxy_fee||0) + '</td>' +
+        '<td style="padding:8px 6px;text-align:right">' + (r.customs_tax_percent||13) + '%</td>' +
         '<td style="padding:8px 6px;text-align:right">¥' + (r.intl_shipping||0) + '</td>' +
         '<td style="padding:8px 6px;text-align:right">¥' + (r.domestic_shipping||0) + '</td>' +
         '<td style="padding:8px 6px;text-align:right">¥' + ((r.box_fee||0)+(r.packing_fee||0)) + '</td>' +
@@ -2012,6 +2014,7 @@ async function saveFeeRule() {
     box_size: $('rfc-box-size').value,
     japan_domestic_shipping: parseFloat($('rfc-jp').value) || 0,
     proxy_fee: parseFloat($('rfc-proxy').value) || 0,
+    customs_tax_percent: parseFloat($('rfc-ct').value) || 13,
     handling_fee_percent: parseFloat($('rfc-hf').value) || 0,
     intl_shipping: parseFloat($('rfc-intl').value) || 0,
     domestic_shipping: parseFloat($('rfc-dom').value) || 0,
@@ -2068,6 +2071,8 @@ async function doCalc() {
   // 日本站
   $('calc-detail-jp').textContent = (f.japan_domestic_shipping || 0).toFixed(2);
   $('calc-detail-proxy').textContent = (f.proxy_fee || 0).toFixed(2);
+  $('calc-detail-ct-pct').textContent = f.customs_tax_percent || 13;
+  $('calc-detail-ct').textContent = (f.customs_tax || 0).toFixed(2);
   $('calc-detail-jp-sub').textContent = '¥' + (f.japan_subtotal || 0).toFixed(2);
   // 出境
   $('calc-detail-intl').textContent = (f.intl_shipping || 0).toFixed(2);
@@ -2196,6 +2201,7 @@ async function loadBoxSizes() {
           <div style="font-size:11px;color:var(--text-muted);padding:6px 0 2px;font-weight:600">日本站</div>
           <div class="calc-detail-row"><span style="padding-left:8px">日本运费</span><span>-¥<span id="calc-detail-jp">0</span></span></div>
           <div class="calc-detail-row"><span style="padding-left:8px">代购手续费</span><span>-¥<span id="calc-detail-proxy">0</span></span></div>
+          <div class="calc-detail-row"><span style="padding-left:8px">海关税费 (<span id="calc-detail-ct-pct">0</span>%)</span><span>-¥<span id="calc-detail-ct">0</span></span></div>
           <div class="calc-detail-row" style="font-weight:600"><span>日本站小计</span><span id="calc-detail-jp-sub">¥0</span></div>
           <div style="font-size:11px;color:var(--text-muted);padding:6px 0 2px;font-weight:600">出境</div>
           <div class="calc-detail-row"><span style="padding-left:8px">国际运费</span><span>-¥<span id="calc-detail-intl">0</span></span></div>

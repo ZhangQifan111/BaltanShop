@@ -180,6 +180,7 @@ async function initDB() {
       packing_fee REAL DEFAULT 0,
       profit_margin_percent REAL DEFAULT 15,
       proxy_fee REAL DEFAULT 0,
+      customs_tax_percent REAL DEFAULT 13,
       created_at TEXT DEFAULT (datetime('now','localtime')),
       updated_at TEXT DEFAULT (datetime('now','localtime'))
     )
@@ -187,6 +188,8 @@ async function initDB() {
 
   // Migration: add proxy_fee if not exists (existing DBs)
   try { db.run("ALTER TABLE fee_rules ADD COLUMN proxy_fee REAL DEFAULT 0"); } catch (e) { /* already exists */ }
+  // Migration: add customs_tax_percent if not exists (existing DBs)
+  try { db.run("ALTER TABLE fee_rules ADD COLUMN customs_tax_percent REAL DEFAULT 13"); } catch (e) { /* already exists */ }
 
   // Default shipping rules
   const rc1 = queryOne("SELECT COUNT(*) as c FROM shipping_rules"); if (!rc1 || rc1.c === 0) {
@@ -747,19 +750,22 @@ app.post('/api/calc-buy-price', (req, res) => {
   const handling_pct = custom_fees?.handling_fee_percent ?? rule?.handling_fee_percent ?? 0;
   const japan_domestic = custom_fees?.japan_domestic_shipping ?? rule?.japan_domestic_shipping ?? 0;
   const proxy_fee = custom_fees?.proxy_fee ?? rule?.proxy_fee ?? 0;  // 代购手续费
-  const tax = custom_fees?.tax ?? rule?.tax ?? 0;
+  const customs_pct = custom_fees?.customs_tax_percent ?? rule?.customs_tax_percent ?? 13; // 海关税费%
   const intl = custom_fees?.intl_shipping ?? rule?.intl_shipping ?? 0;
   const domestic = custom_fees?.domestic_shipping ?? rule?.domestic_shipping ?? 0;
   const box_fee = custom_fees?.box_fee ?? rule?.box_fee ?? 0;
   const packing = custom_fees?.packing_fee ?? rule?.packing_fee ?? 0;
 
   // 按购入顺序的费用明细
-  const japan_subtotal = japan_domestic + proxy_fee;                   // 日本站小计
+  const japan_subtotal = japan_domestic + proxy_fee;                   // 日本站小计（不含海关税费）
   const china_subtotal = domestic + box_fee + packing;                 // 国内段小计
-  const total_fixed = japan_subtotal + intl + china_subtotal;         // 固定费用合计
-  const xianyu_fee = sell * (handling_pct / 100);                    // 咸鱼平台手续费
-  const target_profit = sell * (profit_margin / 100);                // 目标利润
-  const buy_price_max = sell - total_fixed - xianyu_fee - target_profit; // 买入价上限
+  const total_fixed = japan_subtotal + intl + china_subtotal;         // 固定费用合计（不含海关税费和比例费）
+  const xianyu_fee = sell * (handling_pct / 100);                    // 咸鱼平台手续费（按售价）
+  const target_profit = sell * (profit_margin / 100);                // 目标利润（按售价）
+  // 海关税费 = 买入价 × 百分比，故需解方程：sell = buy + total_fixed + customs_tax + xianyu_fee + target_profit
+  // → buy_price_max = (sell - total_fixed - xianyu_fee - target_profit) / (1 + customs_pct/100)
+  const buy_price_max = (sell - total_fixed - xianyu_fee - target_profit) / (1 + customs_pct / 100);
+  const customs_tax = buy_price_max * (customs_pct / 100);            // 海关税费（基于买入价）
 
   res.json({
     sell_price: sell,
@@ -769,7 +775,9 @@ app.post('/api/calc-buy-price', (req, res) => {
       // 日本站
       japan_domestic_shipping: japan_domestic,      // 日本运费
       proxy_fee: proxy_fee,                         // 代购手续费
-      japan_subtotal: Math.round(japan_subtotal * 100) / 100,
+      customs_tax: Math.round(customs_tax * 100) / 100,
+      customs_tax_percent: customs_pct,
+      japan_subtotal: Math.round((japan_subtotal + customs_tax) * 100) / 100,
       // 出境
       intl_shipping: intl,                          // 国际运费
       // 国内段
