@@ -1270,16 +1270,19 @@ async function renderTransitList() {
     var stageLabel = {stage1:'阶段①',stage2:'阶段②',stage3:'阶段③',stocked:'已入库',cancelled:'已取消'}[stage]||stage;
     var stageColor = {stage1:'var(--orange)',stage2:'var(--blue)',stage3:'var(--purple)',stocked:'var(--green)',cancelled:'var(--text-muted)'}[stage];
     var stageBg = {stage1:'rgba(240,160,48,0.12)',stage2:'rgba(96,165,250,0.12)',stage3:'rgba(168,85,247,0.12)',stocked:'rgba(74,222,128,0.12)',cancelled:'rgba(107,112,133,0.12)'}[stage];
-    var s1jpy = r.stage1_jpy ? r.stage1_jpy.toFixed(0) : '';
-    var s1h = r.stage1_handling ? r.stage1_handling.toFixed(0) : '';
-    var s1ds = r.stage1_domestic_ship ? r.stage1_domestic_ship.toFixed(0) : '';
-    var s1 = '<span class="stage-chip">①' + (s1jpy?'买'+s1jpy:'') + (s1h?'费'+s1h:'') + (s1ds?'运'+s1ds:'') + (r.stage1_amount?'¥'+r.stage1_amount.toFixed(0):'') + '</span>';
-    var s2ds = r.stage2_domestic_ship ? r.stage2_domestic_ship.toFixed(0) : '';
-    var s2h = r.stage2_handling ? r.stage2_handling.toFixed(0) : '';
-    var s2 = r.stage2_amount ? '<span class="stage-chip">②' + (s2ds?'运'+s2ds:'') + (s2h?'费'+s2h:'') + '¥'+r.stage2_amount.toFixed(0) + '</span>' : '';
-    var s3i = r.stage3_intl_ship ? r.stage3_intl_ship.toFixed(0) : '';
-    var s3t = r.stage3_tax ? r.stage3_tax.toFixed(0) : '';
-    var s3 = r.stage3_amount ? '<span class="stage-chip">③' + (s3i?'国'+s3i:'') + (s3t?'税'+s3t:'') + '¥'+r.stage3_amount.toFixed(0) + '</span>' : '';
+    var s1jpy = r.stage1_jpy || 0;
+    var s1h = r.stage1_handling || 0;
+    var s1ds = r.stage1_domestic_ship || 0;
+    var s1has = s1jpy + s1h + s1ds > 0;
+    var s1 = '<span class="stage-chip">①' + (s1has ? (s1jpy?'买'+s1jpy.toFixed(0):'') + (s1h?'费'+s1h.toFixed(0):'') + (s1ds?'运'+s1ds.toFixed(0):'') : '¥'+((r.stage1_amount||0)).toFixed(0)) + '</span>';
+    var s2ds = r.stage2_domestic_ship || 0;
+    var s2h = r.stage2_handling || 0;
+    var s2has = s2ds + s2h > 0;
+    var s2 = r.stage2_amount ? '<span class="stage-chip">②' + (s2has ? (s2ds?'运'+s2ds.toFixed(0):'') + (s2h?'费'+s2h.toFixed(0):'') : '¥'+r.stage2_amount.toFixed(0)) + '</span>' : '';
+    var s3i = r.stage3_intl_ship || 0;
+    var s3t = r.stage3_tax || 0;
+    var s3has = s3i + s3t > 0;
+    var s3 = r.stage3_amount ? '<span class="stage-chip">③' + (s3has ? (s3i?'国'+s3i.toFixed(0):'') + (s3t?'税'+s3t.toFixed(0):'') : '¥'+r.stage3_amount.toFixed(0)) + '</span>' : '';
     var nextBtn = '';
     if (stage === 'stage1') nextBtn = '<button class="card-btn advance" onclick="openTransitStage2('+r.id+')">推进阶段②</button>';
     if (stage === 'stage2') nextBtn = '<button class="card-btn advance" onclick="openTransitStage3('+r.id+')">推进阶段③</button>';
@@ -1472,9 +1475,11 @@ async function submitTransitEdit() {
     if (!toy) toy = toys.find(function(t){ return t.name === rec.name && t.status === 'stock'; });
     if (toy) {
       toy.cost = newCost;
-      toy.japan_price_cny = rec.stage1_amount||0;
-      toy.handling_fee = rec.stage2_amount||0;
-      toy.intl_shipping = rec.stage3_amount||0;
+      toy.japan_price_cny = rec.stage1_jpy||0;
+      toy.handling_fee = (rec.stage1_handling||0) + (rec.stage2_handling||0);
+      toy.japan_domestic_shipping = (rec.stage1_domestic_ship||0) + (rec.stage2_domestic_ship||0);
+      toy.intl_shipping = rec.stage3_intl_ship||0;
+      toy.tax = rec.stage3_tax||0;
       await put('/api/toys/'+toy.id, toy);
     }
   }
