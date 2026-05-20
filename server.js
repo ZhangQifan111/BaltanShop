@@ -348,8 +348,8 @@ app.get('/api/purchase-records', (req, res) => {
 
 app.post('/api/purchase-records', (req, res) => {
   const p = req.body;
-  db.run(`INSERT INTO purchase_records (name,category,source,stage1_date,stage1_amount,stage1_note,status) VALUES (?,?,?,?,?,?,?)`,
-    [p.name||'', p.category||'其他', p.source||'direct', p.stage1_date||'', p.stage1_amount||0, p.stage1_note||'', 'stage1']);
+  db.run(`INSERT INTO purchase_records (name,category,source,stage1_date,stage1_amount,stage1_jpy,stage1_handling,stage1_domestic_ship,stage1_note,status) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    [p.name||'', p.category||'其他', p.source||'direct', p.stage1_date||'', p.stage1_amount||0, parseFloat(p.stage1_jpy)||0, parseFloat(p.stage1_handling)||0, parseFloat(p.stage1_domestic_ship)||0, p.stage1_note||'', 'stage1']);
   saveDB();
   const rs = db.exec('SELECT last_insert_rowid()');
   const lastId = (rs && rs[0] && rs[0].values && rs[0].values[0]) ? rs[0].values[0][0] : 0;
