@@ -1932,7 +1932,6 @@ async function renderFeeRules() {
     '<th style="padding:8px 6px;text-align:left;font-size:10px;color:var(--text-muted)">箱规</th>' +
     '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">日运费</th>' +
     '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">代购费</th>' +
-    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">税费</th>' +
     '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">国运费</th>' +
     '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">内运费</th>' +
     '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">箱费</th>' +
@@ -1945,7 +1944,6 @@ async function renderFeeRules() {
         '<td style="padding:8px 6px;color:var(--text-muted)">' + (r.box_size || '通用') + '</td>' +
         '<td style="padding:8px 6px;text-align:right">¥' + (r.japan_domestic_shipping||0) + '</td>' +
         '<td style="padding:8px 6px;text-align:right">¥' + (r.proxy_fee||0) + '</td>' +
-        '<td style="padding:8px 6px;text-align:right">¥' + (r.tax||0) + '</td>' +
         '<td style="padding:8px 6px;text-align:right">¥' + (r.intl_shipping||0) + '</td>' +
         '<td style="padding:8px 6px;text-align:right">¥' + (r.domestic_shipping||0) + '</td>' +
         '<td style="padding:8px 6px;text-align:right">¥' + ((r.box_fee||0)+(r.packing_fee||0)) + '</td>' +
@@ -1978,9 +1976,7 @@ function showFeeRuleForm(rule) {
     '</div><div class="form-group">' +
       '<label>代购手续费 (¥)</label><input type="number" id="rfc-proxy" value="' + (rule ? (rule.proxy_fee||'') : '') + '" inputmode="decimal" placeholder="0">' +
     '</div></div>' +
-    '<div class="form-row" style="margin-top:10px"><div class="form-group">' +
-      '<label>税费 (¥)</label><input type="number" id="rfc-tax" value="' + (rule ? rule.tax : '') + '" inputmode="decimal" placeholder="0">' +
-    '</div><div class="form-group">' +
+    '<div class="form-group">' +
       '<label>咸鱼手续费 (%)</label><input type="number" id="rfc-hf" value="' + (rule ? (rule.xianyu_fee_percent||rule.handling_fee_percent||'') : '') + '" inputmode="decimal" placeholder="0">' +
     '</div></div>' +
     '<div style="font-size:11px;color:var(--text-muted);padding:8px 0 4px;font-weight:600">出境 / 国内</div>' +
@@ -2016,7 +2012,6 @@ async function saveFeeRule() {
     box_size: $('rfc-box-size').value,
     japan_domestic_shipping: parseFloat($('rfc-jp').value) || 0,
     proxy_fee: parseFloat($('rfc-proxy').value) || 0,
-    tax: parseFloat($('rfc-tax').value) || 0,
     handling_fee_percent: parseFloat($('rfc-hf').value) || 0,
     intl_shipping: parseFloat($('rfc-intl').value) || 0,
     domestic_shipping: parseFloat($('rfc-dom').value) || 0,
@@ -2202,7 +2197,6 @@ async function loadBoxSizes() {
           <div style="font-size:11px;color:var(--text-muted);padding:6px 0 2px;font-weight:600">日本站</div>
           <div class="calc-detail-row"><span style="padding-left:8px">日本运费</span><span>-¥<span id="calc-detail-jp">0</span></span></div>
           <div class="calc-detail-row"><span style="padding-left:8px">代购手续费</span><span>-¥<span id="calc-detail-proxy">0</span></span></div>
-          <div class="calc-detail-row"><span style="padding-left:8px">税费</span><span>-¥<span id="calc-detail-tax">0</span></span></div>
           <div class="calc-detail-row" style="font-weight:600"><span>日本站小计</span><span id="calc-detail-jp-sub">¥0</span></div>
           <div style="font-size:11px;color:var(--text-muted);padding:6px 0 2px;font-weight:600">出境</div>
           <div class="calc-detail-row"><span style="padding-left:8px">国际运费</span><span>-¥<span id="calc-detail-intl">0</span></span></div>

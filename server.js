@@ -754,7 +754,7 @@ app.post('/api/calc-buy-price', (req, res) => {
   const packing = custom_fees?.packing_fee ?? rule?.packing_fee ?? 0;
 
   // 按购入顺序的费用明细
-  const japan_subtotal = japan_domestic + proxy_fee + tax;           // 日本站小计
+  const japan_subtotal = japan_domestic + proxy_fee;                   // 日本站小计
   const china_subtotal = domestic + box_fee + packing;                 // 国内段小计
   const total_fixed = japan_subtotal + intl + china_subtotal;         // 固定费用合计
   const xianyu_fee = sell * (handling_pct / 100);                    // 咸鱼平台手续费
@@ -769,7 +769,6 @@ app.post('/api/calc-buy-price', (req, res) => {
       // 日本站
       japan_domestic_shipping: japan_domestic,      // 日本运费
       proxy_fee: proxy_fee,                         // 代购手续费
-      tax: tax,                                     // 税费
       japan_subtotal: Math.round(japan_subtotal * 100) / 100,
       // 出境
       intl_shipping: intl,                          // 国际运费
