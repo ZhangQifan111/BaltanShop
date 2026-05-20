@@ -179,10 +179,14 @@ async function initDB() {
       box_fee REAL DEFAULT 0,
       packing_fee REAL DEFAULT 0,
       profit_margin_percent REAL DEFAULT 15,
+      proxy_fee REAL DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now','localtime')),
       updated_at TEXT DEFAULT (datetime('now','localtime'))
     )
   `);
+
+  // Migration: add proxy_fee if not exists (existing DBs)
+  try { db.run("ALTER TABLE fee_rules ADD COLUMN proxy_fee REAL DEFAULT 0"); } catch (e) { /* already exists */ }
 
   // Default shipping rules
   const rc1 = queryOne("SELECT COUNT(*) as c FROM shipping_rules"); if (!rc1 || rc1.c === 0) {
@@ -726,6 +730,7 @@ app.delete('/api/fee-rules/:id', (req, res) => {
 });
 
 // ─── Buy Price Calculator ───
+// 费用按购入现金流顺序排列：日本站付费 → 出境 → 到中国仓库 → 咸鱼平台扣费
 app.post('/api/calc-buy-price', (req, res) => {
   const { sell_price, category, box_size, custom_fees } = req.body;
   const sell = parseFloat(sell_price) || 0;
@@ -735,42 +740,55 @@ app.post('/api/calc-buy-price', (req, res) => {
   let rule = null;
   if (category) {
     const rules = queryAll('SELECT * FROM fee_rules WHERE category=? ORDER BY box_size DESC', [category]);
-    // Prefer exact box_size match, fall back to empty box_size (generic)
     rule = rules.find(r => r.box_size === box_size) || rules.find(r => !r.box_size) || rules[0] || null;
   }
 
   const profit_margin = custom_fees?.profit_margin_percent ?? rule?.profit_margin_percent ?? 15;
   const handling_pct = custom_fees?.handling_fee_percent ?? rule?.handling_fee_percent ?? 0;
   const japan_domestic = custom_fees?.japan_domestic_shipping ?? rule?.japan_domestic_shipping ?? 0;
-  const intl = custom_fees?.intl_shipping ?? rule?.intl_shipping ?? 0;
+  const proxy_fee = custom_fees?.proxy_fee ?? rule?.proxy_fee ?? 0;  // 代购手续费
   const tax = custom_fees?.tax ?? rule?.tax ?? 0;
+  const intl = custom_fees?.intl_shipping ?? rule?.intl_shipping ?? 0;
   const domestic = custom_fees?.domestic_shipping ?? rule?.domestic_shipping ?? 0;
   const box_fee = custom_fees?.box_fee ?? rule?.box_fee ?? 0;
   const packing = custom_fees?.packing_fee ?? rule?.packing_fee ?? 0;
 
-  const total_fees = japan_domestic + intl + tax + domestic + box_fee + packing;
-  const handling_fee = sell * (handling_pct / 100);
-  const target_profit = sell * (profit_margin / 100);
-  const buy_price_max = sell - handling_fee - total_fees - target_profit;
+  // 按购入顺序的费用明细
+  const japan_subtotal = japan_domestic + proxy_fee + tax;           // 日本站小计
+  const china_subtotal = domestic + box_fee + packing;                 // 国内段小计
+  const total_fixed = japan_subtotal + intl + china_subtotal;         // 固定费用合计
+  const xianyu_fee = sell * (handling_pct / 100);                    // 咸鱼平台手续费
+  const target_profit = sell * (profit_margin / 100);                // 目标利润
+  const buy_price_max = sell - total_fixed - xianyu_fee - target_profit; // 买入价上限
 
   res.json({
     sell_price: sell,
     fee_rule: rule ? { category: rule.category, box_size: rule.box_size } : null,
+    // 按购入顺序排列的费用明细
     fees: {
-      handling_fee: Math.round(handling_fee * 100) / 100,
-      handling_fee_percent: handling_pct,
-      japan_domestic_shipping: japan_domestic,
-      intl_shipping: intl,
-      tax: tax,
-      domestic_shipping: domestic,
-      box_fee: box_fee,
-      packing_fee: packing,
-      total_fixed_fees: Math.round(total_fees * 100) / 100
+      // 日本站
+      japan_domestic_shipping: japan_domestic,      // 日本运费
+      proxy_fee: proxy_fee,                         // 代购手续费
+      tax: tax,                                     // 税费
+      japan_subtotal: Math.round(japan_subtotal * 100) / 100,
+      // 出境
+      intl_shipping: intl,                          // 国际运费
+      // 国内段
+      domestic_shipping: domestic,                  // 国内运费
+      box_fee: box_fee,                             // 箱费
+      packing_fee: packing,                          // 包装费
+      china_subtotal: Math.round(china_subtotal * 100) / 100,
+      // 固定费用合计
+      total_fixed_fees: Math.round(total_fixed * 100) / 100,
+      // 咸鱼平台
+      xianyu_fee: Math.round(xianyu_fee * 100) / 100,
+      xianyu_fee_percent: handling_pct
     },
     target_profit: Math.round(target_profit * 100) / 100,
     target_profit_margin: profit_margin,
     buy_price_max: Math.round(buy_price_max * 100) / 100,
-    break_even: Math.round((sell - handling_fee - total_fees) * 100) / 100
+    // 盈亏平衡点：cover所有固定成本后的最低售价
+    break_even: Math.round((total_fixed + (sell * handling_pct / 100) / (1 - handling_pct / 100)) * 100) / 100
   });
 });
 

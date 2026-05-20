@@ -1930,23 +1930,27 @@ async function renderFeeRules() {
     '<tr style="background:var(--bg-secondary)">' +
     '<th style="padding:8px 6px;text-align:left;font-size:10px;color:var(--text-muted)">品类</th>' +
     '<th style="padding:8px 6px;text-align:left;font-size:10px;color:var(--text-muted)">箱规</th>' +
-    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">手续费%</th>' +
-    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">日本运费</th>' +
-    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">国际运费</th>' +
+    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">日运费</th>' +
+    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">代购费</th>' +
     '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">税费</th>' +
-    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">国内运费</th>' +
-    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">利润率%</th>' +
+    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">国运费</th>' +
+    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">内运费</th>' +
+    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">箱费</th>' +
+    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">咸鱼%</th>' +
+    '<th style="padding:8px 6px;text-align:right;font-size:10px;color:var(--text-muted)">利润率</th>' +
     '<th style="padding:8px 6px"></th>' +
     '</tr>' +
     rules.map(function(r) {
       return '<tr style="border-bottom:1px solid var(--border)">' +
         '<td style="padding:8px 6px">' + esc(r.category) + '</td>' +
         '<td style="padding:8px 6px;color:var(--text-muted)">' + (r.box_size || '通用') + '</td>' +
-        '<td style="padding:8px 6px;text-align:right">' + (r.handling_fee_percent||0) + '%</td>' +
         '<td style="padding:8px 6px;text-align:right">¥' + (r.japan_domestic_shipping||0) + '</td>' +
-        '<td style="padding:8px 6px;text-align:right">¥' + (r.intl_shipping||0) + '</td>' +
+        '<td style="padding:8px 6px;text-align:right">¥' + (r.proxy_fee||0) + '</td>' +
         '<td style="padding:8px 6px;text-align:right">¥' + (r.tax||0) + '</td>' +
+        '<td style="padding:8px 6px;text-align:right">¥' + (r.intl_shipping||0) + '</td>' +
         '<td style="padding:8px 6px;text-align:right">¥' + (r.domestic_shipping||0) + '</td>' +
+        '<td style="padding:8px 6px;text-align:right">¥' + ((r.box_fee||0)+(r.packing_fee||0)) + '</td>' +
+        '<td style="padding:8px 6px;text-align:right">' + (r.handling_fee_percent||0) + '%</td>' +
         '<td style="padding:8px 6px;text-align:right;color:var(--green)">' + (r.profit_margin_percent||15) + '%</td>' +
         '<td style="padding:8px 6px;text-align:right">' +
           '<button onclick="editFeeRule(' + r.id + ')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:2px 6px">编辑</button>' +
@@ -1970,24 +1974,28 @@ function showFeeRuleForm(rule) {
       '<label>箱规（留空=通用）</label>' +
       '<select id="rfc-box-size"><option value="">通用</option>' + boxes.map(function(b){ return '<option value="'+esc(b)+'">' + esc(b) + '</option>'; }).join('') + '</select>' +
     '</div></div>' +
-    '<div class="form-row" style="margin-top:10px"><div class="form-group">' +
-      '<label>手续费 (%)</label><input type="number" id="rfc-hf" value="' + (rule ? rule.handling_fee_percent : '') + '" inputmode="decimal" placeholder="0">' +
-    '</div><div class="form-group">' +
+    '<div style="font-size:11px;color:var(--text-muted);padding:8px 0 4px;font-weight:600">日本站</div>' +
+    '<div class="form-row"><div class="form-group">' +
       '<label>日本运费 (¥)</label><input type="number" id="rfc-jp" value="' + (rule ? rule.japan_domestic_shipping : '') + '" inputmode="decimal" placeholder="0">' +
+    '</div><div class="form-group">' +
+      '<label>代购手续费 (¥)</label><input type="number" id="rfc-proxy" value="' + (rule ? (rule.proxy_fee||'') : '') + '" inputmode="decimal" placeholder="0">' +
     '</div></div>' +
     '<div class="form-row" style="margin-top:10px"><div class="form-group">' +
+      '<label>税费 (¥)</label><input type="number" id="rfc-tax" value="' + (rule ? rule.tax : '') + '" inputmode="decimal" placeholder="0">' +
+    '</div><div class="form-group">' +
+      '<label>咸鱼手续费 (%)</label><input type="number" id="rfc-hf" value="' + (rule ? (rule.xianyu_fee_percent||rule.handling_fee_percent||'') : '') + '" inputmode="decimal" placeholder="0">' +
+    '</div></div>' +
+    '<div style="font-size:11px;color:var(--text-muted);padding:8px 0 4px;font-weight:600">出境 / 国内</div>' +
+    '<div class="form-row"><div class="form-group">' +
       '<label>国际运费 (¥)</label><input type="number" id="rfc-intl" value="' + (rule ? rule.intl_shipping : '') + '" inputmode="decimal" placeholder="0">' +
     '</div><div class="form-group">' +
-      '<label>税费 (¥)</label><input type="number" id="rfc-tax" value="' + (rule ? rule.tax : '') + '" inputmode="decimal" placeholder="0">' +
+      '<label>国内运费 (¥)</label><input type="number" id="rfc-dom" value="' + (rule ? rule.domestic_shipping : '') + '" inputmode="decimal" placeholder="0">' +
     '</div></div>' +
     '<div class="form-row" style="margin-top:10px"><div class="form-group">' +
-      '<label>国内运费 (¥)</label><input type="number" id="rfc-dom" value="' + (rule ? rule.domestic_shipping : '') + '" inputmode="decimal" placeholder="0">' +
-    '</div><div class="form-group">' +
       '<label>箱费+包装 (¥)</label><input type="number" id="rfc-box" value="' + (rule ? (rule.box_fee||'') : '') + '" inputmode="decimal" placeholder="0">' +
-    '</div></div>' +
-    '<div class="form-group" style="margin-top:10px">' +
+    '</div><div class="form-group">' +
       '<label>默认利润率 (%)</label><input type="number" id="rfc-margin" value="' + (rule ? rule.profit_margin_percent : '15') + '" inputmode="decimal" placeholder="15">' +
-    '</div>' +
+    '</div></div>' +
     '<div style="display:flex;gap:8px;margin-top:14px">' +
       '<button onclick="saveFeeRule()" class="btn btn-primary" style="flex:1">保存</button>' +
       '<button onclick="renderFeeRules()" class="btn" style="flex:1">取消</button>' +
@@ -2010,10 +2018,11 @@ async function saveFeeRule() {
   var data = {
     category: $('rfc-category').value,
     box_size: $('rfc-box-size').value,
-    handling_fee_percent: parseFloat($('rfc-hf').value) || 0,
     japan_domestic_shipping: parseFloat($('rfc-jp').value) || 0,
-    intl_shipping: parseFloat($('rfc-intl').value) || 0,
+    proxy_fee: parseFloat($('rfc-proxy').value) || 0,
     tax: parseFloat($('rfc-tax').value) || 0,
+    handling_fee_percent: parseFloat($('rfc-hf').value) || 0,
+    intl_shipping: parseFloat($('rfc-intl').value) || 0,
     domestic_shipping: parseFloat($('rfc-dom').value) || 0,
     box_fee: parseFloat($('rfc-box').value) || 0,
     packing_fee: 0,
@@ -2061,16 +2070,26 @@ async function doCalc() {
   var margin = parseFloat($('calc-margin').value) || 15;
   var body = { sell_price: sell, category: cat, box_size: box, custom_fees: { profit_margin_percent: margin } };
   var res = await post('/api/calc-buy-price', body);
+  var f = res.fees;
   $('calc-result').style.display = 'block';
   $('calc-buy-price').textContent = res.buy_price_max.toFixed(2);
   $('calc-detail-sell').textContent = '¥' + res.sell_price.toFixed(2);
-  $('calc-detail-hf-pct').textContent = res.fees.handling_fee_percent;
-  $('calc-detail-hf').textContent = res.fees.handling_fee.toFixed(2);
-  $('calc-detail-jp').textContent = res.fees.japan_domestic_shipping.toFixed(2);
-  $('calc-detail-intl').textContent = res.fees.intl_shipping.toFixed(2);
-  $('calc-detail-tax').textContent = res.fees.tax.toFixed(2);
-  $('calc-detail-dom').textContent = res.fees.domestic_shipping.toFixed(2);
-  $('calc-detail-box').textContent = (res.fees.box_fee + res.fees.packing_fee).toFixed(2);
+  // 日本站
+  $('calc-detail-jp').textContent = (f.japan_domestic_shipping || 0).toFixed(2);
+  $('calc-detail-proxy').textContent = (f.proxy_fee || 0).toFixed(2);
+  $('calc-detail-tax').textContent = (f.tax || 0).toFixed(2);
+  $('calc-detail-jp-sub').textContent = '¥' + (f.japan_subtotal || 0).toFixed(2);
+  // 出境
+  $('calc-detail-intl').textContent = (f.intl_shipping || 0).toFixed(2);
+  var intlSub = (f.japan_subtotal || 0) + (f.intl_shipping || 0);
+  $('calc-detail-intl-sub').textContent = '¥' + intlSub.toFixed(2);
+  // 到中国仓库
+  $('calc-detail-dom').textContent = (f.domestic_shipping || 0).toFixed(2);
+  $('calc-detail-box').textContent = ((f.box_fee || 0) + (f.packing_fee || 0)).toFixed(2);
+  $('calc-detail-cn-sub').textContent = '¥' + (f.china_subtotal || 0).toFixed(2);
+  // 咸鱼卖出
+  $('calc-detail-hf-pct').textContent = f.xianyu_fee_percent || 0;
+  $('calc-detail-hf').textContent = (f.xianyu_fee || 0).toFixed(2);
   $('calc-detail-margin-pct').textContent = res.target_profit_margin;
   $('calc-detail-margin').textContent = res.target_profit.toFixed(2);
   $('calc-detail-buy').textContent = res.buy_price_max.toFixed(2);
@@ -2179,19 +2198,28 @@ async function loadBoxSizes() {
     <div id="calc-result" style="margin-top:16px;display:none">
       <div class="card" style="background:var(--bg-secondary);padding:16px">
         <div style="font-size:13px;color:var(--text-muted);margin-bottom:10px">估算结果</div>
-        <div style="font-size:32px;font-weight:700;color:var(--accent);margin-bottom:12px">¥<span id="calc-buy-price">0</span></div>
-        <div style="font-size:13px;color:var(--text-muted);margin-bottom:4px">买入价上限（超过即亏损）</div>
-        <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px">
-          <div class="calc-detail-row"><span>咸鱼售价</span><span id="calc-detail-sell">-</span></div>
-          <div class="calc-detail-row"><span>手续费 (<span id="calc-detail-hf-pct">0</span>%)</span><span>-¥<span id="calc-detail-hf">0</span></span></div>
-          <div class="calc-detail-row"><span>日本运费</span><span>-¥<span id="calc-detail-jp">0</span></span></div>
-          <div class="calc-detail-row"><span>国际运费</span><span>-¥<span id="calc-detail-intl">0</span></span></div>
-          <div class="calc-detail-row"><span>税费</span><span>-¥<span id="calc-detail-tax">0</span></span></div>
-          <div class="calc-detail-row"><span>国内运费</span><span>-¥<span id="calc-detail-dom">0</span></span></div>
-          <div class="calc-detail-row"><span>箱费+包装</span><span>-¥<span id="calc-detail-box">0</span></span></div>
-          <div class="calc-detail-row"><span>目标利润 (<span id="calc-detail-margin-pct">0</span>%)</span><span>-¥<span id="calc-detail-margin">0</span></span></div>
-          <div class="calc-detail-row" style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px;font-weight:600"><span>买入价上限</span><span style="color:var(--accent)">¥<span id="calc-detail-buy">0</span></span></div>
-          <div class="calc-detail-row"><span>盈亏平衡点（不计利润）</span><span>¥<span id="calc-detail-breakeven">0</span></span></div>
+        <div style="font-size:32px;font-weight:700;color:var(--accent);margin-bottom:4px">¥<span id="calc-buy-price">0</span></div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">买入价上限（超出即亏损）</div>
+        <div style="border-top:1px solid var(--border);padding-top:10px">
+          <!-- 咸鱼售价 -->
+          <div class="calc-detail-row"><span>咸鱼售价</span><span id="calc-detail-sell">¥0</span></div>
+          <div style="font-size:11px;color:var(--text-muted);padding:6px 0 2px;font-weight:600">日本站</div>
+          <div class="calc-detail-row"><span style="padding-left:8px">日本运费</span><span>-¥<span id="calc-detail-jp">0</span></span></div>
+          <div class="calc-detail-row"><span style="padding-left:8px">代购手续费</span><span>-¥<span id="calc-detail-proxy">0</span></span></div>
+          <div class="calc-detail-row"><span style="padding-left:8px">税费</span><span>-¥<span id="calc-detail-tax">0</span></span></div>
+          <div class="calc-detail-row" style="font-weight:600"><span>日本站小计</span><span id="calc-detail-jp-sub">¥0</span></div>
+          <div style="font-size:11px;color:var(--text-muted);padding:6px 0 2px;font-weight:600">出境</div>
+          <div class="calc-detail-row"><span style="padding-left:8px">国际运费</span><span>-¥<span id="calc-detail-intl">0</span></span></div>
+          <div class="calc-detail-row" style="font-weight:600"><span>出境小计</span><span id="calc-detail-intl-sub">¥0</span></div>
+          <div style="font-size:11px;color:var(--text-muted);padding:6px 0 2px;font-weight:600">到中国仓库</div>
+          <div class="calc-detail-row"><span style="padding-left:8px">国内运费</span><span>-¥<span id="calc-detail-dom">0</span></span></div>
+          <div class="calc-detail-row"><span style="padding-left:8px">箱费+包装</span><span>-¥<span id="calc-detail-box">0</span></span></div>
+          <div class="calc-detail-row" style="font-weight:600"><span>到仓库小计</span><span id="calc-detail-cn-sub">¥0</span></div>
+          <div style="font-size:11px;color:var(--text-muted);padding:6px 0 2px;font-weight:600">咸鱼卖出</div>
+          <div class="calc-detail-row"><span style="padding-left:8px">咸鱼手续费 (<span id="calc-detail-hf-pct">0</span>%)</span><span>-¥<span id="calc-detail-hf">0</span></span></div>
+          <div class="calc-detail-row"><span style="padding-left:8px">目标利润 (<span id="calc-detail-margin-pct">0</span>%)</span><span>-¥<span id="calc-detail-margin">0</span></span></div>
+          <div class="calc-detail-row" style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px;font-weight:700;font-size:15px"><span>买入价上限</span><span style="color:var(--accent)">¥<span id="calc-detail-buy">0</span></span></div>
+          <div class="calc-detail-row" style="margin-top:4px"><span style="font-size:12px;color:var(--text-muted)">盈亏平衡点（不计利润）</span><span style="font-size:12px">¥<span id="calc-detail-breakeven">0</span></span></div>
         </div>
       </div>
     </div>
