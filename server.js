@@ -571,8 +571,20 @@ app.put('/api/settings/:key', (req, res) => {
 app.get('/api/stats', (req, res) => {
   const toys = queryAll('SELECT * FROM toys');
   const recs = queryAll("SELECT * FROM purchase_records WHERE status NOT IN ('stocked','cancelled')");
+  const feeRules = queryAll('SELECT * FROM fee_rules');
   let transitCost = 0;
   for (const r of recs) { transitCost += (r.stage1_amount||0) + (r.stage2_amount||0) + (r.stage3_amount||0); }
+
+  function calcXFee(t) {
+    if (!t.sell || t.sell <= 0 || !feeRules || feeRules.length === 0) return 0;
+    const pt = t.source === 'proxy' ? 'proxy' : 'direct';
+    let rule = feeRules.find(function(r){ return r.category === t.category && (r.box_size === t.box_size || !r.box_size) && r.purchase_type === pt; });
+    if (!rule) rule = feeRules.find(function(r){ return r.category === t.category && r.purchase_type === pt; });
+    if (!rule) rule = feeRules.find(function(r){ return r.category === t.category; });
+    if (rule && rule.handling_fee_percent > 0) return t.sell * rule.handling_fee_percent / 100;
+    return 0;
+  }
+
   let totalCost = 0, totalSell = 0, totalProfit = 0, totalRevenue = 0, stockValue = 0, pending = 0, stockCount = 0, doneCount = 0;
   for (const t of toys) {
     if (t.status === 'stock' && t.source !== 'secondhand') { stockValue += t.cost || 0; stockCount++; }
@@ -586,7 +598,8 @@ app.get('/api/stats', (req, res) => {
       const logisticFee = t.logistics_fee || 0;
       const boxFee = t.box_fee || 0;
       const packingFee = t.packing_fee || 0;
-      const profit = received - huabei - cost - logisticFee - boxFee - packingFee;
+      const xFee = calcXFee(t);
+      const profit = received - huabei - cost - logisticFee - boxFee - packingFee - xFee;
       totalSell += sell;
       totalCost += cost;
       totalRevenue += received;
@@ -858,6 +871,32 @@ app.get('/api/box-sizes', (req, res) => {
   res.json(boxes.map(b => b.name));
 });
 
+
+// ─── Manual backup API ───
+app.post('/api/backup', (req, res) => {
+  try {
+    backupDB();
+    const files = fs.readdirSync(BACKUP_DIR).filter(f => f.startsWith('data.db.')).sort().reverse();
+    res.json({ ok: true, backups: files.slice(0, 10) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/backups', (req, res) => {
+  try {
+    ensureBackupDir();
+    const files = fs.readdirSync(BACKUP_DIR).filter(f => f.startsWith('data.db.')).sort().reverse();
+    const list = files.map(f => {
+      const s = fs.statSync(path.join(BACKUP_DIR, f));
+      return { name: f, size: s.size, mtime: s.mtime };
+    });
+    res.json(list);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Static files & fallback (must be AFTER all API routes) ───
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
@@ -906,6 +945,27 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 4020;
 
+
+const BACKUP_DIR = path.join(__dirname, 'backups');
+function ensureBackupDir() {
+  if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+}
+function backupDB() {
+  if (!fs.existsSync(DB_PATH)) return;
+  ensureBackupDir();
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const bak = path.join(BACKUP_DIR, 'data.db.' + ts + '.bak');
+  fs.copyFileSync(DB_PATH, bak);
+  console.log('DB backup saved:', bak);
+  // Keep only last 10 backups
+  const files = fs.readdirSync(BACKUP_DIR).filter(f => f.startsWith('data.db.')).sort();
+  while (files.length > 10) {
+    fs.unlinkSync(path.join(BACKUP_DIR, files.shift()));
+    console.log('Old backup removed:', files[0]);
+  }
+}
+
 initDB().then(() => {
+  backupDB();
   app.listen(PORT, '0.0.0.0', () => console.log('BuyLedger running on port ' + PORT));
 });

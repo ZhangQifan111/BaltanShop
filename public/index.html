@@ -627,11 +627,6 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
 <div class="page active" id="page-home">
   <div class="stats" id="home-stats"></div>
   <div class="section">
-    <div class="section-title">低库存提醒</div>
-    <div id="low-stock-list"></div>
-    <div class="empty-state" id="low-stock-empty" style="display:none">库存充足</div>
-  </div>
-  <div class="section">
     <div class="section-title">待处理</div>
     <div id="home-pending"></div>
     <div class="empty-state" id="home-pending-empty" style="display:none">没有待处理的订单</div>
@@ -1606,7 +1601,7 @@ function setFilter(f,btn){ curF=f; document.querySelectorAll('.filter-chip').for
 
 async function loadData(){ toys=await get('/api/toys'); supplies=await get('/api/supplies'); rules=await get('/api/fee-rules'); var s=await get('/api/settings'); if(s&&s.categories){ categories=s.categories.split(',').filter(c=>c.trim()); renderCategories(); } await loadBoxSizes(); }
 
-function getXFee(t){ if(!t.sell||t.sell<=0||!rules||rules.length===0) return 0; var pt=t.source==='proxy'?'代购':'直购'; var rule=rules.find(function(r){ return r.category===t.category&&(r.box_size===t.box_size||!r.box_size)&&r.purchase_type===pt; }); if(!rule) rule=rules.find(function(r){ return r.category===t.category&&r.purchase_type===pt; }); if(!rule) rule=rules.find(function(r){ return r.category===t.category; }); if(rule&&rule.handling_fee_percent>0) return t.sell*rule.handling_fee_percent/100; return 0; }
+function getXFee(t){ if(!t.sell||t.sell<=0||!rules||rules.length===0) return 0; var pt=t.source==='proxy'?'proxy':'direct'; var rule=rules.find(function(r){ return r.category===t.category&&(r.box_size===t.box_size||!r.box_size)&&r.purchase_type===pt; }); if(!rule) rule=rules.find(function(r){ return r.category===t.category&&r.purchase_type===pt; }); if(!rule) rule=rules.find(function(r){ return r.category===t.category; }); if(rule&&rule.handling_fee_percent>0) return t.sell*rule.handling_fee_percent/100; return 0; }
 
 function renderCategories(list){ if(list) categories=list; ['f-category','misc-category','te-category','tre-category','tr-category'].forEach(function(id){ var sel=$(id); if(!sel) return; sel.innerHTML=''; categories.forEach(function(c){ var opt=document.createElement('option'); opt.value=c; opt.textContent=c; sel.appendChild(opt); }); }); }
 
@@ -1763,9 +1758,6 @@ async function renderHome(){
   var pend=toys.filter(function(t){ return t.status==='sold'; });
   $('home-pending-empty').style.display=pend.length===0?'block':'none';
   $('home-pending').innerHTML=pend.map(rc).join('');
-  var low=supplies.filter(function(s){ return s.stock<=s.low_stock_threshold; });
-  $('low-stock-empty').style.display=low.length===0?'block':'none';
-  $('low-stock-list').innerHTML=low.map(function(s){ return '<div class="card" style="margin-bottom:6px;padding:10px 14px"><div style="font-size:13px;font-weight:500">'+s.name+'</div><div class="supply-stock low">库存 <span class="num">'+s.stock+'</span> '+s.unit+' (阈值:'+s.low_stock_threshold+')</div></div>'; }).join('');
 }
 
 function renderSupplies(){
