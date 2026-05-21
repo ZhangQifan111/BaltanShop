@@ -1172,7 +1172,7 @@ function renderMiscList(){
     var pl='<div class="record-profit '+(proj!==null?(proj>=0?'positive':'negative'):'')+'">'+projStr+'</div>';
     var ac='<div class="record-actions" style="justify-content:space-between"><button class="record-btn" onclick="openToyEdit('+t.id+')">编辑</button><button class="record-btn red" onclick="removeRecord('+t.id+')">删除</button></div>';
     var imgHtml='';
-    return '<div class="record-card"><div style="display:flex;gap:10px;align-items:flex-start">''<div style="flex:1;min-width:0"><div class="record-header"><div class="record-name">'+t.name+'</div><span class="badge" style="background:var(--orange)22;color:var(--orange)">杂项</span></div><div class="record-meta">'+t.date+' · '+costStr+'</div>'+fin+pl+ac+'</div></div></div>';
+    return '<div class="record-card"><div style="display:flex;gap:10px;align-items:flex-start"><div style="flex:1;min-width:0"><div class="record-header"><div class="record-name">'+t.name+'</div><span class="badge" style="background:var(--orange)22;color:var(--orange)">杂项</span></div><div class="record-meta">'+t.date+' · '+costStr+'</div>'+fin+pl+ac+'</div></div></div>';
   }).join('');
 }
 
