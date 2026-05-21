@@ -607,9 +607,6 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
   <button class="nav-item" onclick="switchTab('sold',this)">
     <span class="nav-icon">📦</span><span class="nav-label">仓库</span>
   </button>
-  <button class="nav-item" onclick="switchTab('supplies',this)">
-    <span class="nav-icon">📦</span><span class="nav-label">耗材</span>
-  </button>
   <button class="nav-item" onclick="switchTab('misc',this)">
     <span class="nav-icon">🏷️</span><span class="nav-label">杂项</span>
   </button>
@@ -729,12 +726,6 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
 </div>
 
 <!-- ========= SUPPLIES ========= -->
-<div class="page" id="page-supplies">
-  <div class="section">
-    <div class="section-title">耗材库存</div>
-    <div class="card" id="supplies-list"></div>
-  </div>
-</div>
 
 <!-- ========= MISC (杂项/二手) ========= -->
 <div class="page" id="page-misc">
@@ -771,9 +762,9 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
 <!-- ========= SETTINGS ========= -->
 <div class="page" id="page-settings">
   <div class="section">
-    <div class="section-title">耗材配置</div>
+    <div class="section-title">耗材管理</div>
     <button onclick="addSupply()" class="btn btn-primary" style="margin-bottom:10px">+ 添加</button>
-    <div class="card" id="supplies-config-list"></div>
+    <div id="supplies-list"></div>
   </div>
   <div class="section">
     <div class="section-title">分类配置</div>
@@ -1731,7 +1722,7 @@ async function renderSettings(){
   $('cfg-done-count').textContent=st.done_count+' 笔';
   $('cfg-stock-count').textContent=st.stock_count+' 件';
   $('cfg-profit').textContent=(st.total_profit>=0?'+':'')+'¥'+st.total_profit.toFixed(2);
-  if($('supplies-config-list'))$('supplies-config-list').innerHTML=supplies.map(function(s){ return '<div class="rule-row"><span class="rule-region" style="color:var(--text)">'+s.name+'</span><span class="rule-provinces">¥'+s.unit_price.toFixed(2)+'/'+s.unit+' · 阈值'+s.low_stock_threshold+'</span><span class="rule-price">'+s.stock+'</span><span style="margin-left:8px;color:#f87171;cursor:pointer" onclick="delSupply('+s.id+')">删除</span></div>'; }).join('');
+  renderSupplies();
   var catDiv = document.getElementById('categories-config');
   if(catDiv) {
     var html = '<div style="margin-bottom:10px"><input type="text" id="new-category" placeholder="新分类名称"><button onclick="addCategory()" class="btn btn-primary" style="margin-left:8px">添加</button></div><div id="categories-list"></div>';
