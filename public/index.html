@@ -104,27 +104,28 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
 .img-upload-area { border: 1.5px dashed var(--border); border-radius: var(--radius); padding: 16px; text-align: center; cursor: pointer; transition: all 0.15s; margin-top: 10px; }
 .img-upload-area:hover { border-color: var(--accent); background: rgba(240,160,48,0.06); }
 /* Premium Warehouse Grid */
-#sold-list,#transit-list{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:0;margin:0}
-.premium-card{background:rgba(30,33,46,0.7);border:1px solid rgba(255,255,255,0.07);border-radius:16px;padding:16px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);transition:all 0.3s cubic-bezier(0.25,0.46,0.45,0.94);position:relative;overflow:hidden}
+#sold-list,#transit-list{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0;margin:0}
+.premium-card{background:rgba(30,33,46,0.7);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:10px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);transition:all 0.3s cubic-bezier(0.25,0.46,0.45,0.94);position:relative;overflow:hidden}
 .premium-card::before{content:'';position:absolute;inset:0;border-radius:16px;padding:1px;background:linear-gradient(135deg,rgba(255,255,255,0.1),transparent 50%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
 .premium-card:hover{transform:translateY(-4px);border-color:rgba(255,255,255,0.14);box-shadow:0 16px 40px rgba(0,0,0,0.4)}
 .premium-card:hover .card-actions{opacity:1;transform:translateY(0)}
-.card-badge{display:inline-flex;align-items:center;gap:4px;font-family:'DM Mono',monospace;font-size:10px;font-weight:500;letter-spacing:0.04em;padding:3px 8px;border-radius:20px;margin-bottom:10px}
+.card-badge{display:inline-flex;align-items:center;gap:4px;font-family:'DM Mono',monospace;font-size:10px;font-weight:500;letter-spacing:0.04em;padding:2px 6px;border-radius:20px;margin-bottom:4px}
 .card-badge.stock{background:rgba(74,222,128,0.12);color:#4ade80}
 .card-badge.sold{background:rgba(96,165,250,0.12);color:#60a5fa}
 .card-badge.done{background:rgba(240,160,48,0.12);color:#f0a030}
 .card-badge.returned{background:rgba(248,113,113,0.12);color:#f87171}
 .card-badge.misc{background:rgba(168,85,247,0.12);color:#a855f7}
-.card-name{font-size:13px;font-weight:600;color:#d0d4e8;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.card-profit{font-size:22px;font-weight:600;font-family:'DM Mono',monospace;margin-bottom:10px;letter-spacing:-0.02em}
+.card-name{font-size:12px;font-weight:600;color:#d0d4e8;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-profit{font-size:16px;font-weight:600;font-family:'DM Mono',monospace;margin-bottom:6px;letter-spacing:-0.02em}
+.card-sub-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}.card-sub-row .sub-label{font-size:9px;color:#6b7085;text-transform:uppercase;letter-spacing:0.06em}.card-sub-row .sub-value{font-size:14px;font-weight:600;font-family:'DM Mono',monospace;color:#d0d4e8}
 .card-profit.positive{color:#4ade80}
 .card-profit.negative{color:#f87171}
 .card-profit.zero{color:#6b7085}
 .card-info-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
-.card-info-label{font-size:10px;color:#6b7085;text-transform:uppercase;letter-spacing:0.06em}
+.card-info-label{font-size:9px;color:#6b7085;text-transform:uppercase;letter-spacing:0.06em}
 .card-info-value{font-size:12px;color:#a0a4b8;font-family:'DM Mono',monospace}
-.card-actions{display:flex;gap:6px;margin-top:14px;opacity:0;transform:translateY(6px);transition:all 0.25s ease}
-.card-btn{flex:1;padding:7px 4px;border-radius:8px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#a0a4b8;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all 0.2s;text-align:center}
+.card-actions{display:flex;gap:4px;margin-top:6px;opacity:0;transform:translateY(4px);transition:all 0.25s ease}
+.card-btn{flex:1;padding:5px 3px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#a0a4b8;font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;transition:all 0.2s;text-align:center}
 .card-btn:active{transform:scale(0.97)}
 .card-btn.sell{background:rgba(74,222,128,0.1);border-color:rgba(74,222,128,0.25);color:#4ade80}
 .card-btn.sell:hover{background:rgba(74,222,128,0.2)}
@@ -148,8 +149,8 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
 /* ── Premium Warehouse Grid ── */
 #sold-list {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
   padding: 0;
   margin: 0;
 }
@@ -276,7 +277,7 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
 .confirm-img-empty { color: var(--text-muted); font-size: 13px; padding: 20px; text-align: center; width: 100%; }
 .confirm-img-info { background: var(--bg); border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-size: 12px; color: var(--text-muted); }
 .confirm-img-info .cii-name { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 6px; }
-.confirm-img-meta { display: flex; gap: 12px; flex-wrap: wrap; }
+.confirm-img-meta { display: flex; gap: 8px; flex-wrap: wrap; }
 .confirm-img-meta span { background: var(--surface-hover); padding: 2px 8px; border-radius: 4px; }
 .confirm-err { color: var(--red); font-size: 12px; text-align: center; margin-top: 8px; }
 
@@ -386,7 +387,7 @@ header p { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
 .rec-btn:hover { background: var(--accent-dim); }
 .rec-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .rec-btn.secondary { background: var(--surface-hover); color: var(--text); border: 1px solid var(--border); }
-.rec-loading { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px; color: var(--text-muted); }
+.rec-loading { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 24px; color: var(--text-muted); }
 .rec-spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .rec-error { color: var(--red); font-size: 13px; text-align: center; padding: 12px; background: var(--red-dim); border-radius: 8px; margin-top: 12px; }
@@ -1131,7 +1132,7 @@ function pc(t){
     actions+='<button class="card-btn sell" onclick="event.stopPropagation();openSell('+t.id+')">出售</button>';
   }
   actions+='<button class="card-btn edit" onclick="event.stopPropagation();openToyEdit('+t.id+')">编辑</button><button class="card-btn delete" onclick="event.stopPropagation();removeRecord('+t.id+')">删除</button>';
-  return '<div class="premium-card"><div class="card-name" onclick="openToyEdit('+t.id+')">'+t.name+'</div>'+badge+'<div class="card-profit '+profitClass+'">'+profitStr+'</div><div class="card-info-row"><span class="card-info-label">成本</span><span class="card-info-value">'+costStr+'</span></div><div class="card-info-row"><span class="card-info-label">售价</span><span class="card-info-value">'+sellStr+'</span></div><div class="card-info-row"><span class="card-info-label">'+t.date+'</span><span class="card-info-value">'+sl(t.source)+'</span></div><div class="card-actions">'+actions+'</div></div>';
+  var dateLabel='<span style="font-size:9px;color:#6b7085;text-transform:uppercase;letter-spacing:0.06em">'+t.date+'</span><span style="font-size:9px;color:#6b7085"> · '+sl(t.source)+'</span>';return '<div class="premium-card"><div class="card-name" onclick="openToyEdit('+t.id+')">'+t.name+'</div>'+badge+'<div class="card-sub-row"><span class="sub-label">成本</span><span class="sub-value">'+costStr+'</span></div><div class="card-sub-row"><span class="sub-label">售价</span><span class="sub-value">'+sellStr+'</span></div><div class="card-profit '+profitClass+'">'+profitStr+'</div>'+dateLabel+'<div class="card-actions">'+actions+'</div></div>';
 }
 
 var curSearch='';
