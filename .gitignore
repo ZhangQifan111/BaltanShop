@@ -1,0 +1,29 @@
+# Node
+node_modules/
+
+# Build output (server side dist/ is leftover from earlier Vite-era monorepo)
+dist/
+dist.bak/
+dist.before-estimate/
+
+# Database & runtime data
+data.db
+backups/
+
+# User-uploaded / scraped media
+uploads/
+
+# Logs
+*.log
+server.log
+sv.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
