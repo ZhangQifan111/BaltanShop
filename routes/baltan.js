@@ -90,6 +90,11 @@ router.post('/download-images', async (req, res) => {
           [localUrl, parseInt(r.slug.split('-')[0]), r.slug.split('-')[1]]);
         updated += 1;
       }
+      if (r.big) {
+        const localBigUrl = `/uploads/baltan/${r.slug}-big.png`;
+        db.update('UPDATE baltan_reference SET image_big_url=? WHERE id=(SELECT id FROM baltan_reference WHERE generation=? AND ref_id=?)',
+          [localBigUrl, parseInt(r.slug.split('-')[0]), r.slug.split('-')[1]]);
+      }
     }
     const total = results.reduce((s, r) => s + (r.thumb?.size || 0) + (r.big?.size || 0), 0);
     const skipped = results.filter(r => r.thumb?.skipped).length;
