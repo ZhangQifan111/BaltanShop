@@ -193,8 +193,18 @@ CREATE TABLE IF NOT EXISTS baltan_reference (
   series TEXT,
   character_slug TEXT,
   character_name_ja TEXT,
+  character_name_zh TEXT,
   brand TEXT,
+  is_custom INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS monster_favorites (
+  character_slug TEXT NOT NULL,
+  ref_id TEXT NOT NULL DEFAULT '',
+  note TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (character_slug, ref_id)
 );
 INSERT OR IGNORE INTO categories (name, color) VALUES ('vinyl', '#60a5fa');
 INSERT OR IGNORE INTO categories (name, color) VALUES ('plush', '#a78bfa');

@@ -14,6 +14,7 @@ const SERIES_LABELS = {
   'ultraq': '奥特Q',
   'others': '其他',
   'ultrafight': '格斗',
+  'custom': '自定义',
 };
 
 const DEFAULT_FEES = {
@@ -69,42 +70,72 @@ function SeriesTab({ s, active, onClick }) {
   );
 }
 
-function CharacterCard({ c, onClick }) {
-  const initial = (c.character_slug || '?').charAt(0).toUpperCase();
+function StarButton({ active, onClick, size = 'md' }) {
+  const sz = size === 'sm' ? 'text-sm' : 'text-base';
   return (
     <button
       type="button"
-      onClick={onClick}
-      className="card overflow-hidden text-left hover:ring-1 hover:ring-accent/40 transition-shadow flex flex-col"
+      onClick={(e) => { e.stopPropagation(); e.preventDefault(); onClick(); }}
+      className={
+        'leading-none select-none transition-opacity ' + sz + ' ' +
+        (active ? 'opacity-100' : 'opacity-30 hover:opacity-70')
+      }
+      title={active ? '取消收藏' : '收藏'}
     >
-      {c.thumbnail_url ? (
-        <img
-          src={c.thumbnail_url}
-          alt={c.character_name_ja || c.character_slug}
-          className="block w-full h-auto object-contain bg-black/30"
-          style={{ aspectRatio: '100 / 147' }}
-          loading="lazy"
-        />
-      ) : (
-        <div
-          className="w-full bg-black/30 flex items-center justify-center text-3xl font-bold text-[#6b7085]"
-          style={{ aspectRatio: '100 / 147' }}
-        >
-          {initial}
-        </div>
-      )}
-      <div className="p-3 flex-1 flex flex-col gap-1 min-w-0">
-        <div className="text-base font-bold text-accent truncate">
-          {c.character_name_zh || c.character_slug}
-        </div>
-        <div className="text-[11px] text-[#a0a4b8] truncate">
-          {c.character_name_ja}
-        </div>
-        <div className="text-xs text-[#6b7085] mt-auto">
-          {c.toy_count} 件
-        </div>
-      </div>
+      {active ? '⭐' : '☆'}
     </button>
+  );
+}
+
+function CustomBadge() {
+  return (
+    <span className="inline-block text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+      🛠 自定义
+    </span>
+  );
+}
+
+function CharacterCard({ c, onClick, isFav, onToggleFav }) {
+  const initial = (c.character_slug || '?').charAt(0).toUpperCase();
+  return (
+    <div className="card overflow-hidden text-left hover:ring-1 hover:ring-accent/40 transition-shadow flex flex-col relative">
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex flex-col flex-1 text-left"
+      >
+        {c.thumbnail_url ? (
+          <img
+            src={c.thumbnail_url}
+            alt={c.character_name_ja || c.character_slug}
+            className="block w-full h-auto object-contain bg-black/30"
+            style={{ aspectRatio: '100 / 147' }}
+            loading="lazy"
+          />
+        ) : (
+          <div
+            className="w-full bg-black/30 flex items-center justify-center text-3xl font-bold text-[#6b7085]"
+            style={{ aspectRatio: '100 / 147' }}
+          >
+            {initial}
+          </div>
+        )}
+        <div className="p-3 flex-1 flex flex-col gap-1 min-w-0">
+          <div className="text-base font-bold text-accent truncate">
+            {c.character_name_zh || c.character_slug}
+          </div>
+          <div className="text-[11px] text-[#a0a4b8] truncate">
+            {c.character_name_ja}
+          </div>
+          <div className="text-xs text-[#6b7085] mt-auto">
+            {c.toy_count} 件 {c.has_custom ? '· 含自定义' : ''}
+          </div>
+        </div>
+      </button>
+      <div className="absolute top-1.5 right-1.5">
+        <StarButton active={isFav} onClick={onToggleFav} />
+      </div>
+    </div>
   );
 }
 
@@ -447,13 +478,196 @@ function AddForm({ item, onClose, onAdded, addToy }) {
   );
 }
 
-function ToyCard({ it, onZoom, panel, openPanel, addToy, onAdded }) {
+function CustomToyForm({ defaultCharacter, onClose, onAdded, setToast }) {
+  const [form, setForm] = useState({
+    name: '',
+    source: 'custom',
+    brand: '',
+    image_url: '',
+    detail_url: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState(null);
+  const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const submit = async () => {
+    if (!form.name.trim()) { setErr('名称必填'); return; }
+    setLoading(true); setErr(null);
+    try {
+      const r = await api.post('/monster/custom-toy', {
+        character_slug: defaultCharacter.character_slug,
+        name: form.name.trim(),
+        source: form.source,
+        brand: form.brand.trim() || null,
+        image_url: form.image_url.trim() || null,
+        detail_url: form.detail_url.trim() || null,
+      });
+      setToast(`已添加 ${r.ref_id}`);
+      onAdded();
+      onClose();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 space-y-2 text-xs">
+      <div className="text-amber-300 text-[10px]">+ 第三方玩具 · 归属角色：{defaultCharacter.character_name_zh || defaultCharacter.character_slug}</div>
+      <div>
+        <span className="text-[9px] text-[#6b7085] block mb-0.5">名称 *</span>
+        <input type="text" value={form.name} onChange={e => update('name', e.target.value)}
+          placeholder="例: 海洋堂 食玩 グビラ"
+          className="input text-xs w-full" />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <span className="text-[9px] text-[#6b7085] block mb-0.5">厂家/品牌</span>
+          <input type="text" value={form.brand} onChange={e => update('brand', e.target.value)}
+            className="input text-xs w-full" />
+        </div>
+        <div>
+          <span className="text-[9px] text-[#6b7085] block mb-0.5">类型</span>
+          <input type="text" value={form.source} onChange={e => update('source', e.target.value)}
+            placeholder="custom / sofvi / figure …"
+            className="input text-xs w-full" />
+        </div>
+      </div>
+      <div>
+        <span className="text-[9px] text-[#6b7085] block mb-0.5">图片 URL（http(s) 会被下载到本地）</span>
+        <input type="text" value={form.image_url} onChange={e => update('image_url', e.target.value)}
+          placeholder="https://…  （留空则无图）"
+          className="input text-xs w-full" />
+      </div>
+      <div>
+        <span className="text-[9px] text-[#6b7085] block mb-0.5">考据链接（可选）</span>
+        <input type="text" value={form.detail_url} onChange={e => update('detail_url', e.target.value)}
+          className="input text-xs w-full" />
+      </div>
+      {err && <div className="text-red-400 text-[10px]">{err}</div>}
+      <div className="flex gap-2">
+        <button type="button" onClick={submit} disabled={loading}
+          className="px-3 py-1.5 rounded bg-amber-500 text-[#0f1117] text-xs font-medium disabled:opacity-50">
+          {loading ? '保存中…' : '保存'}
+        </button>
+        <button type="button" onClick={onClose}
+          className="px-3 py-1.5 rounded bg-white/5 text-[#a0a4b8] text-xs">取消</button>
+      </div>
+    </div>
+  );
+}
+
+function CustomCharacterForm({ defaultSeries, onClose, onAdded, setToast }) {
+  const [form, setForm] = useState({
+    character_slug: '',
+    character_name_ja: '',
+    character_name_zh: '',
+    series: defaultSeries || 'custom',
+    first_toy_name: '',
+    brand: '',
+    image_url: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState(null);
+  const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const submit = async () => {
+    const slug = form.character_slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    if (!slug || !form.character_name_ja.trim() || !form.first_toy_name.trim()) {
+      setErr('slug、日文名、首个玩具名都必填');
+      return;
+    }
+    setLoading(true); setErr(null);
+    try {
+      const r = await api.post('/monster/custom-character', {
+        character_slug: slug,
+        character_name_ja: form.character_name_ja.trim(),
+        character_name_zh: form.character_name_zh.trim() || null,
+        series: form.series.trim() || 'custom',
+        first_toy: {
+          name: form.first_toy_name.trim(),
+          brand: form.brand.trim() || null,
+          image_url: form.image_url.trim() || null,
+        },
+      });
+      setToast(`已创建 ${r.character_slug}`);
+      onAdded(r.series);
+      onClose();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 space-y-2 text-xs">
+      <div className="text-amber-300 text-[10px]">+ 第三方角色（自定义）</div>
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <span className="text-[9px] text-[#6b7085] block mb-0.5">slug * (英文/数字/-)</span>
+          <input type="text" value={form.character_slug} onChange={e => update('character_slug', e.target.value)}
+            placeholder="mykaiju-01"
+            className="input text-xs w-full" />
+        </div>
+        <div>
+          <span className="text-[9px] text-[#6b7085] block mb-0.5">日文名 *</span>
+          <input type="text" value={form.character_name_ja} onChange={e => update('character_name_ja', e.target.value)}
+            className="input text-xs w-full" />
+        </div>
+        <div>
+          <span className="text-[9px] text-[#6b7085] block mb-0.5">中文名</span>
+          <input type="text" value={form.character_name_zh} onChange={e => update('character_name_zh', e.target.value)}
+            className="input text-xs w-full" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <span className="text-[9px] text-[#6b7085] block mb-0.5">归属系列</span>
+          <input type="text" value={form.series} onChange={e => update('series', e.target.value)}
+            placeholder="ultraman / custom …"
+            className="input text-xs w-full" />
+        </div>
+        <div>
+          <span className="text-[9px] text-[#6b7085] block mb-0.5">首个玩具名 *</span>
+          <input type="text" value={form.first_toy_name} onChange={e => update('first_toy_name', e.target.value)}
+            className="input text-xs w-full" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <span className="text-[9px] text-[#6b7085] block mb-0.5">厂家/品牌</span>
+          <input type="text" value={form.brand} onChange={e => update('brand', e.target.value)}
+            className="input text-xs w-full" />
+        </div>
+        <div>
+          <span className="text-[9px] text-[#6b7085] block mb-0.5">图片 URL</span>
+          <input type="text" value={form.image_url} onChange={e => update('image_url', e.target.value)}
+            placeholder="https://…（留空则无图）"
+            className="input text-xs w-full" />
+        </div>
+      </div>
+      {err && <div className="text-red-400 text-[10px]">{err}</div>}
+      <div className="flex gap-2">
+        <button type="button" onClick={submit} disabled={loading}
+          className="px-3 py-1.5 rounded bg-amber-500 text-[#0f1117] text-xs font-medium disabled:opacity-50">
+          {loading ? '创建中…' : '创建角色'}
+        </button>
+        <button type="button" onClick={onClose}
+          className="px-3 py-1.5 rounded bg-white/5 text-[#a0a4b8] text-xs">取消</button>
+      </div>
+    </div>
+  );
+}
+
+function ToyCard({ it, onZoom, panel, openPanel, addToy, onAdded, isFav, onToggleFav }) {
   const key = it.ref_id;
   const hasOwned = it.owned && it.owned.length > 0;
   const activePanel = panel[key];
 
   return (
-    <div className="card overflow-hidden flex flex-col">
+    <div className="card overflow-hidden flex flex-col relative">
       {it.image_url ? (
         <button
           type="button"
@@ -476,10 +690,14 @@ function ToyCard({ it, onZoom, panel, openPanel, addToy, onAdded }) {
           无图
         </div>
       )}
+      <div className="absolute top-1.5 right-1.5 z-10">
+        <StarButton active={isFav} onClick={onToggleFav} />
+      </div>
       <div className="p-2.5 flex-1 flex flex-col gap-1 min-w-0">
-        <div className="flex items-baseline gap-1.5">
+        <div className="flex items-baseline gap-1.5 flex-wrap">
           <span className="text-xs text-accent">#{it.ref_id.split('-').pop()}</span>
           <span className="text-[10px] text-[#6b7085] truncate">{it.source}</span>
+          {it.is_custom ? <CustomBadge /> : null}
         </div>
         {hasOwned && (
           <div className="space-y-0.5">
@@ -552,6 +770,15 @@ export default function Monster() {
   const [viewing, setViewing] = useState(null);
   const [loading, setLoading] = useState(false);
   const [panel, setPanel] = useState({});
+
+  const [viewMode, setViewMode] = useState('all'); // 'all' | 'favorites'
+  const [favorites, setFavorites] = useState([]); // [{character_slug, ref_id, note, created_at}]
+  const [favCharacters, setFavCharacters] = useState([]);
+  const [favLoading, setFavLoading] = useState(false);
+
+  const [showCustomToyForm, setShowCustomToyForm] = useState(false);
+  const [showCustomCharForm, setShowCustomCharForm] = useState(false);
+
   const setToast = useStore(s => s.setToast);
   const addToy = useStore(s => s.addToy);
 
@@ -568,7 +795,33 @@ export default function Monster() {
   }, []);
 
   useEffect(() => {
-    if (!currentSeries) return;
+    (async () => {
+      try {
+        const r = await api.get('/monster/favorites');
+        setFavorites(r.favorites || []);
+      } catch (e) { /* silent */ }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (viewMode !== 'favorites') return;
+    const slugs = Array.from(new Set(favorites.map(f => f.character_slug)));
+    if (!slugs.length) { setFavCharacters([]); return; }
+    (async () => {
+      setFavLoading(true);
+      try {
+        const r = await api.post('/monster/favorites/characters', { slugs });
+        setFavCharacters(r.characters || []);
+      } catch (e) {
+        setToast('加载收藏失败: ' + e.message);
+      } finally {
+        setFavLoading(false);
+      }
+    })();
+  }, [viewMode, favorites]);
+
+  useEffect(() => {
+    if (!currentSeries || viewMode === 'favorites') return;
     setCurrentCharacter(null);
     setToys([]);
     setPanel({});
@@ -580,7 +833,7 @@ export default function Monster() {
         setToast('加载角色失败: ' + e.message);
       }
     })();
-  }, [currentSeries]);
+  }, [currentSeries, viewMode]);
 
   const loadToys = async (c) => {
     if (!c) return [];
@@ -601,6 +854,7 @@ export default function Monster() {
   const selectCharacter = async (c) => {
     setCurrentCharacter(c);
     setPanel({});
+    setShowCustomToyForm(false);
     await loadToys(c);
   };
 
@@ -608,9 +862,68 @@ export default function Monster() {
     setCurrentCharacter(null);
     setToys([]);
     setPanel({});
+    setShowCustomToyForm(false);
   };
 
   const openPanel = (key, p) => setPanel(o => ({ ...o, [key]: o[key] === p ? null : p }));
+
+  const isCharFav = (slug) => favorites.some(f => f.character_slug === slug && f.ref_id === '');
+  const isToyFav = (slug, refId) => favorites.some(f => f.character_slug === slug && f.ref_id === refId);
+
+  const toggleFav = async (character_slug, ref_id = '') => {
+    const active = ref_id === ''
+      ? isCharFav(character_slug)
+      : isToyFav(character_slug, ref_id);
+    // optimistic update
+    setFavorites(prev => {
+      if (active) return prev.filter(f => !(f.character_slug === character_slug && f.ref_id === ref_id));
+      return [{ character_slug, ref_id, note: null, created_at: new Date().toISOString() }, ...prev];
+    });
+    try {
+      if (active) {
+        await api.del(`/monster/favorites?character_slug=${encodeURIComponent(character_slug)}&ref_id=${encodeURIComponent(ref_id)}`);
+      } else {
+        await api.post('/monster/favorites', { character_slug, ref_id });
+      }
+    } catch (e) {
+      setToast('收藏失败: ' + e.message);
+      // 回滚
+      setFavorites(prev => active
+        ? [...prev, { character_slug, ref_id, note: null, created_at: new Date().toISOString() }]
+        : prev.filter(f => !(f.character_slug === character_slug && f.ref_id === ref_id))
+      );
+    }
+  };
+
+  const reloadCharacters = async () => {
+    if (!currentSeries) return;
+    try {
+      const r = await api.get(`/monster/characters?series=${encodeURIComponent(currentSeries)}`);
+      setCharacters(r.characters || []);
+    } catch (e) { setToast('刷新角色失败: ' + e.message); }
+  };
+
+  const reloadSeries = async () => {
+    try {
+      const r = await api.get('/monster/series');
+      setSeriesList(r.series || []);
+    } catch (e) { setToast('刷新 series 失败: ' + e.message); }
+  };
+
+  const onCustomCharAdded = async (newSeries) => {
+    await reloadSeries();
+    if (newSeries) {
+      setCurrentSeries(newSeries);
+      setViewMode('all');
+    }
+  };
+
+  const onCustomToyAdded = async () => {
+    if (currentCharacter) await loadToys(currentCharacter);
+    await reloadCharacters();
+  };
+
+  const favCharCount = new Set(favorites.map(f => f.character_slug)).size;
 
   return (
     <div className="space-y-4">
@@ -624,19 +937,52 @@ export default function Monster() {
         </p>
       </div>
 
+      {/* series tabs + 收藏切换 + 第三方角色入口 */}
       {currentCharacter === null && (
-        <div className="flex flex-wrap gap-2">
-          {seriesList.map(s => (
-            <SeriesTab
-              key={s.series}
-              s={s}
-              active={s.series === currentSeries}
-              onClick={() => setCurrentSeries(s.series)}
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2 items-center">
+            {viewMode === 'all' && seriesList.map(s => (
+              <SeriesTab
+                key={s.series}
+                s={s}
+                active={s.series === currentSeries}
+                onClick={() => setCurrentSeries(s.series)}
+              />
+            ))}
+            <button
+              type="button"
+              onClick={() => setViewMode(viewMode === 'favorites' ? 'all' : 'favorites')}
+              className={
+                'text-xs px-3 py-1.5 rounded-full transition-colors ' +
+                (viewMode === 'favorites'
+                  ? 'bg-yellow-500 text-[#0f1117] font-semibold'
+                  : 'bg-white/5 text-[#a0a4b8] border border-white/10 hover:bg-white/10')
+              }
+            >
+              {viewMode === 'favorites' ? '★ 收藏' : `☆ 收藏 (${favCharCount})`}
+            </button>
+            {viewMode === 'all' && (
+              <button
+                type="button"
+                onClick={() => setShowCustomCharForm(o => !o)}
+                className="text-xs px-3 py-1.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25"
+              >
+                + 第三方角色
+              </button>
+            )}
+          </div>
+          {showCustomCharForm && (
+            <CustomCharacterForm
+              defaultSeries={currentSeries}
+              onClose={() => setShowCustomCharForm(false)}
+              onAdded={onCustomCharAdded}
+              setToast={setToast}
             />
-          ))}
+          )}
         </div>
       )}
 
+      {/* 面包屑（角色页） */}
       {currentCharacter && (
         <div className="flex items-center gap-2 text-xs">
           <button
@@ -654,38 +1000,87 @@ export default function Monster() {
         </div>
       )}
 
-      {currentCharacter === null && characters.length > 0 && (
+      {/* 角色网格（全部模式） */}
+      {viewMode === 'all' && currentCharacter === null && characters.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {characters.map(c => (
             <CharacterCard
               key={c.character_slug}
               c={c}
               onClick={() => selectCharacter(c)}
+              isFav={isCharFav(c.character_slug)}
+              onToggleFav={() => toggleFav(c.character_slug, '')}
             />
           ))}
         </div>
       )}
 
-      {currentCharacter && (
-        loading ? (
+      {/* 角色网格（收藏模式） */}
+      {viewMode === 'favorites' && currentCharacter === null && (
+        favLoading ? (
           <div className="text-xs text-[#6b7085]">加载中…</div>
-        ) : toys.length === 0 ? (
-          <div className="text-xs text-[#6b7085]">暂无数据</div>
+        ) : favCharacters.length === 0 ? (
+          <div className="text-xs text-[#6b7085]">还没有收藏。点角色卡右上角的 ☆ 收藏怪兽。</div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {toys.map(it => (
-              <ToyCard
-                key={it.ref_id}
-                it={it}
-                onZoom={() => setViewing(it)}
-                panel={panel}
-                openPanel={openPanel}
-                addToy={addToy}
-                onAdded={() => loadToys(currentCharacter)}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {favCharacters.map(c => (
+              <CharacterCard
+                key={c.character_slug}
+                c={c}
+                onClick={() => { setCurrentSeries(c.series || 'custom'); setViewMode('all'); selectCharacter(c); }}
+                isFav={isCharFav(c.character_slug)}
+                onToggleFav={() => toggleFav(c.character_slug, '')}
               />
             ))}
           </div>
         )
+      )}
+
+      {/* 玩具列表（角色页） */}
+      {currentCharacter && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] text-[#6b7085]">
+              反算购入价 · 录入库存
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowCustomToyForm(o => !o)}
+              className="text-xs px-3 py-1.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25"
+            >
+              {showCustomToyForm ? '收起' : '+ 第三方玩具'}
+            </button>
+          </div>
+          {showCustomToyForm && (
+            <CustomToyForm
+              defaultCharacter={currentCharacter}
+              onClose={() => setShowCustomToyForm(false)}
+              onAdded={onCustomToyAdded}
+              setToast={setToast}
+            />
+          )}
+          {loading ? (
+            <div className="text-xs text-[#6b7085]">加载中…</div>
+          ) : toys.length === 0 ? (
+            <div className="text-xs text-[#6b7085]">暂无数据</div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              {toys.map(it => (
+                <ToyCard
+                  key={it.ref_id}
+                  it={it}
+                  onZoom={() => setViewing(it)}
+                  panel={panel}
+                  openPanel={openPanel}
+                  addToy={addToy}
+                  onAdded={() => loadToys(currentCharacter)}
+                  isFav={isToyFav(it.character_slug, it.ref_id)}
+                  onToggleFav={() => toggleFav(it.character_slug, it.ref_id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {viewing && (

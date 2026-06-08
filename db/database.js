@@ -99,6 +99,21 @@ function migrate() {
     if (!baltanCols.has('brand')) {
       changes.push("ALTER TABLE baltan_reference ADD COLUMN brand TEXT");
     }
+    if (!baltanCols.has('is_custom')) {
+      changes.push("ALTER TABLE baltan_reference ADD COLUMN is_custom INTEGER DEFAULT 0");
+    }
+    if (!baltanCols.has('character_name_zh')) {
+      changes.push("ALTER TABLE baltan_reference ADD COLUMN character_name_zh TEXT");
+    }
+  }
+  if (!tableNames.has('monster_favorites')) {
+    changes.push(`CREATE TABLE monster_favorites (
+      character_slug TEXT NOT NULL,
+      ref_id TEXT NOT NULL DEFAULT '',
+      note TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (character_slug, ref_id)
+    )`);
   }
   // 一次性迁移：旧 ref_id 格式纯数字 "01" (无 prefix) 改为 "{slug}-{nn}"，并补 series/slug/name
   if (tableNames.has('baltan_reference')) {
