@@ -71,18 +71,21 @@ function SeriesTab({ s, active, onClick }) {
 }
 
 function StarButton({ active, onClick, size = 'md' }) {
-  const sz = size === 'sm' ? 'text-sm' : 'text-base';
+  const dim = size === 'sm' ? 'w-7 h-7 text-sm' : 'w-9 h-9 text-base';
   return (
     <button
       type="button"
       onClick={(e) => { e.stopPropagation(); e.preventDefault(); onClick(); }}
-      className={
-        'leading-none select-none transition-opacity ' + sz + ' ' +
-        (active ? 'opacity-100' : 'opacity-30 hover:opacity-70')
-      }
       title={active ? '取消收藏' : '收藏'}
+      className={
+        dim + ' rounded-full flex items-center justify-center leading-none select-none ' +
+        'transition-all duration-150 active:scale-90 hover:scale-110 ' +
+        (active
+          ? 'bg-yellow-400 text-[#0f1117] shadow-md shadow-yellow-500/50 ring-2 ring-yellow-300/80'
+          : 'bg-black/45 backdrop-blur-sm text-white/85 hover:bg-black/65 hover:text-white border border-white/15')
+      }
     >
-      {active ? '⭐' : '☆'}
+      {active ? '★' : '☆'}
     </button>
   );
 }
@@ -98,7 +101,14 @@ function CustomBadge() {
 function CharacterCard({ c, onClick, isFav, onToggleFav }) {
   const initial = (c.character_slug || '?').charAt(0).toUpperCase();
   return (
-    <div className="card overflow-hidden text-left hover:ring-1 hover:ring-accent/40 transition-shadow flex flex-col relative">
+    <div
+      className={
+        'card overflow-hidden text-left transition-all duration-150 flex flex-col relative ' +
+        (isFav
+          ? 'ring-2 ring-yellow-400/70 shadow-lg shadow-yellow-500/15'
+          : 'hover:ring-1 hover:ring-accent/40')
+      }
+    >
       <button
         type="button"
         onClick={onClick}
@@ -127,12 +137,13 @@ function CharacterCard({ c, onClick, isFav, onToggleFav }) {
           <div className="text-[11px] text-[#a0a4b8] truncate">
             {c.character_name_ja}
           </div>
-          <div className="text-xs text-[#6b7085] mt-auto">
-            {c.toy_count} 件 {c.has_custom ? '· 含自定义' : ''}
+          <div className="text-xs text-[#6b7085] mt-auto flex items-center gap-1">
+            <span>{c.toy_count} 件 {c.has_custom ? '· 含自定义' : ''}</span>
+            {isFav && <span className="text-yellow-400">· ★ 已收藏</span>}
           </div>
         </div>
       </button>
-      <div className="absolute top-1.5 right-1.5">
+      <div className="absolute top-2 right-2 z-10">
         <StarButton active={isFav} onClick={onToggleFav} />
       </div>
     </div>
@@ -667,7 +678,12 @@ function ToyCard({ it, onZoom, panel, openPanel, addToy, onAdded, isFav, onToggl
   const activePanel = panel[key];
 
   return (
-    <div className="card overflow-hidden flex flex-col relative">
+    <div
+      className={
+        'card overflow-hidden flex flex-col relative transition-all duration-150 ' +
+        (isFav ? 'ring-2 ring-yellow-400/70 shadow-lg shadow-yellow-500/15' : '')
+      }
+    >
       {it.image_url ? (
         <button
           type="button"
@@ -690,7 +706,7 @@ function ToyCard({ it, onZoom, panel, openPanel, addToy, onAdded, isFav, onToggl
           无图
         </div>
       )}
-      <div className="absolute top-1.5 right-1.5 z-10">
+      <div className="absolute top-2 right-2 z-10">
         <StarButton active={isFav} onClick={onToggleFav} />
       </div>
       <div className="p-2.5 flex-1 flex flex-col gap-1 min-w-0">
@@ -953,13 +969,13 @@ export default function Monster() {
               type="button"
               onClick={() => setViewMode(viewMode === 'favorites' ? 'all' : 'favorites')}
               className={
-                'text-xs px-3 py-1.5 rounded-full transition-colors ' +
+                'text-xs px-3 py-1.5 rounded-full transition-all font-medium ' +
                 (viewMode === 'favorites'
-                  ? 'bg-yellow-500 text-[#0f1117] font-semibold'
-                  : 'bg-white/5 text-[#a0a4b8] border border-white/10 hover:bg-white/10')
+                  ? 'bg-yellow-400 text-[#0f1117] font-semibold shadow-md shadow-yellow-500/30'
+                  : 'bg-yellow-500/10 text-yellow-300 border border-yellow-500/40 hover:bg-yellow-500/20')
               }
             >
-              {viewMode === 'favorites' ? '★ 收藏' : `☆ 收藏 (${favCharCount})`}
+              {viewMode === 'favorites' ? '★ 收藏视图' : `☆ 收藏 (${favCharCount})`}
             </button>
             {viewMode === 'all' && (
               <button
@@ -1020,7 +1036,7 @@ export default function Monster() {
         favLoading ? (
           <div className="text-xs text-[#6b7085]">加载中…</div>
         ) : favCharacters.length === 0 ? (
-          <div className="text-xs text-[#6b7085]">还没有收藏。点角色卡右上角的 ☆ 收藏怪兽。</div>
+          <div className="text-xs text-[#6b7085]">还没有收藏。点角色卡 <span className="text-yellow-400">☆</span> 收藏喜欢的怪兽。</div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {favCharacters.map(c => (
