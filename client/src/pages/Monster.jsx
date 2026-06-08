@@ -669,10 +669,64 @@ function CustomCharacterForm({ defaultSeries, onClose, onAdded, setToast }) {
   );
 }
 
-function ToyCard({ it, onZoom, panel, openPanel, addToy, onAdded, isFav, onToggleFav }) {
-  const key = it.ref_id;
+function ToyFormModal({ item, type, onClose, onAdded, addToy }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const isAdd = type === 'add';
+  const nn = item.ref_id.split('-').pop();
+  const title = isAdd ? '录入库存' : '反算购入价';
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#161924] border border-white/10 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between p-3 border-b border-white/10 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            {item.image_url && (
+              <img
+                src={item.image_url}
+                alt=""
+                className="w-10 h-14 object-contain bg-black/30 rounded shrink-0"
+              />
+            )}
+            <div className="min-w-0">
+              <div className="text-sm font-bold text-white">{title}</div>
+              <div className="text-xs text-[#a0a4b8] truncate">
+                {item.character_name_zh || item.character_slug} #{nn} {item.source}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-xl text-[#a0a4b8] hover:text-white hover:bg-white/10 shrink-0"
+          >
+            ×
+          </button>
+        </div>
+        <div className="p-4 overflow-y-auto flex-1">
+          {isAdd ? (
+            <AddForm key={item.ref_id} item={item} onClose={onClose} onAdded={onAdded} addToy={addToy} />
+          ) : (
+            <EstimateForm key={item.ref_id} item={item} onClose={onClose} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ToyCard({ it, onZoom, onOpenForm, addToy, isFav, onToggleFav }) {
   const hasOwned = it.owned && it.owned.length > 0;
-  const activePanel = panel[key];
 
   return (
     <div
@@ -736,40 +790,20 @@ function ToyCard({ it, onZoom, panel, openPanel, addToy, onAdded, isFav, onToggl
         {!hasOwned && (
           <button
             type="button"
-            onClick={() => openPanel(key, 'estimate')}
-            className={
-              'flex-1 text-xs font-semibold py-1.5 rounded ' +
-              (activePanel === 'estimate'
-                ? 'bg-accent text-[#0f1117]'
-                : 'bg-accent/15 text-accent border border-accent/40 hover:bg-accent/25')
-            }
+            onClick={() => onOpenForm('estimate')}
+            className="flex-1 text-xs font-semibold py-1.5 rounded bg-accent/15 text-accent border border-accent/40 hover:bg-accent/25"
           >
-            {activePanel === 'estimate' ? '收起' : '🧮 反算'}
+            🧮 反算
           </button>
         )}
         <button
           type="button"
-          onClick={() => openPanel(key, 'add')}
-          className={
-            'flex-1 text-xs font-semibold py-1.5 rounded ' +
-            (activePanel === 'add'
-              ? 'bg-emerald-500 text-[#0f1117]'
-              : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25')
-          }
+          onClick={() => onOpenForm('add')}
+          className="flex-1 text-xs font-semibold py-1.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25"
         >
-          {activePanel === 'add' ? '收起' : hasOwned ? '➕ 再录' : '➕ 录入'}
+          {hasOwned ? '➕ 再录' : '➕ 录入'}
         </button>
       </div>
-      {activePanel === 'estimate' && !hasOwned && (
-        <div className="border-t border-white/5 px-2.5 pb-2.5">
-          <EstimateForm item={it} onClose={() => openPanel(key, null)} />
-        </div>
-      )}
-      {activePanel === 'add' && (
-        <div className="border-t border-white/5 px-2.5 pb-2.5">
-          <AddForm item={it} onClose={() => openPanel(key, null)} onAdded={onAdded} addToy={addToy} />
-        </div>
-      )}
     </div>
   );
 }
@@ -782,7 +816,7 @@ export default function Monster() {
   const [toys, setToys] = useState([]);
   const [viewing, setViewing] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [panel, setPanel] = useState({});
+  const [formModal, setFormModal] = useState(null); // { type: 'add'|'estimate', item } | null
 
   const [viewMode, setViewMode] = useState('all'); // 'all' | 'favorites'
   const [favorites, setFavorites] = useState([]); // [{character_slug, ref_id, note, created_at}]
@@ -844,7 +878,7 @@ export default function Monster() {
     if (!currentSeries || viewMode === 'favorites') return;
     setCurrentCharacter(null);
     setToys([]);
-    setPanel({});
+    setFormModal(null);
     (async () => {
       try {
         const r = await api.get(`/monster/characters?series=${encodeURIComponent(currentSeries)}`);
@@ -874,7 +908,7 @@ export default function Monster() {
 
   const selectCharacter = async (c, series) => {
     setCurrentCharacter(c);
-    setPanel({});
+    setFormModal(null);
     setShowCustomToyForm(false);
     await loadToys(c, series);
   };
@@ -882,11 +916,25 @@ export default function Monster() {
   const backToCharacters = () => {
     setCurrentCharacter(null);
     setToys([]);
-    setPanel({});
+    setFormModal(null);
     setShowCustomToyForm(false);
   };
 
-  const openPanel = (key, p) => setPanel(o => ({ ...o, [key]: o[key] === p ? null : p }));
+  const openFormModal = (type, item) => {
+    setFormModal(prev => {
+      // 同一玩具同一类型再次点击 → 关闭
+      if (prev?.type === type && prev?.item?.ref_id === item.ref_id) return null;
+      return { type, item };
+    });
+  };
+
+  const closeFormModal = () => setFormModal(null);
+
+  const handleFormAdded = async () => {
+    closeFormModal();
+    if (viewMode === 'favorites') await refreshFavToys();
+    else if (currentCharacter) await loadToys(currentCharacter);
+  };
 
   // 角色卡仅作"该角色下有单品已收藏"的视觉提示（黄色 ring），不参与 toggle
   const isCharFav = (slug) => favorites.some(f => f.character_slug === slug);
@@ -1053,10 +1101,8 @@ export default function Monster() {
                 key={it.ref_id}
                 it={it}
                 onZoom={() => setViewing(it)}
-                panel={panel}
-                openPanel={openPanel}
+                onOpenForm={(type) => openFormModal(type, it)}
                 addToy={addToy}
-                onAdded={refreshFavToys}
                 isFav={isToyFav(it.character_slug, it.ref_id)}
                 onToggleFav={() => toggleFav(it.character_slug, it.ref_id)}
               />
@@ -1099,10 +1145,8 @@ export default function Monster() {
                   key={it.ref_id}
                   it={it}
                   onZoom={() => setViewing(it)}
-                  panel={panel}
-                  openPanel={openPanel}
+                  onOpenForm={(type) => openFormModal(type, it)}
                   addToy={addToy}
-                  onAdded={() => loadToys(currentCharacter)}
                   isFav={isToyFav(it.character_slug, it.ref_id)}
                   onToggleFav={() => toggleFav(it.character_slug, it.ref_id)}
                 />
@@ -1121,6 +1165,16 @@ export default function Monster() {
           }
           detailUrl={viewing.detail_url}
           onClose={() => setViewing(null)}
+        />
+      )}
+
+      {formModal && (
+        <ToyFormModal
+          item={formModal.item}
+          type={formModal.type}
+          onClose={closeFormModal}
+          onAdded={handleFormAdded}
+          addToy={addToy}
         />
       )}
     </div>
