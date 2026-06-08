@@ -1138,7 +1138,16 @@ export default function Monster() {
               <CharacterCard
                 key={c.character_slug}
                 c={c}
-                onClick={() => { const s = c.series || currentSeries; setCurrentSeries(s); setViewMode('all'); selectCharacter(c, s); }}
+                onClick={() => {
+                  if (!c.thumbnail_url && !c.image_big_url) return;
+                  setViewing({
+                    image_url: c.thumbnail_url,
+                    image_big_url: c.image_big_url,
+                    character_name_zh: c.character_name_zh,
+                    character_name_ja: c.character_name_ja,
+                    character_slug: c.character_slug,
+                  });
+                }}
                 isFav={isCharFav(c.character_slug)}
                 onToggleFav={() => toggleFav(c.character_slug, '')}
               />
@@ -1197,7 +1206,10 @@ export default function Monster() {
       {viewing && (
         <ImageModal
           src={viewing.image_big_url || viewing.image_url}
-          alt={`${viewing.character_name_zh || viewing.character_name_ja || viewing.character_slug} ${viewing.source}`}
+          alt={viewing.source
+            ? `${viewing.character_name_zh || viewing.character_name_ja || viewing.character_slug} ${viewing.source}`
+            : (viewing.character_name_zh || viewing.character_name_ja || viewing.character_slug)
+          }
           detailUrl={viewing.detail_url}
           onClose={() => setViewing(null)}
         />

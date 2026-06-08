@@ -285,6 +285,7 @@ router.post('/favorites/characters', async (req, res) => {
          MAX(character_name_zh) AS character_name_zh,
          COUNT(*) AS toy_count,
          MIN(image_url) AS thumbnail_url,
+         MIN(image_big_url) AS image_big_url,
          MAX(is_custom) AS has_custom
        FROM baltan_reference
        WHERE character_slug IN (${placeholders})
@@ -295,6 +296,7 @@ router.post('/favorites/characters', async (req, res) => {
     for (const r of rows) {
       r.character_name_zh = r.character_name_zh || CHARACTER_NAME_ZH[r.character_slug] || null;
       r.thumbnail_url = withVersion(r.thumbnail_url);
+      r.image_big_url = withVersion(r.image_big_url);
     }
     res.json({ characters: rows });
   } catch (e) {
