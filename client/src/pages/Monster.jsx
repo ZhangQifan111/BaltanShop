@@ -98,7 +98,7 @@ function CustomBadge() {
   );
 }
 
-function CharacterCard({ c, onClick, isFav }) {
+function CharacterCard({ c, onClick, isFav, onRemoveFav }) {
   const initial = (c.character_slug || '?').charAt(0).toUpperCase();
 
   return (
@@ -110,6 +110,18 @@ function CharacterCard({ c, onClick, isFav }) {
           : 'hover:ring-1 hover:ring-accent/40')
       }
     >
+      {onRemoveFav && (
+        <div className="absolute top-2 right-2 z-10">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onRemoveFav(); }}
+            title="移除收藏"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-base leading-none select-none transition-all duration-150 active:scale-90 hover:scale-110 bg-black/55 backdrop-blur-sm text-white/85 border border-white/20 hover:bg-red-500/85 hover:border-red-300/60 hover:text-white"
+          >
+            ×
+          </button>
+        </div>
+      )}
       <button
         type="button"
         onClick={onClick}
@@ -914,6 +926,18 @@ export default function Monster() {
     }
   };
 
+  // 收藏视图用：一次性移除该角色下的所有收藏
+  const removeAllFavsForChar = async (character_slug) => {
+    const snapshot = favorites.filter(f => f.character_slug === character_slug);
+    setFavorites(prev => prev.filter(f => f.character_slug !== character_slug));
+    try {
+      await api.del(`/monster/favorites?character_slug=${encodeURIComponent(character_slug)}&all=1`);
+    } catch (e) {
+      setToast('取消收藏失败: ' + e.message);
+      setFavorites(prev => [...snapshot, ...prev]);
+    }
+  };
+
   const reloadCharacters = async () => {
     if (!currentSeries) return;
     try {
@@ -1056,6 +1080,7 @@ export default function Monster() {
                   });
                 }}
                 isFav={isCharFav(c.character_slug)}
+                onRemoveFav={() => removeAllFavsForChar(c.character_slug)}
               />
             ))}
           </div>
