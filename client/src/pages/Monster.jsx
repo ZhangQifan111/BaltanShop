@@ -147,7 +147,7 @@ function CharacterCard({ c, onClick, isFav }) {
   );
 }
 
-function EstimateForm({ item, onClose }) {
+function EstimateForm({ item, onClose, onUseForAdd }) {
   const [form, setForm] = useState({ ...DEFAULT_FEES });
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -210,6 +210,15 @@ function EstimateForm({ item, onClose }) {
           <div className="text-[10px] text-[#6b7085]">建议购入价上限</div>
           <div className="text-lg font-bold text-accent">¥{result.base_price?.toFixed(0)}</div>
           {!result.feasible && <div className="text-[10px] text-red-400 mt-1">{result.warning}</div>}
+          {result.feasible && onUseForAdd && (
+            <button
+              type="button"
+              onClick={() => onUseForAdd(result.base_price)}
+              className="mt-2 w-full px-3 py-1.5 rounded bg-emerald-500 text-[#0f1117] text-xs font-semibold hover:bg-emerald-400"
+            >
+              ➕ 用 ¥{result.base_price?.toFixed(0)} 录入库存
+            </button>
+          )}
         </div>
       )}
       {result?.error && (
@@ -219,7 +228,7 @@ function EstimateForm({ item, onClose }) {
   );
 }
 
-function AddForm({ item, onClose, onAdded, addToy }) {
+function AddForm({ item, onClose, onAdded, addToy, initialAmount = '' }) {
   const nn = item.ref_id.split('-').pop();
   const displayName = item.character_name_zh || item.character_slug || '';
   const defaultName = `${displayName} #${nn} ${item.source}`;
@@ -227,7 +236,7 @@ function AddForm({ item, onClose, onAdded, addToy }) {
     name: defaultName,
     source: 'direct',
     status: 'stock',
-    stage1_amount: '',
+    stage1_amount: initialAmount ? String(initialAmount) : '',
     purchase_date: new Date().toISOString().slice(0, 10),
     notes: '',
     baltan_ref_id: item.ref_id,
@@ -669,7 +678,7 @@ function CustomCharacterForm({ defaultSeries, onClose, onAdded, setToast }) {
   );
 }
 
-function ToyFormModal({ item, type, onClose, onAdded, addToy }) {
+function ToyFormModal({ item, type, onClose, onAdded, addToy, initialAmount = '', onUseForAdd }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -715,9 +724,21 @@ function ToyFormModal({ item, type, onClose, onAdded, addToy }) {
         </div>
         <div className="p-4 overflow-y-auto flex-1">
           {isAdd ? (
-            <AddForm key={item.ref_id} item={item} onClose={onClose} onAdded={onAdded} addToy={addToy} />
+            <AddForm
+              key={item.ref_id}
+              item={item}
+              onClose={onClose}
+              onAdded={onAdded}
+              addToy={addToy}
+              initialAmount={initialAmount}
+            />
           ) : (
-            <EstimateForm key={item.ref_id} item={item} onClose={onClose} />
+            <EstimateForm
+              key={item.ref_id}
+              item={item}
+              onClose={onClose}
+              onUseForAdd={onUseForAdd}
+            />
           )}
         </div>
       </div>
@@ -920,11 +941,11 @@ export default function Monster() {
     setShowCustomToyForm(false);
   };
 
-  const openFormModal = (type, item) => {
+  const openFormModal = (type, item, initialAmount = '') => {
     setFormModal(prev => {
       // 同一玩具同一类型再次点击 → 关闭
       if (prev?.type === type && prev?.item?.ref_id === item.ref_id) return null;
-      return { type, item };
+      return { type, item, initialAmount };
     });
   };
 
@@ -1172,8 +1193,10 @@ export default function Monster() {
         <ToyFormModal
           item={formModal.item}
           type={formModal.type}
+          initialAmount={formModal.initialAmount}
           onClose={closeFormModal}
           onAdded={handleFormAdded}
+          onUseForAdd={(amount) => openFormModal('add', formModal.item, amount)}
           addToy={addToy}
         />
       )}
