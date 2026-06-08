@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import useStore from '../stores/useStore';
 import ImageModal from '../components/ImageModal';
@@ -90,6 +90,54 @@ function StarButton({ active, onClick, size = 'md' }) {
   );
 }
 
+const BURST_PARTICLES = 10;
+const BURST_KEYFRAMES = `
+@keyframes starBurst {
+  0%   { transform: translate(-50%, -50%) scale(0.2) rotate(0deg);   opacity: 0; }
+  20%  { transform: translate(-50%, -50%) scale(1.2) rotate(0deg);   opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.9) rotate(var(--rot)); opacity: 0; }
+}
+@keyframes favPop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(0.92); }
+  70%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+`;
+
+function Burst() {
+  const particles = [];
+  for (let i = 0; i < BURST_PARTICLES; i++) {
+    const angle = (i / BURST_PARTICLES) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+    const dist = 36 + Math.random() * 28;
+    particles.push({
+      dx: Math.cos(angle) * dist,
+      dy: Math.sin(angle) * dist,
+      rot: (Math.random() * 180 - 90).toFixed(0) + 'deg',
+      emoji: ['✨', '⭐', '🌟', '✦'][i % 4],
+      delay: i * 18,
+    });
+  }
+  return (
+    <div className="absolute inset-0 pointer-events-none z-20 flex items-center justify-center">
+      {particles.map((p, i) => (
+        <span
+          key={i}
+          className="absolute text-yellow-300 text-base"
+          style={{
+            '--dx': p.dx + 'px',
+            '--dy': p.dy + 'px',
+            '--rot': p.rot,
+            animation: `starBurst 700ms cubic-bezier(0.2, 0.7, 0.3, 1) ${p.delay}ms forwards`,
+          }}
+        >
+          {p.emoji}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function CustomBadge() {
   return (
     <span className="inline-block text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
@@ -99,7 +147,18 @@ function CustomBadge() {
 }
 
 function CharacterCard({ c, onClick, isFav, onToggleFav }) {
+  const [burstKey, setBurstKey] = useState(0);
+  const [popKey, setPopKey] = useState(0);
   const initial = (c.character_slug || '?').charAt(0).toUpperCase();
+
+  const handleFav = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onToggleFav();
+    if (!isFav) setBurstKey(k => k + 1);
+    setPopKey(k => k + 1);
+  };
+
   return (
     <div
       className={
@@ -109,6 +168,7 @@ function CharacterCard({ c, onClick, isFav, onToggleFav }) {
           : 'hover:ring-1 hover:ring-accent/40')
       }
     >
+      <style>{BURST_KEYFRAMES}</style>
       <button
         type="button"
         onClick={onClick}
@@ -137,15 +197,26 @@ function CharacterCard({ c, onClick, isFav, onToggleFav }) {
           <div className="text-[11px] text-[#a0a4b8] truncate">
             {c.character_name_ja}
           </div>
-          <div className="text-xs text-[#6b7085] mt-auto flex items-center gap-1">
-            <span>{c.toy_count} 件 {c.has_custom ? '· 含自定义' : ''}</span>
-            {isFav && <span className="text-yellow-400">· ★ 已收藏</span>}
+          <div className="text-xs text-[#6b7085] mt-auto">
+            {c.toy_count} 件 {c.has_custom ? '· 含自定义' : ''}
           </div>
         </div>
       </button>
-      <div className="absolute top-2 right-2 z-10">
-        <StarButton active={isFav} onClick={onToggleFav} />
-      </div>
+      <button
+        type="button"
+        onClick={handleFav}
+        className={
+          'w-full text-xs font-semibold py-2 flex items-center justify-center gap-1.5 border-t transition-all duration-150 active:scale-95 select-none ' +
+          (isFav
+            ? 'bg-yellow-400 text-[#0f1117] border-yellow-300 hover:bg-yellow-300 shadow-inner'
+            : 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30 hover:bg-yellow-500/20')
+        }
+        style={popKey ? { animation: `favPop 320ms ease-out` } : undefined}
+        key={popKey}
+      >
+        {isFav ? '★ 已收藏' : '⭐ 收藏怪兽'}
+      </button>
+      {burstKey > 0 && <Burst key={burstKey} />}
     </div>
   );
 }
