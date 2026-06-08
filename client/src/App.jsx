@@ -8,14 +8,14 @@ import Estimate from './pages/Estimate';
 
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
-import Baltan from './pages/Baltan';
+import Monster from './pages/Monster';
 
 const NAV = [
   { path: '/', label: '总览', icon: '🏠' },
   { path: '/procurement', label: '采购', icon: '🛒' },
   { path: '/warehouse', label: '仓库', icon: '📦' },
   { path: '/estimate', label: '估算', icon: '💰' },
-  { path: '/baltan', label: '巴坦', icon: '👽' },
+  { path: '/monster', label: '怪兽', icon: '👹' },
   { path: '/analytics', label: '分析', icon: '📊' },
   { path: '/settings', label: '设置', icon: '⚙️' },
 ];
@@ -84,7 +84,7 @@ export default function App() {
           <Route path="/procurement" element={<Procurement />} />
           <Route path="/warehouse" element={<Warehouse />} />
           <Route path="/estimate" element={<Estimate />} />
-          <Route path="/baltan" element={<Baltan />} />
+          <Route path="/monster" element={<Monster />} />
 
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/settings" element={<Settings />} />

@@ -16,7 +16,11 @@ if (fs.existsSync(staticPath)) {
 // 用户上传 / 下载的图片
 const uploadsPath = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsPath)) fs.mkdirSync(uploadsPath, { recursive: true });
-app.use('/uploads', express.static(uploadsPath));
+app.use('/uploads', express.static(uploadsPath, {
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+  },
+}));
 
 // API Routes
 app.use('/api/toys', require('./routes/toys'));
@@ -26,6 +30,7 @@ app.use('/api/supplies', require('./routes/supplies'));
 app.use('/api/fee-rules', require('./routes/feeRules'));
 app.use('/api/shipping-rules', require('./routes/shippingRules'));
 app.use('/api/baltan', require('./routes/baltan'));
+app.use('/api/monster', require('./routes/baltan'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/stats', require('./routes/stats'));
 const { router: backupRouter } = require('./routes/backup');

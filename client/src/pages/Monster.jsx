@@ -1,6 +1,20 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import useStore from '../stores/useStore';
+import ImageModal from '../components/ImageModal';
+
+const SERIES_LABELS = {
+  'ultraman': '初代',
+  'return-of-ultraman': '归曼',
+  'ultraseven': '赛文',
+  'ultraman-ace': '艾斯',
+  'ultraman-leo': '雷欧',
+  'ultramantaro': '太郎',
+  'ultraman80': '80',
+  'ultraq': '奥特Q',
+  'others': '其他',
+  'ultrafight': '格斗',
+};
 
 const DEFAULT_FEES = {
   source: 'direct',
@@ -16,7 +30,83 @@ const DEFAULT_FEES = {
   refund_amount: '0',
 };
 
+const SOURCE_DEFAULTS = {
+  direct: { stage2_handling: 10, stage2_domestic_ship: 90, stage3_intl_ship: 70, logistics_fee: 10, box_fee: 5, packing_fee: 5 },
+  proxy:  { stage2_handling: 0,  stage2_domestic_ship: 0,  stage3_intl_ship: 70, logistics_fee: 10, box_fee: 5, packing_fee: 5 },
+};
+
 const num = (v) => (v === '' || v === null || v === undefined) ? 0 : Number(v);
+
+function Field({ label, v, onChange }) {
+  return (
+    <label className="block">
+      <span className="text-[9px] text-[#6b7085] block mb-0.5">{label}</span>
+      <input
+        type="number"
+        value={v}
+        onChange={e => onChange(e.target.value)}
+        className="input text-xs w-full"
+      />
+    </label>
+  );
+}
+
+function SeriesTab({ s, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        'text-xs px-3 py-1.5 rounded-full transition-colors ' +
+        (active
+          ? 'bg-accent text-[#0f1117] font-semibold'
+          : 'bg-white/5 text-[#a0a4b8] hover:bg-white/10 border border-white/10')
+      }
+    >
+      {SERIES_LABELS[s.series] || s.series}
+      <span className="ml-1.5 text-[10px] opacity-70">{s.toys}</span>
+    </button>
+  );
+}
+
+function CharacterCard({ c, onClick }) {
+  const initial = (c.character_slug || '?').charAt(0).toUpperCase();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="card overflow-hidden text-left hover:ring-1 hover:ring-accent/40 transition-shadow flex flex-col"
+    >
+      {c.thumbnail_url ? (
+        <img
+          src={c.thumbnail_url}
+          alt={c.character_name_ja || c.character_slug}
+          className="block w-full h-auto object-contain bg-black/30"
+          style={{ aspectRatio: '100 / 147' }}
+          loading="lazy"
+        />
+      ) : (
+        <div
+          className="w-full bg-black/30 flex items-center justify-center text-3xl font-bold text-[#6b7085]"
+          style={{ aspectRatio: '100 / 147' }}
+        >
+          {initial}
+        </div>
+      )}
+      <div className="p-3 flex-1 flex flex-col gap-1 min-w-0">
+        <div className="text-base font-bold text-accent truncate">
+          {c.character_name_zh || c.character_slug}
+        </div>
+        <div className="text-[11px] text-[#a0a4b8] truncate">
+          {c.character_name_ja}
+        </div>
+        <div className="text-xs text-[#6b7085] mt-auto">
+          {c.toy_count} 件
+        </div>
+      </div>
+    </button>
+  );
+}
 
 function EstimateForm({ item, onClose }) {
   const [form, setForm] = useState({ ...DEFAULT_FEES });
@@ -90,32 +180,10 @@ function EstimateForm({ item, onClose }) {
   );
 }
 
-// 切换进货渠道时套用的默认值（与 /procurement 入库流程对齐）
-const SOURCE_DEFAULTS = {
-  direct: {
-    stage2_handling: 10,
-    stage2_domestic_ship: 90,
-    stage3_intl_ship: 70,
-    logistics_fee: 10,
-    box_fee: 5,
-    packing_fee: 5,
-  },
-  proxy: {
-    stage2_handling: 0,
-    stage2_domestic_ship: 0,
-    stage3_intl_ship: 70,
-    logistics_fee: 10,
-    box_fee: 5,
-    packing_fee: 5,
-  },
-};
-
 function AddForm({ item, onClose, onAdded, addToy }) {
-  const gen = item.generation;
-  const defaultName = gen === 1
-    ? `バルタン星人${item.ref_id} ${item.source}`
-    : `バルタン星人（二代目）${item.ref_id} ${item.source}`;
-  const refId = `${gen}-${item.ref_id}`;
+  const nn = item.ref_id.split('-').pop();
+  const displayName = item.character_name_zh || item.character_slug || '';
+  const defaultName = `${displayName} #${nn} ${item.source}`;
   const [form, setForm] = useState({
     name: defaultName,
     source: 'direct',
@@ -123,20 +191,15 @@ function AddForm({ item, onClose, onAdded, addToy }) {
     stage1_amount: '',
     purchase_date: new Date().toISOString().slice(0, 10),
     notes: '',
-    baltan_ref_id: refId,
+    baltan_ref_id: item.ref_id,
     ...SOURCE_DEFAULTS.direct,
   });
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  // 切换渠道：重置阶段费用默认值，但保留用户已填的 stage1_amount / name / status / date / notes
   const onSourceChange = (s) => {
-    setForm(f => ({
-      ...f,
-      source: s,
-      ...SOURCE_DEFAULTS[s],
-    }));
+    setForm(f => ({ ...f, source: s, ...SOURCE_DEFAULTS[s] }));
   };
 
   const submit = async () => {
@@ -159,12 +222,9 @@ function AddForm({ item, onClose, onAdded, addToy }) {
         box_fee: num(form.box_fee),
         packing_fee: num(form.packing_fee),
       };
-      // 海关税 = stage1_amount × 0.13 (与 /procurement 一致)
       body.stage3_tax = Math.round(body.stage1_amount * 0.13 * 100) / 100;
-      // 汇总阶段金额
       body.stage2_amount = body.stage2_handling + body.stage2_domestic_ship;
       body.stage3_amount = body.stage3_intl_ship + body.stage3_tax;
-      // 阶段日期默认同购入日期
       body.stage2_date = body.stage3_date = form.purchase_date || null;
 
       await addToy(body);
@@ -178,7 +238,6 @@ function AddForm({ item, onClose, onAdded, addToy }) {
   };
 
   const isDirect = form.source === 'direct';
-  // 实时展示海关税（只读）
   const computedTax = Math.round(num(form.stage1_amount) * 0.13 * 100) / 100;
   const computedStage2 = num(form.stage2_handling) + num(form.stage2_domestic_ship);
   const computedStage3 = num(form.stage3_intl_ship) + computedTax;
@@ -220,7 +279,6 @@ function AddForm({ item, onClose, onAdded, addToy }) {
         </div>
       </div>
 
-      {/* ① 买货成本 */}
       <div className="pt-1.5 border-t border-white/5">
         <div className="text-[10px] text-[#6b7085] mb-1">① 买货成本</div>
         <div className="grid grid-cols-2 gap-2">
@@ -248,7 +306,6 @@ function AddForm({ item, onClose, onAdded, addToy }) {
         </div>
       </div>
 
-      {/* ② 国内中转 */}
       <div className="pt-1.5 border-t border-white/5">
         <div className="text-[10px] text-[#6b7085] mb-1">② 国内中转</div>
         <div className="grid grid-cols-3 gap-2">
@@ -284,7 +341,6 @@ function AddForm({ item, onClose, onAdded, addToy }) {
         </div>
       </div>
 
-      {/* ③ 国际段 */}
       <div className="pt-1.5 border-t border-white/5">
         <div className="text-[10px] text-[#6b7085] mb-1">③ 国际段</div>
         <div className="grid grid-cols-3 gap-2">
@@ -319,7 +375,6 @@ function AddForm({ item, onClose, onAdded, addToy }) {
         </div>
       </div>
 
-      {/* 仓储发货 */}
       <div className="pt-1.5 border-t border-white/5">
         <div className="text-[10px] text-[#6b7085] mb-1">仓储发货</div>
         <div className="grid grid-cols-3 gap-2">
@@ -353,7 +408,6 @@ function AddForm({ item, onClose, onAdded, addToy }) {
         </div>
       </div>
 
-      {/* 备注 */}
       <div>
         <span className="text-[9px] text-[#6b7085] block mb-0.5">备注</span>
         <input
@@ -364,7 +418,6 @@ function AddForm({ item, onClose, onAdded, addToy }) {
         />
       </div>
 
-      {/* 总成本预览 */}
       <div className="pt-1.5 border-t border-white/5 flex items-center justify-between">
         <span className="text-[10px] text-[#6b7085]">预估总成本</span>
         <span className="text-base font-bold text-accent">
@@ -394,265 +447,251 @@ function AddForm({ item, onClose, onAdded, addToy }) {
   );
 }
 
-function Field({ label, v, onChange }) {
-  return (
-    <label className="block">
-      <span className="text-[9px] text-[#6b7085] block mb-0.5">{label}</span>
-      <input
-        type="number"
-        value={v}
-        onChange={e => onChange(e.target.value)}
-        className="input text-xs w-full"
-      />
-    </label>
-  );
-}
+function ToyCard({ it, onZoom, panel, openPanel, addToy, onAdded }) {
+  const key = it.ref_id;
+  const hasOwned = it.owned && it.owned.length > 0;
+  const activePanel = panel[key];
 
-function ImageModal({ src, alt, detailUrl, onClose }) {
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
   return (
-    <div
-      className="fixed inset-0 bg-black/85 z-[200] flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="relative max-w-[92vw] max-h-[92vh]"
-        onClick={e => e.stopPropagation()}
-      >
-        {!loaded && (
-          <div className="flex items-center justify-center w-64 h-64 text-xs text-[#a0a4b8]">
-            加载中…
+    <div className="card overflow-hidden flex flex-col">
+      {it.image_url ? (
+        <button
+          type="button"
+          onClick={onZoom}
+          className="bg-black/30 cursor-zoom-in hover:opacity-80 transition-opacity"
+        >
+          <img
+            src={it.image_url}
+            alt={`${it.character_name_zh || it.character_slug} ${it.source}`}
+            className="block w-full h-auto object-contain"
+            style={{ aspectRatio: '100 / 147' }}
+            loading="lazy"
+          />
+        </button>
+      ) : (
+        <div
+          className="w-full bg-black/30 flex items-center justify-center text-[10px] text-[#6b7085]"
+          style={{ aspectRatio: '100 / 147' }}
+        >
+          无图
+        </div>
+      )}
+      <div className="p-2.5 flex-1 flex flex-col gap-1 min-w-0">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-xs text-accent">#{it.ref_id.split('-').pop()}</span>
+          <span className="text-[10px] text-[#6b7085] truncate">{it.source}</span>
+        </div>
+        {hasOwned && (
+          <div className="space-y-0.5">
+            {it.owned.map(o => (
+              <div key={o.id} className="text-[11px] text-[#a0a4b8] flex gap-1 items-center">
+                <span className="text-accent">●</span>
+                <span className="truncate flex-1">{o.name}</span>
+                <span className="shrink-0">¥{o.total_cost?.toFixed(0) || 0}</span>
+              </div>
+            ))}
           </div>
         )}
-        <img
-          src={src}
-          alt={alt}
-          onLoad={() => setLoaded(true)}
-          onError={() => setLoaded(true)}
-          className={`max-w-full max-h-[92vh] object-contain rounded shadow-2xl ${loaded ? '' : 'hidden'}`}
-          referrerPolicy="no-referrer"
-        />
-        <div className="absolute top-2 right-2 flex gap-2">
-          {detailUrl && (
-            <a
-              href={detailUrl}
-              target="_blank"
-              rel="noreferrer"
-              onClick={e => e.stopPropagation()}
-              className="px-2.5 py-1 rounded bg-black/70 text-white text-xs hover:bg-black/90"
-            >
-              考据 ↗
-            </a>
-          )}
+        <a
+          href={it.detail_url}
+          target="_blank"
+          rel="noreferrer"
+          className="text-[10px] text-accent hover:underline mt-auto"
+        >
+          考据 ↗
+        </a>
+      </div>
+      <div className="px-2.5 pb-2.5 flex gap-1.5 border-t border-white/5 pt-1.5">
+        {!hasOwned && (
           <button
             type="button"
-            onClick={onClose}
-            className="px-2.5 py-1 rounded bg-black/70 text-white text-xs hover:bg-black/90"
+            onClick={() => openPanel(key, 'estimate')}
+            className={
+              'flex-1 text-xs font-semibold py-1.5 rounded ' +
+              (activePanel === 'estimate'
+                ? 'bg-accent text-[#0f1117]'
+                : 'bg-accent/15 text-accent border border-accent/40 hover:bg-accent/25')
+            }
           >
-            ✕ 关闭
+            {activePanel === 'estimate' ? '收起' : '🧮 反算'}
           </button>
-        </div>
+        )}
+        <button
+          type="button"
+          onClick={() => openPanel(key, 'add')}
+          className={
+            'flex-1 text-xs font-semibold py-1.5 rounded ' +
+            (activePanel === 'add'
+              ? 'bg-emerald-500 text-[#0f1117]'
+              : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25')
+          }
+        >
+          {activePanel === 'add' ? '收起' : hasOwned ? '➕ 再录' : '➕ 录入'}
+        </button>
       </div>
+      {activePanel === 'estimate' && !hasOwned && (
+        <div className="border-t border-white/5 px-2.5 pb-2.5">
+          <EstimateForm item={it} onClose={() => openPanel(key, null)} />
+        </div>
+      )}
+      {activePanel === 'add' && (
+        <div className="border-t border-white/5 px-2.5 pb-2.5">
+          <AddForm item={it} onClose={() => openPanel(key, null)} onAdded={onAdded} addToy={addToy} />
+        </div>
+      )}
     </div>
   );
 }
 
-export default function Baltan() {
-  const [data, setData] = useState(null);
-  const [panel, setPanel] = useState({}); // key => 'estimate' | 'add' | null
+export default function Monster() {
+  const [seriesList, setSeriesList] = useState([]);
+  const [currentSeries, setCurrentSeries] = useState(null);
+  const [characters, setCharacters] = useState([]);
+  const [currentCharacter, setCurrentCharacter] = useState(null);
+  const [toys, setToys] = useState([]);
   const [viewing, setViewing] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [panel, setPanel] = useState({});
   const setToast = useStore(s => s.setToast);
   const addToy = useStore(s => s.addToy);
 
-  const load = async () => {
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await api.get('/monster/series');
+        setSeriesList(r.series || []);
+        if (r.series?.length) setCurrentSeries(r.series[0].series);
+      } catch (e) {
+        setToast('加载 series 失败: ' + e.message);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!currentSeries) return;
+    setCurrentCharacter(null);
+    setToys([]);
+    setPanel({});
+    (async () => {
+      try {
+        const r = await api.get(`/monster/characters?series=${encodeURIComponent(currentSeries)}`);
+        setCharacters(r.characters || []);
+      } catch (e) {
+        setToast('加载角色失败: ' + e.message);
+      }
+    })();
+  }, [currentSeries]);
+
+  const loadToys = async (c) => {
+    if (!c) return [];
+    setLoading(true);
     try {
-      const d = await api.get('/baltan/reference');
-      setData(d);
+      const r = await api.get(`/baltan/reference?series=${encodeURIComponent(currentSeries)}&character=${encodeURIComponent(c.character_slug)}`);
+      const items = r.items || [];
+      setToys(items);
+      return items;
     } catch (e) {
-      setToast('加载失败: ' + e.message);
+      setToast('加载玩具失败: ' + e.message);
+      return [];
+    } finally {
+      setLoading(false);
     }
   };
 
-  useEffect(() => { load(); }, []);
-
-  const openPanel = (key, p) => setPanel(o => ({ ...o, [key]: o[key] === p ? null : p }));
-  const closePanel = (key) => setPanel(o => ({ ...o, [key]: null }));
-
-  if (!data) return <div className="text-xs text-[#6b7085]">加载中…</div>;
-
-  const gen1 = data.items.filter(i => i.generation === 1);
-  const gen2 = data.items.filter(i => i.generation === 2);
-
-  const renderItem = (it) => {
-    const key = `${it.generation}-${it.ref_id}`;
-    const hasOwned = it.owned.length > 0;
-    const activePanel = panel[key]; // 'estimate' | 'add' | undefined/null
-    return (
-      <div key={key} className="card overflow-hidden flex flex-col relative">
-        {/* 怪兽剪影水印 */}
-        <svg
-          viewBox="0 0 100 100"
-          className="pointer-events-none absolute right-1 bottom-1 w-12 h-12 opacity-[0.05] text-red-500"
-          fill="currentColor"
-        >
-          <path d="M 30 35 Q 30 15, 50 15 Q 70 15, 70 35 L 75 40 L 70 45 L 70 70 Q 70 80, 60 80 L 40 80 Q 30 80, 30 70 L 30 45 L 25 40 Z" />
-          <ellipse cx="40" cy="40" rx="4" ry="6" fill="#0f1117" />
-          <ellipse cx="60" cy="40" rx="4" ry="6" fill="#0f1117" />
-        </svg>
-        <div className="flex">
-          {it.image_url && (
-            <button
-              type="button"
-              onClick={() => setViewing(it)}
-              className="shrink-0 bg-black/30 cursor-zoom-in hover:opacity-80 transition-opacity"
-            >
-              <img
-                src={it.image_url}
-                alt={`#${it.ref_id} ${it.source}`}
-                className="block w-32 h-auto object-contain"
-                style={{ aspectRatio: '100 / 147' }}
-                loading="lazy"
-              />
-            </button>
-          )}
-          <div className="p-3 flex-1 flex flex-col gap-2 min-w-0">
-            <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold text-accent shrink-0">#{it.ref_id}</span>
-              <span className="text-base text-[#a0a4b8] truncate">{it.source}</span>
-            </div>
-            {hasOwned ? (
-              <div className="space-y-1 flex-1 overflow-hidden">
-                {it.owned.map(o => (
-                  <div key={o.id} className="text-sm text-[#a0a4b8] flex gap-1.5 items-center">
-                    <span className="text-accent">●</span>
-                    <span className="truncate flex-1">{o.name}</span>
-                    <span className="shrink-0">¥{o.total_cost?.toFixed(0) || 0}</span>
-                  </div>
-                ))}
-              </div>
-            ) : it.fuzzy_count > 0 ? (
-              <div className="text-xs text-[#6b7085] flex-1">
-                未精确绑定 · 名字含「巴坦」的玩具 {it.fuzzy_count} 件
-              </div>
-            ) : (
-              <div className="text-sm text-[#6b7085] flex-1">未收录</div>
-            )}
-            <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-white/5">
-              <a
-                href={it.detail_url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sm text-accent hover:underline"
-              >
-                考据 ↗
-              </a>
-              <div className="flex gap-1.5">
-                {!hasOwned && (
-                  <button
-                    type="button"
-                    onClick={() => openPanel(key, 'estimate')}
-                    className={
-                      activePanel === 'estimate'
-                        ? 'text-sm font-semibold px-3 py-1.5 rounded bg-accent text-[#0f1117]'
-                        : 'text-sm font-medium px-3 py-1.5 rounded bg-accent/15 text-accent border border-accent/40 hover:bg-accent/25'
-                    }
-                  >
-                    {activePanel === 'estimate' ? '收起' : '🧮 反算'}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => openPanel(key, 'add')}
-                  className={
-                    activePanel === 'add'
-                      ? 'text-sm font-semibold px-3 py-1.5 rounded bg-emerald-500 text-[#0f1117]'
-                      : 'text-sm font-medium px-3 py-1.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25'
-                  }
-                >
-                  {activePanel === 'add' ? '收起' : hasOwned ? '➕ 再录一只' : '➕ 录入'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-        {activePanel === 'estimate' && !hasOwned && (
-          <div className="border-t border-white/5">
-            <EstimateForm item={it} onClose={() => closePanel(key)} />
-          </div>
-        )}
-        {activePanel === 'add' && (
-          <div className="border-t border-white/5">
-            <AddForm item={it} onClose={() => closePanel(key)} onAdded={load} addToy={addToy} />
-          </div>
-        )}
-      </div>
-    );
+  const selectCharacter = async (c) => {
+    setCurrentCharacter(c);
+    setPanel({});
+    await loadToys(c);
   };
 
+  const backToCharacters = () => {
+    setCurrentCharacter(null);
+    setToys([]);
+    setPanel({});
+  };
+
+  const openPanel = (key, p) => setPanel(o => ({ ...o, [key]: o[key] === p ? null : p }));
+
   return (
-    <div className="relative space-y-6">
-      {/* 背景：深紫黑 + 顶部蓝光晕 + 底部红光晕 + 4 层星点 */}
-      <div
-        className="pointer-events-none fixed inset-0 z-0"
-        style={{
-          background: `
-            radial-gradient(ellipse 60% 40% at 30% 0%, rgba(99, 102, 241, 0.18) 0%, transparent 60%),
-            radial-gradient(ellipse 50% 35% at 85% 100%, rgba(239, 68, 68, 0.14) 0%, transparent 55%),
-            radial-gradient(1.5px 1.5px at 25px 25px, rgba(255,255,255,0.7), transparent),
-            radial-gradient(1px 1px at 75px 75px, rgba(255,255,255,0.5), transparent),
-            radial-gradient(1.2px 1.2px at 125px 30px, rgba(255,255,255,0.6), transparent),
-            radial-gradient(1px 1px at 175px 110px, rgba(255,255,255,0.4), transparent),
-            #0a0612
-          `,
-          backgroundSize: '100% 100%, 100% 100%, 100px 100px, 100px 100px, 150px 150px, 120px 120px, 100% 100%',
-        }}
-      />
-      <div className="relative z-10 space-y-6">
+    <div className="space-y-4">
       <div>
-        {/* 顶部斯派修姆光线：红+银+蓝渐变细条 */}
-        <div className="h-0.5 rounded-full mb-3" style={{ background: 'linear-gradient(90deg, transparent 0%, #ef4444 20%, #e5e7eb 50%, #3b82f6 80%, transparent 100%)' }} />
         <h2 className="text-lg font-bold flex items-center gap-2">
-          {/* 奥特曼胸灯：红圆 + 闪烁 */}
-          <span className="relative inline-block w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_2px_rgba(239,68,68,0.7)] animate-pulse" />
-          巴尔坦收藏
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_2px_rgba(245,158,11,0.6)]" />
+          怪兽图鉴
         </h2>
         <p className="text-xs text-[#6b7085]">
-          来源：<a href="https://ultrakaijyu.com/ultraman/alienbaltan.html" target="_blank" rel="noreferrer" className="text-accent hover:underline">ウルトラ怪獣.com 資料室</a>
-        </p>
-        <p className="text-xs text-[#6b7085] mt-1">
-          共 {data.items.length} 条 · 一代 {gen1.length} · 二代 {gen2.length} · 我现有 {data.owned_count} 件
+          来源：<a href="https://ultrakaijyu.com/" target="_blank" rel="noreferrer" className="text-accent hover:underline">ウルトラ怪獣.com 資料室</a>
         </p>
       </div>
 
-      <section>
-        <h3 className="text-base font-bold text-[#a0a4b8] mb-3 flex items-center gap-2">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-          一代（バルタン星人）
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {gen1.map(renderItem)}
+      {currentCharacter === null && (
+        <div className="flex flex-wrap gap-2">
+          {seriesList.map(s => (
+            <SeriesTab
+              key={s.series}
+              s={s}
+              active={s.series === currentSeries}
+              onClick={() => setCurrentSeries(s.series)}
+            />
+          ))}
         </div>
-      </section>
+      )}
 
-      <section>
-        <h3 className="text-base font-bold text-[#a0a4b8] mb-3 flex items-center gap-2">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-          二代（バルタン星人 二代目）
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {gen2.map(renderItem)}
+      {currentCharacter && (
+        <div className="flex items-center gap-2 text-xs">
+          <button
+            type="button"
+            onClick={backToCharacters}
+            className="text-accent hover:underline"
+          >
+            ← 返回 {SERIES_LABELS[currentSeries] || currentSeries}
+          </button>
+          <span className="text-[#6b7085]">/</span>
+          <span className="text-[#a0a4b8] font-medium">
+            {currentCharacter.character_name_zh || currentCharacter.character_name_ja || currentCharacter.character_slug}
+          </span>
+          <span className="text-[#6b7085]">· {toys.length} 件</span>
         </div>
-      </section>
-      </div>
+      )}
+
+      {currentCharacter === null && characters.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {characters.map(c => (
+            <CharacterCard
+              key={c.character_slug}
+              c={c}
+              onClick={() => selectCharacter(c)}
+            />
+          ))}
+        </div>
+      )}
+
+      {currentCharacter && (
+        loading ? (
+          <div className="text-xs text-[#6b7085]">加载中…</div>
+        ) : toys.length === 0 ? (
+          <div className="text-xs text-[#6b7085]">暂无数据</div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {toys.map(it => (
+              <ToyCard
+                key={it.ref_id}
+                it={it}
+                onZoom={() => setViewing(it)}
+                panel={panel}
+                openPanel={openPanel}
+                addToy={addToy}
+                onAdded={() => loadToys(currentCharacter)}
+              />
+            ))}
+          </div>
+        )
+      )}
+
       {viewing && (
         <ImageModal
           src={viewing.image_big_url || viewing.image_url}
-          alt={`#${viewing.ref_id} ${viewing.source}`}
+          alt={`${viewing.character_name_zh || viewing.character_name_ja || viewing.character_slug} ${viewing.source}`}
           detailUrl={viewing.detail_url}
           onClose={() => setViewing(null)}
         />

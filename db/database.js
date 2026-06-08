@@ -71,6 +71,10 @@ function migrate() {
       image_url TEXT,
       image_big_url TEXT,
       position INTEGER DEFAULT 0,
+      series TEXT,
+      character_slug TEXT,
+      character_name_ja TEXT,
+      brand TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     )`);
   } else {
@@ -82,6 +86,45 @@ function migrate() {
     }
     if (!baltanCols.has('image_big_url')) {
       changes.push("ALTER TABLE baltan_reference ADD COLUMN image_big_url TEXT");
+    }
+    if (!baltanCols.has('series')) {
+      changes.push("ALTER TABLE baltan_reference ADD COLUMN series TEXT");
+    }
+    if (!baltanCols.has('character_slug')) {
+      changes.push("ALTER TABLE baltan_reference ADD COLUMN character_slug TEXT");
+    }
+    if (!baltanCols.has('character_name_ja')) {
+      changes.push("ALTER TABLE baltan_reference ADD COLUMN character_name_ja TEXT");
+    }
+    if (!baltanCols.has('brand')) {
+      changes.push("ALTER TABLE baltan_reference ADD COLUMN brand TEXT");
+    }
+  }
+  // 一次性迁移：旧 ref_id 格式纯数字 "01" (无 prefix) 改为 "{slug}-{nn}"，并补 series/slug/name
+  if (tableNames.has('baltan_reference')) {
+    const oldFormatCount = (db.exec(
+      "SELECT COUNT(*) FROM baltan_reference WHERE ref_id GLOB '[0-9]*' AND length(ref_id) <= 3"
+    )[0]?.values[0]?.[0]) > 0;
+    if (oldFormatCount) {
+      changes.push(`UPDATE baltan_reference
+        SET ref_id = CASE generation
+            WHEN 1 THEN 'alienbaltan-' || ref_id
+            ELSE 'alienbaltan2-' || ref_id
+          END,
+          series = 'ultraman',
+          character_slug = CASE generation WHEN 1 THEN 'alienbaltan' ELSE 'alienbaltan2' END,
+          character_name_ja = CASE generation WHEN 1 THEN 'バルタン星人' ELSE 'バルタン星人（二代目）' END
+        WHERE ref_id GLOB '[0-9]*' AND length(ref_id) <= 3`);
+    }
+  }
+  // 独立迁移：toys.baltan_ref_id 旧格式 "1-01" → "alienbaltan-01"
+  if (colNames.has('baltan_ref_id')) {
+    const toysOldFormat = (db.exec(
+      "SELECT COUNT(*) FROM toys WHERE baltan_ref_id LIKE '1-%' OR baltan_ref_id LIKE '2-%'"
+    )[0]?.values[0]?.[0]) > 0;
+    if (toysOldFormat) {
+      changes.push(`UPDATE toys SET baltan_ref_id = 'alienbaltan-' || substr(baltan_ref_id, 3) WHERE baltan_ref_id LIKE '1-%' AND substr(baltan_ref_id, 3) GLOB '[0-9]*'`);
+      changes.push(`UPDATE toys SET baltan_ref_id = 'alienbaltan2-' || substr(baltan_ref_id, 3) WHERE baltan_ref_id LIKE '2-%' AND substr(baltan_ref_id, 3) GLOB '[0-9]*'`);
     }
   }
   for (const sql of changes) db.run(sql);

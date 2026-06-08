@@ -190,6 +190,10 @@ CREATE TABLE IF NOT EXISTS baltan_reference (
   image_url TEXT,
   image_big_url TEXT,
   position INTEGER DEFAULT 0,
+  series TEXT,
+  character_slug TEXT,
+  character_name_ja TEXT,
+  brand TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );
 INSERT OR IGNORE INTO categories (name, color) VALUES ('vinyl', '#60a5fa');
