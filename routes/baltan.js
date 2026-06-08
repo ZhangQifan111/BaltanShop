@@ -280,6 +280,7 @@ router.post('/favorites/characters', async (req, res) => {
     const rows = await db.all(
       `SELECT
          character_slug,
+         MAX(series) AS series,
          MAX(character_name_ja) AS character_name_ja,
          MAX(character_name_zh) AS character_name_zh,
          COUNT(*) AS toy_count,

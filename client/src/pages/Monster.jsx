@@ -922,11 +922,12 @@ export default function Monster() {
     })();
   }, [currentSeries, viewMode]);
 
-  const loadToys = async (c) => {
+  const loadToys = async (c, series) => {
     if (!c) return [];
     setLoading(true);
+    const useSeries = series || currentSeries;
     try {
-      const r = await api.get(`/baltan/reference?series=${encodeURIComponent(currentSeries)}&character=${encodeURIComponent(c.character_slug)}`);
+      const r = await api.get(`/baltan/reference?series=${encodeURIComponent(useSeries)}&character=${encodeURIComponent(c.character_slug)}`);
       const items = r.items || [];
       setToys(items);
       return items;
@@ -938,11 +939,11 @@ export default function Monster() {
     }
   };
 
-  const selectCharacter = async (c) => {
+  const selectCharacter = async (c, series) => {
     setCurrentCharacter(c);
     setPanel({});
     setShowCustomToyForm(false);
-    await loadToys(c);
+    await loadToys(c, series);
   };
 
   const backToCharacters = () => {
@@ -1137,7 +1138,7 @@ export default function Monster() {
               <CharacterCard
                 key={c.character_slug}
                 c={c}
-                onClick={() => { setCurrentSeries(c.series || 'custom'); setViewMode('all'); selectCharacter(c); }}
+                onClick={() => { const s = c.series || currentSeries; setCurrentSeries(s); setViewMode('all'); selectCharacter(c, s); }}
                 isFav={isCharFav(c.character_slug)}
                 onToggleFav={() => toggleFav(c.character_slug, '')}
               />
