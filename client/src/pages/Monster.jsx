@@ -90,54 +90,6 @@ function StarButton({ active, onClick, size = 'md' }) {
   );
 }
 
-const BURST_PARTICLES = 10;
-const BURST_KEYFRAMES = `
-@keyframes starBurst {
-  0%   { transform: translate(-50%, -50%) scale(0.2) rotate(0deg);   opacity: 0; }
-  20%  { transform: translate(-50%, -50%) scale(1.2) rotate(0deg);   opacity: 1; }
-  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.9) rotate(var(--rot)); opacity: 0; }
-}
-@keyframes favPop {
-  0%   { transform: scale(1); }
-  40%  { transform: scale(0.92); }
-  70%  { transform: scale(1.06); }
-  100% { transform: scale(1); }
-}
-`;
-
-function Burst() {
-  const particles = [];
-  for (let i = 0; i < BURST_PARTICLES; i++) {
-    const angle = (i / BURST_PARTICLES) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
-    const dist = 36 + Math.random() * 28;
-    particles.push({
-      dx: Math.cos(angle) * dist,
-      dy: Math.sin(angle) * dist,
-      rot: (Math.random() * 180 - 90).toFixed(0) + 'deg',
-      emoji: ['✨', '⭐', '🌟', '✦'][i % 4],
-      delay: i * 18,
-    });
-  }
-  return (
-    <div className="absolute inset-0 pointer-events-none z-20 flex items-center justify-center">
-      {particles.map((p, i) => (
-        <span
-          key={i}
-          className="absolute text-yellow-300 text-base"
-          style={{
-            '--dx': p.dx + 'px',
-            '--dy': p.dy + 'px',
-            '--rot': p.rot,
-            animation: `starBurst 700ms cubic-bezier(0.2, 0.7, 0.3, 1) ${p.delay}ms forwards`,
-          }}
-        >
-          {p.emoji}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function CustomBadge() {
   return (
     <span className="inline-block text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
@@ -146,18 +98,8 @@ function CustomBadge() {
   );
 }
 
-function CharacterCard({ c, onClick, isFav, onToggleFav }) {
-  const [burstKey, setBurstKey] = useState(0);
-  const [popKey, setPopKey] = useState(0);
+function CharacterCard({ c, onClick, isFav }) {
   const initial = (c.character_slug || '?').charAt(0).toUpperCase();
-
-  const handleFav = (e) => {
-    e.stopPropagation();
-    e.preventDefault();
-    onToggleFav();
-    if (!isFav) setBurstKey(k => k + 1);
-    setPopKey(k => k + 1);
-  };
 
   return (
     <div
@@ -168,7 +110,6 @@ function CharacterCard({ c, onClick, isFav, onToggleFav }) {
           : 'hover:ring-1 hover:ring-accent/40')
       }
     >
-      <style>{BURST_KEYFRAMES}</style>
       <button
         type="button"
         onClick={onClick}
@@ -202,21 +143,6 @@ function CharacterCard({ c, onClick, isFav, onToggleFav }) {
           </div>
         </div>
       </button>
-      <button
-        type="button"
-        onClick={handleFav}
-        className={
-          'w-full text-xs font-semibold py-2 flex items-center justify-center gap-1.5 border-t transition-all duration-150 active:scale-95 select-none ' +
-          (isFav
-            ? 'bg-yellow-400 text-[#0f1117] border-yellow-300 hover:bg-yellow-300 shadow-inner'
-            : 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30 hover:bg-yellow-500/20')
-        }
-        style={popKey ? { animation: `favPop 320ms ease-out` } : undefined}
-        key={popKey}
-      >
-        {isFav ? '★ 已收藏' : '⭐ 收藏怪兽'}
-      </button>
-      {burstKey > 0 && <Burst key={burstKey} />}
     </div>
   );
 }
@@ -955,39 +881,24 @@ export default function Monster() {
 
   const openPanel = (key, p) => setPanel(o => ({ ...o, [key]: o[key] === p ? null : p }));
 
-  // 角色级"已收藏"= 该角色下有任何收藏（角色级 + 单品级都算）
+  // 角色卡仅作"该角色下有单品已收藏"的视觉提示（黄色 ring），不参与 toggle
   const isCharFav = (slug) => favorites.some(f => f.character_slug === slug);
   const isToyFav = (slug, refId) => favorites.some(f => f.character_slug === slug && f.ref_id === refId);
 
-  const toggleFav = async (character_slug, ref_id = '') => {
-    const isCharLevel = ref_id === '';
-    const active = isCharLevel
-      ? isCharFav(character_slug)
-      : isToyFav(character_slug, ref_id);
-
-    // 角色级取消：要删该 slug 全部收藏（含单品级），先快照以便回滚
-    const removedSnapshot = (active && isCharLevel)
-      ? favorites.filter(f => f.character_slug === character_slug)
-      : null;
+  const toggleFav = async (character_slug, ref_id) => {
+    const active = isToyFav(character_slug, ref_id);
 
     // optimistic update
     setFavorites(prev => {
       if (!active) {
         return [{ character_slug, ref_id, note: null, created_at: new Date().toISOString() }, ...prev];
       }
-      if (isCharLevel) {
-        return prev.filter(f => f.character_slug !== character_slug);
-      }
       return prev.filter(f => !(f.character_slug === character_slug && f.ref_id === ref_id));
     });
 
     try {
       if (active) {
-        if (isCharLevel) {
-          await api.del(`/monster/favorites?character_slug=${encodeURIComponent(character_slug)}&all=1`);
-        } else {
-          await api.del(`/monster/favorites?character_slug=${encodeURIComponent(character_slug)}&ref_id=${encodeURIComponent(ref_id)}`);
-        }
+        await api.del(`/monster/favorites?character_slug=${encodeURIComponent(character_slug)}&ref_id=${encodeURIComponent(ref_id)}`);
       } else {
         await api.post('/monster/favorites', { character_slug, ref_id });
       }
@@ -997,9 +908,6 @@ export default function Monster() {
       setFavorites(prev => {
         if (!active) {
           return prev.filter(f => !(f.character_slug === character_slug && f.ref_id === ref_id));
-        }
-        if (isCharLevel && removedSnapshot) {
-          return [...removedSnapshot, ...prev];
         }
         return [...prev, { character_slug, ref_id, note: null, created_at: new Date().toISOString() }];
       });
@@ -1120,7 +1028,6 @@ export default function Monster() {
               c={c}
               onClick={() => selectCharacter(c)}
               isFav={isCharFav(c.character_slug)}
-              onToggleFav={() => toggleFav(c.character_slug, '')}
             />
           ))}
         </div>
@@ -1131,7 +1038,7 @@ export default function Monster() {
         favLoading ? (
           <div className="text-xs text-[#6b7085]">加载中…</div>
         ) : favCharacters.length === 0 ? (
-          <div className="text-xs text-[#6b7085]">还没有收藏。点角色卡 <span className="text-yellow-400">☆</span> 收藏喜欢的怪兽。</div>
+          <div className="text-xs text-[#6b7085]">还没有收藏。进入角色页后，点玩具卡右上角的 <span className="text-yellow-400">☆</span> 收藏喜欢的单品。</div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {favCharacters.map(c => (
@@ -1149,7 +1056,6 @@ export default function Monster() {
                   });
                 }}
                 isFav={isCharFav(c.character_slug)}
-                onToggleFav={() => toggleFav(c.character_slug, '')}
               />
             ))}
           </div>
