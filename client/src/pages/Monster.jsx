@@ -954,31 +954,54 @@ export default function Monster() {
 
   const openPanel = (key, p) => setPanel(o => ({ ...o, [key]: o[key] === p ? null : p }));
 
-  const isCharFav = (slug) => favorites.some(f => f.character_slug === slug && f.ref_id === '');
+  // 角色级"已收藏"= 该角色下有任何收藏（角色级 + 单品级都算）
+  const isCharFav = (slug) => favorites.some(f => f.character_slug === slug);
   const isToyFav = (slug, refId) => favorites.some(f => f.character_slug === slug && f.ref_id === refId);
 
   const toggleFav = async (character_slug, ref_id = '') => {
-    const active = ref_id === ''
+    const isCharLevel = ref_id === '';
+    const active = isCharLevel
       ? isCharFav(character_slug)
       : isToyFav(character_slug, ref_id);
+
+    // 角色级取消：要删该 slug 全部收藏（含单品级），先快照以便回滚
+    const removedSnapshot = (active && isCharLevel)
+      ? favorites.filter(f => f.character_slug === character_slug)
+      : null;
+
     // optimistic update
     setFavorites(prev => {
-      if (active) return prev.filter(f => !(f.character_slug === character_slug && f.ref_id === ref_id));
-      return [{ character_slug, ref_id, note: null, created_at: new Date().toISOString() }, ...prev];
+      if (!active) {
+        return [{ character_slug, ref_id, note: null, created_at: new Date().toISOString() }, ...prev];
+      }
+      if (isCharLevel) {
+        return prev.filter(f => f.character_slug !== character_slug);
+      }
+      return prev.filter(f => !(f.character_slug === character_slug && f.ref_id === ref_id));
     });
+
     try {
       if (active) {
-        await api.del(`/monster/favorites?character_slug=${encodeURIComponent(character_slug)}&ref_id=${encodeURIComponent(ref_id)}`);
+        if (isCharLevel) {
+          await api.del(`/monster/favorites?character_slug=${encodeURIComponent(character_slug)}&all=1`);
+        } else {
+          await api.del(`/monster/favorites?character_slug=${encodeURIComponent(character_slug)}&ref_id=${encodeURIComponent(ref_id)}`);
+        }
       } else {
         await api.post('/monster/favorites', { character_slug, ref_id });
       }
     } catch (e) {
-      setToast('收藏失败: ' + e.message);
+      setToast('操作失败: ' + e.message);
       // 回滚
-      setFavorites(prev => active
-        ? [...prev, { character_slug, ref_id, note: null, created_at: new Date().toISOString() }]
-        : prev.filter(f => !(f.character_slug === character_slug && f.ref_id === ref_id))
-      );
+      setFavorites(prev => {
+        if (!active) {
+          return prev.filter(f => !(f.character_slug === character_slug && f.ref_id === ref_id));
+        }
+        if (isCharLevel && removedSnapshot) {
+          return [...removedSnapshot, ...prev];
+        }
+        return [...prev, { character_slug, ref_id, note: null, created_at: new Date().toISOString() }];
+      });
     }
   };
 

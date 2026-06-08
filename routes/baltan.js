@@ -257,10 +257,14 @@ router.post('/favorites', async (req, res) => {
 
 router.delete('/favorites', async (req, res) => {
   try {
-    const { character_slug, ref_id = '' } = req.query;
+    const { character_slug, ref_id = '', all } = req.query;
     if (!character_slug) return res.status(400).json({ error: 'character_slug required' });
-    db.runSync('DELETE FROM monster_favorites WHERE character_slug = ? AND ref_id = ?',
-      [character_slug, ref_id]);
+    if (all === '1' || all === 'true') {
+      db.runSync('DELETE FROM monster_favorites WHERE character_slug = ?', [character_slug]);
+    } else {
+      db.runSync('DELETE FROM monster_favorites WHERE character_slug = ? AND ref_id = ?',
+        [character_slug, ref_id]);
+    }
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
