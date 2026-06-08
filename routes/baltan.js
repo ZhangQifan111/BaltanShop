@@ -304,6 +304,62 @@ router.post('/favorites/characters', async (req, res) => {
   }
 });
 
+// 取收藏玩具的完整卡片信息（用于"收藏"视图，按单品粒度）
+router.post('/favorites/toys', async (req, res) => {
+  try {
+    const favorites = await db.all(
+      `SELECT * FROM monster_favorites WHERE ref_id != '' ORDER BY created_at DESC`
+    );
+    if (!favorites.length) return res.json({ toys: [] });
+
+    const slugs = Array.from(new Set(favorites.map(f => f.character_slug).filter(Boolean)));
+    if (!slugs.length) return res.json({ toys: [] });
+
+    const placeholders = slugs.map(() => '?').join(',');
+    const refs = await db.all(
+      `SELECT * FROM baltan_reference
+       WHERE character_slug IN (${placeholders})
+         AND (${favorites.map(() => '(character_slug = ? AND ref_id = ?)').join(' OR ')})`,
+      [...slugs, ...favorites.flatMap(f => [f.character_slug, f.ref_id])]
+    );
+
+    const exactMatched = await db.all(
+      `SELECT * FROM toys WHERE baltan_ref_id IS NOT NULL`
+    );
+    const ownedByRef = new Map();
+    for (const t of exactMatched) {
+      if (!ownedByRef.has(t.baltan_ref_id)) ownedByRef.set(t.baltan_ref_id, []);
+      ownedByRef.get(t.baltan_ref_id).push(t);
+    }
+
+    const items = refs.map(r => ({
+      id: r.id,
+      ref_id: r.ref_id,
+      generation: r.generation,
+      source: r.source,
+      brand: r.brand,
+      detail_url: r.detail_url,
+      image_url: withVersion(r.image_url),
+      image_big_url: withVersion(r.image_big_url),
+      series: r.series,
+      character_slug: r.character_slug,
+      character_name_ja: r.character_name_ja,
+      character_name_zh: r.character_name_zh || CHARACTER_NAME_ZH[r.character_slug] || null,
+      is_custom: r.is_custom || 0,
+      owned: ownedByRef.get(r.ref_id) || [],
+      fuzzy_count: 0,
+    }));
+    // 按收藏时间倒序（refs 顺序未必与 favorites 一致，这里按 favorites 顺序重排）
+    const refMap = new Map(items.map(it => [`${it.character_slug}::${it.ref_id}`, it]));
+    const ordered = favorites
+      .map(f => refMap.get(`${f.character_slug}::${f.ref_id}`))
+      .filter(Boolean);
+    res.json({ toys: ordered });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // === 自定义玩具 / 角色 ===
 
 // 在已有角色下新增一个第三方玩具

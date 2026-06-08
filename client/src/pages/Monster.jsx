@@ -98,7 +98,7 @@ function CustomBadge() {
   );
 }
 
-function CharacterCard({ c, onClick, isFav, onRemoveFav }) {
+function CharacterCard({ c, onClick, isFav }) {
   const initial = (c.character_slug || '?').charAt(0).toUpperCase();
 
   return (
@@ -110,18 +110,6 @@ function CharacterCard({ c, onClick, isFav, onRemoveFav }) {
           : 'hover:ring-1 hover:ring-accent/40')
       }
     >
-      {onRemoveFav && (
-        <div className="absolute top-2 right-2 z-10">
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onRemoveFav(); }}
-            title="移除收藏"
-            className="w-7 h-7 rounded-full flex items-center justify-center text-base leading-none select-none transition-all duration-150 active:scale-90 hover:scale-110 bg-black/55 backdrop-blur-sm text-white/85 border border-white/20 hover:bg-red-500/85 hover:border-red-300/60 hover:text-white"
-          >
-            ×
-          </button>
-        </div>
-      )}
       <button
         type="button"
         onClick={onClick}
@@ -798,7 +786,7 @@ export default function Monster() {
 
   const [viewMode, setViewMode] = useState('all'); // 'all' | 'favorites'
   const [favorites, setFavorites] = useState([]); // [{character_slug, ref_id, note, created_at}]
-  const [favCharacters, setFavCharacters] = useState([]);
+  const [favToys, setFavToys] = useState([]);
   const [favLoading, setFavLoading] = useState(false);
 
   const [showCustomToyForm, setShowCustomToyForm] = useState(false);
@@ -830,13 +818,12 @@ export default function Monster() {
 
   useEffect(() => {
     if (viewMode !== 'favorites') return;
-    const slugs = Array.from(new Set(favorites.map(f => f.character_slug)));
-    if (!slugs.length) { setFavCharacters([]); return; }
+    if (!favorites.length) { setFavToys([]); return; }
     (async () => {
       setFavLoading(true);
       try {
-        const r = await api.post('/monster/favorites/characters', { slugs });
-        setFavCharacters(r.characters || []);
+        const r = await api.post('/monster/favorites/toys', {});
+        setFavToys(r.toys || []);
       } catch (e) {
         setToast('加载收藏失败: ' + e.message);
       } finally {
@@ -844,6 +831,14 @@ export default function Monster() {
       }
     })();
   }, [viewMode, favorites]);
+
+  const refreshFavToys = async () => {
+    if (viewMode !== 'favorites') return;
+    try {
+      const r = await api.post('/monster/favorites/toys', {});
+      setFavToys(r.toys || []);
+    } catch (e) { setToast('刷新收藏失败: ' + e.message); }
+  };
 
   useEffect(() => {
     if (!currentSeries || viewMode === 'favorites') return;
@@ -926,18 +921,6 @@ export default function Monster() {
     }
   };
 
-  // 收藏视图用：一次性移除该角色下的所有收藏
-  const removeAllFavsForChar = async (character_slug) => {
-    const snapshot = favorites.filter(f => f.character_slug === character_slug);
-    setFavorites(prev => prev.filter(f => f.character_slug !== character_slug));
-    try {
-      await api.del(`/monster/favorites?character_slug=${encodeURIComponent(character_slug)}&all=1`);
-    } catch (e) {
-      setToast('取消收藏失败: ' + e.message);
-      setFavorites(prev => [...snapshot, ...prev]);
-    }
-  };
-
   const reloadCharacters = async () => {
     if (!currentSeries) return;
     try {
@@ -966,7 +949,7 @@ export default function Monster() {
     await reloadCharacters();
   };
 
-  const favCharCount = new Set(favorites.map(f => f.character_slug)).size;
+  const favCount = favorites.length;
 
   return (
     <div className="space-y-4">
@@ -1002,7 +985,7 @@ export default function Monster() {
                   : 'bg-yellow-500/10 text-yellow-300 border border-yellow-500/40 hover:bg-yellow-500/20')
               }
             >
-              {viewMode === 'favorites' ? '★ 收藏视图' : `☆ 收藏 (${favCharCount})`}
+              {viewMode === 'favorites' ? '★ 收藏视图' : `☆ 收藏 (${favCount})`}
             </button>
             {viewMode === 'all' && (
               <button
@@ -1057,30 +1040,25 @@ export default function Monster() {
         </div>
       )}
 
-      {/* 角色网格（收藏模式） */}
+      {/* 玩具网格（收藏模式） */}
       {viewMode === 'favorites' && currentCharacter === null && (
         favLoading ? (
           <div className="text-xs text-[#6b7085]">加载中…</div>
-        ) : favCharacters.length === 0 ? (
+        ) : favToys.length === 0 ? (
           <div className="text-xs text-[#6b7085]">还没有收藏。进入角色页后，点玩具卡右上角的 <span className="text-yellow-400">☆</span> 收藏喜欢的单品。</div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {favCharacters.map(c => (
-              <CharacterCard
-                key={c.character_slug}
-                c={c}
-                onClick={() => {
-                  if (!c.thumbnail_url && !c.image_big_url) return;
-                  setViewing({
-                    image_url: c.thumbnail_url,
-                    image_big_url: c.image_big_url,
-                    character_name_zh: c.character_name_zh,
-                    character_name_ja: c.character_name_ja,
-                    character_slug: c.character_slug,
-                  });
-                }}
-                isFav={isCharFav(c.character_slug)}
-                onRemoveFav={() => removeAllFavsForChar(c.character_slug)}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {favToys.map(it => (
+              <ToyCard
+                key={it.ref_id}
+                it={it}
+                onZoom={() => setViewing(it)}
+                panel={panel}
+                openPanel={openPanel}
+                addToy={addToy}
+                onAdded={refreshFavToys}
+                isFav={isToyFav(it.character_slug, it.ref_id)}
+                onToggleFav={() => toggleFav(it.character_slug, it.ref_id)}
               />
             ))}
           </div>
