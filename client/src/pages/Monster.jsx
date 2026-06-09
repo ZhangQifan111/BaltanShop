@@ -147,10 +147,11 @@ function CharacterCard({ c, onClick, isFav }) {
   );
 }
 
-function EstimateForm({ item, onClose, onUseForAdd }) {
+function EstimateForm({ item, onClose, onUseForAdd, onSaveAsReference }) {
   const [form, setForm] = useState({ ...DEFAULT_FEES });
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const calc = async () => {
@@ -217,6 +218,20 @@ function EstimateForm({ item, onClose, onUseForAdd }) {
               className="mt-2 w-full px-3 py-1.5 rounded bg-emerald-500 text-[#0f1117] text-xs font-semibold hover:bg-emerald-400"
             >
               ➕ 用 ¥{result.base_price?.toFixed(0)} 录入库存
+            </button>
+          )}
+          {result.feasible && onSaveAsReference && (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={async () => {
+                setSaving(true);
+                try { await onSaveAsReference(result.base_price); }
+                finally { setSaving(false); }
+              }}
+              className="mt-2 w-full px-3 py-1.5 rounded bg-yellow-500 text-[#0f1117] text-xs font-semibold hover:bg-yellow-400 disabled:opacity-50"
+            >
+              {saving ? '保存中…' : `★ 保存为购入参考价 ¥${result.base_price?.toFixed(0)}`}
             </button>
           )}
         </div>
@@ -678,7 +693,7 @@ function CustomCharacterForm({ defaultSeries, onClose, onAdded, setToast }) {
   );
 }
 
-function ToyFormModal({ item, type, onClose, onAdded, addToy, initialAmount = '', onUseForAdd }) {
+function ToyFormModal({ item, type, onClose, onAdded, addToy, initialAmount = '', onUseForAdd, onSaveAsReference }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -738,6 +753,7 @@ function ToyFormModal({ item, type, onClose, onAdded, addToy, initialAmount = ''
               item={item}
               onClose={onClose}
               onUseForAdd={onUseForAdd}
+              onSaveAsReference={onSaveAsReference}
             />
           )}
         </div>
@@ -829,6 +845,41 @@ function ToyCard({ it, onZoom, onOpenForm, addToy, isFav, onToggleFav }) {
   );
 }
 
+function ReferencePriceTag({ price, onEdit, onClear }) {
+  if (price != null) {
+    return (
+      <div className="w-full text-[10px] py-1 px-2 rounded bg-yellow-500/10 border border-yellow-500/25 flex items-center justify-center gap-1.5">
+        <span className="text-[#a0a4b8]">购入参考价</span>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="font-bold text-yellow-300 hover:underline"
+          title="点击重新计算"
+        >
+          ¥{Number(price).toFixed(0)}
+        </button>
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-[#6b7085] hover:text-red-400 ml-0.5 leading-none"
+          title="清除参考价"
+        >
+          ×
+        </button>
+      </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      className="w-full text-[10px] py-1 px-2 rounded bg-white/5 text-[#a0a4b8] border border-white/10 hover:bg-white/10 hover:text-white"
+    >
+      + 设置购入参考价
+    </button>
+  );
+}
+
 export default function Monster() {
   const [seriesList, setSeriesList] = useState([]);
   const [currentSeries, setCurrentSeries] = useState(null);
@@ -837,7 +888,7 @@ export default function Monster() {
   const [toys, setToys] = useState([]);
   const [viewing, setViewing] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [formModal, setFormModal] = useState(null); // { type: 'add'|'estimate', item } | null
+  const [formModal, setFormModal] = useState(null); // { type: 'add'|'estimate', item, initialAmount, variant: 'add'|'reference' } | null
 
   const [viewMode, setViewMode] = useState('all'); // 'all' | 'favorites'
   const [favorites, setFavorites] = useState([]); // [{character_slug, ref_id, note, created_at}]
@@ -941,11 +992,11 @@ export default function Monster() {
     setShowCustomToyForm(false);
   };
 
-  const openFormModal = (type, item, initialAmount = '') => {
+  const openFormModal = (type, item, initialAmount = '', variant = 'add') => {
     setFormModal(prev => {
       // 同一玩具同一类型再次点击 → 关闭
-      if (prev?.type === type && prev?.item?.ref_id === item.ref_id) return null;
-      return { type, item, initialAmount };
+      if (prev?.type === type && prev?.item?.ref_id === item.ref_id && prev?.variant === variant) return null;
+      return { type, item, initialAmount, variant };
     });
   };
 
@@ -955,6 +1006,26 @@ export default function Monster() {
     closeFormModal();
     if (viewMode === 'favorites') await refreshFavToys();
     else if (currentCharacter) await loadToys(currentCharacter);
+  };
+
+  const handleSaveReference = async (character_slug, ref_id, amount) => {
+    try {
+      await api.post('/monster/favorites/reference-price', { character_slug, ref_id, price: amount });
+      setToast(`已保存参考价 ¥${Number(amount).toFixed(0)}`);
+      closeFormModal();
+      if (viewMode === 'favorites') await refreshFavToys();
+    } catch (e) {
+      setToast('保存失败: ' + e.message);
+    }
+  };
+
+  const clearReferencePrice = async (character_slug, ref_id) => {
+    try {
+      await api.post('/monster/favorites/reference-price', { character_slug, ref_id, price: null });
+      if (viewMode === 'favorites') await refreshFavToys();
+    } catch (e) {
+      setToast('清除失败: ' + e.message);
+    }
   };
 
   // 角色卡仅作"该角色下有单品已收藏"的视觉提示（黄色 ring），不参与 toggle
@@ -1118,15 +1189,21 @@ export default function Monster() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {favToys.map(it => (
-              <ToyCard
-                key={it.ref_id}
-                it={it}
-                onZoom={() => setViewing(it)}
-                onOpenForm={(type) => openFormModal(type, it)}
-                addToy={addToy}
-                isFav={isToyFav(it.character_slug, it.ref_id)}
-                onToggleFav={() => toggleFav(it.character_slug, it.ref_id)}
-              />
+              <div key={it.ref_id} className="flex flex-col gap-1.5">
+                <ToyCard
+                  it={it}
+                  onZoom={() => setViewing(it)}
+                  onOpenForm={(type) => openFormModal(type, it, '', type === 'estimate' ? 'reference' : 'add')}
+                  addToy={addToy}
+                  isFav={isToyFav(it.character_slug, it.ref_id)}
+                  onToggleFav={() => toggleFav(it.character_slug, it.ref_id)}
+                />
+                <ReferencePriceTag
+                  price={it.reference_price}
+                  onEdit={() => openFormModal('estimate', it, '', 'reference')}
+                  onClear={() => clearReferencePrice(it.character_slug, it.ref_id)}
+                />
+              </div>
             ))}
           </div>
         )
@@ -1196,7 +1273,12 @@ export default function Monster() {
           initialAmount={formModal.initialAmount}
           onClose={closeFormModal}
           onAdded={handleFormAdded}
-          onUseForAdd={(amount) => openFormModal('add', formModal.item, amount)}
+          onUseForAdd={formModal.variant === 'add'
+            ? (amount) => openFormModal('add', formModal.item, amount, 'add')
+            : undefined}
+          onSaveAsReference={formModal.variant === 'reference'
+            ? (amount) => handleSaveReference(formModal.item.character_slug, formModal.item.ref_id, amount)
+            : undefined}
           addToy={addToy}
         />
       )}

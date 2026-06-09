@@ -317,9 +317,11 @@ router.post('/favorites/toys', async (req, res) => {
 
     const placeholders = slugs.map(() => '?').join(',');
     const refs = await db.all(
-      `SELECT * FROM baltan_reference
-       WHERE character_slug IN (${placeholders})
-         AND (${favorites.map(() => '(character_slug = ? AND ref_id = ?)').join(' OR ')})`,
+      `SELECT r.*, f.reference_price
+       FROM baltan_reference r
+       LEFT JOIN monster_favorites f ON r.character_slug = f.character_slug AND r.ref_id = f.ref_id
+       WHERE r.character_slug IN (${placeholders})
+         AND (${favorites.map(() => '(r.character_slug = ? AND r.ref_id = ?)').join(' OR ')})`,
       [...slugs, ...favorites.flatMap(f => [f.character_slug, f.ref_id])]
     );
 
@@ -346,15 +348,44 @@ router.post('/favorites/toys', async (req, res) => {
       character_name_ja: r.character_name_ja,
       character_name_zh: r.character_name_zh || CHARACTER_NAME_ZH[r.character_slug] || null,
       is_custom: r.is_custom || 0,
+      reference_price: r.reference_price,
       owned: ownedByRef.get(r.ref_id) || [],
       fuzzy_count: 0,
     }));
-    // 按收藏时间倒序（refs 顺序未必与 favorites 一致，这里按 favorites 顺序重排）
     const refMap = new Map(items.map(it => [`${it.character_slug}::${it.ref_id}`, it]));
     const ordered = favorites
       .map(f => refMap.get(`${f.character_slug}::${f.ref_id}`))
       .filter(Boolean);
     res.json({ toys: ordered });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 设置/清除收藏单品的购入参考价（price=null 清除）
+router.post('/favorites/reference-price', async (req, res) => {
+  try {
+    const { character_slug, ref_id, price } = req.body || {};
+    if (!character_slug || !ref_id) return res.status(400).json({ error: 'character_slug and ref_id required' });
+
+    const existing = db.getSync(
+      'SELECT 1 FROM monster_favorites WHERE character_slug = ? AND ref_id = ?',
+      [character_slug, ref_id]
+    );
+    if (!existing) return res.status(404).json({ error: '该单品未收藏，无法设置参考价' });
+
+    if (price == null) {
+      db.runSync(
+        'UPDATE monster_favorites SET reference_price = NULL WHERE character_slug = ? AND ref_id = ?',
+        [character_slug, ref_id]
+      );
+    } else {
+      db.runSync(
+        'UPDATE monster_favorites SET reference_price = ? WHERE character_slug = ? AND ref_id = ?',
+        [Number(price), character_slug, ref_id]
+      );
+    }
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

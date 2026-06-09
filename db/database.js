@@ -111,9 +111,17 @@ function migrate() {
       character_slug TEXT NOT NULL,
       ref_id TEXT NOT NULL DEFAULT '',
       note TEXT,
+      reference_price REAL,
       created_at TEXT DEFAULT (datetime('now')),
       PRIMARY KEY (character_slug, ref_id)
     )`);
+  } else {
+    const favCols = new Set(
+      (db.exec("PRAGMA table_info(monster_favorites)")[0]?.values || []).map(r => r[1])
+    );
+    if (!favCols.has('reference_price')) {
+      changes.push("ALTER TABLE monster_favorites ADD COLUMN reference_price REAL");
+    }
   }
   // 一次性迁移：旧 ref_id 格式纯数字 "01" (无 prefix) 改为 "{slug}-{nn}"，并补 series/slug/name
   if (tableNames.has('baltan_reference')) {
