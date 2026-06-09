@@ -848,12 +848,12 @@ function ToyCard({ it, onZoom, onOpenForm, addToy, isFav, onToggleFav }) {
 function ReferencePriceTag({ price, onEdit, onClear }) {
   if (price != null) {
     return (
-      <div className="w-full text-[10px] py-1 px-2 rounded bg-yellow-500/10 border border-yellow-500/25 flex items-center justify-center gap-1.5">
+      <div className="w-full text-xs py-1.5 px-2 rounded bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center gap-1.5">
         <span className="text-[#a0a4b8]">购入参考价</span>
         <button
           type="button"
           onClick={onEdit}
-          className="font-bold text-yellow-300 hover:underline"
+          className="text-base font-bold text-yellow-300 hover:underline"
           title="点击重新计算"
         >
           ¥{Number(price).toFixed(0)}
@@ -861,7 +861,7 @@ function ReferencePriceTag({ price, onEdit, onClear }) {
         <button
           type="button"
           onClick={onClear}
-          className="text-[#6b7085] hover:text-red-400 ml-0.5 leading-none"
+          className="text-sm text-[#6b7085] hover:text-red-400 ml-0.5 leading-none"
           title="清除参考价"
         >
           ×
@@ -873,7 +873,7 @@ function ReferencePriceTag({ price, onEdit, onClear }) {
     <button
       type="button"
       onClick={onEdit}
-      className="w-full text-[10px] py-1 px-2 rounded bg-white/5 text-[#a0a4b8] border border-white/10 hover:bg-white/10 hover:text-white"
+      className="w-full text-xs py-1.5 px-2 rounded bg-white/5 text-[#a0a4b8] border border-white/10 hover:bg-white/10 hover:text-white"
     >
       + 设置购入参考价
     </button>
