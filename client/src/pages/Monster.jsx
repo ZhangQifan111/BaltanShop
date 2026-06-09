@@ -762,7 +762,7 @@ function ToyFormModal({ item, type, onClose, onAdded, addToy, initialAmount = ''
   );
 }
 
-function ToyCard({ it, onZoom, onOpenForm, addToy, isFav, onToggleFav }) {
+function ToyCard({ it, onZoom, onOpenForm, addToy, isFav, onToggleFav, referencePrice, onEditReference, onClearReference }) {
   const hasOwned = it.owned && it.owned.length > 0;
 
   return (
@@ -814,14 +814,24 @@ function ToyCard({ it, onZoom, onOpenForm, addToy, isFav, onToggleFav }) {
             ))}
           </div>
         )}
-        <a
-          href={it.detail_url}
-          target="_blank"
-          rel="noreferrer"
-          className="text-[10px] text-accent hover:underline mt-auto"
-        >
-          考据 ↗
-        </a>
+        {referencePrice !== undefined ? (
+          <div className="mt-auto">
+            <ReferencePriceTag
+              price={referencePrice}
+              onEdit={onEditReference}
+              onClear={onClearReference}
+            />
+          </div>
+        ) : (
+          <a
+            href={it.detail_url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[10px] text-accent hover:underline mt-auto"
+          >
+            考据 ↗
+          </a>
+        )}
       </div>
       <div className="px-2.5 pb-2.5 flex gap-1.5 border-t border-white/5 pt-1.5">
         {!hasOwned && (
@@ -1189,21 +1199,18 @@ export default function Monster() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {favToys.map(it => (
-              <div key={it.ref_id} className="flex flex-col gap-1.5">
-                <ToyCard
-                  it={it}
-                  onZoom={() => setViewing(it)}
-                  onOpenForm={(type) => openFormModal(type, it, '', type === 'estimate' ? 'reference' : 'add')}
-                  addToy={addToy}
-                  isFav={isToyFav(it.character_slug, it.ref_id)}
-                  onToggleFav={() => toggleFav(it.character_slug, it.ref_id)}
-                />
-                <ReferencePriceTag
-                  price={it.reference_price}
-                  onEdit={() => openFormModal('estimate', it, '', 'reference')}
-                  onClear={() => clearReferencePrice(it.character_slug, it.ref_id)}
-                />
-              </div>
+              <ToyCard
+                key={it.ref_id}
+                it={it}
+                onZoom={() => setViewing(it)}
+                onOpenForm={(type) => openFormModal(type, it, '', type === 'estimate' ? 'reference' : 'add')}
+                addToy={addToy}
+                isFav={isToyFav(it.character_slug, it.ref_id)}
+                onToggleFav={() => toggleFav(it.character_slug, it.ref_id)}
+                referencePrice={it.reference_price}
+                onEditReference={() => openFormModal('estimate', it, '', 'reference')}
+                onClearReference={() => clearReferencePrice(it.character_slug, it.ref_id)}
+              />
             ))}
           </div>
         )
