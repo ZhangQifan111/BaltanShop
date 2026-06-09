@@ -1,7 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import useStore from '../stores/useStore';
 import ImageModal from '../components/ImageModal';
+import {
+  ESTIMATE_DEFAULTS,
+  num,
+  SourcePicker,
+  TaxModePicker,
+  ProfitModePicker,
+  ProfitInputs,
+  AdvancedFeesPanel,
+  ResultCard,
+} from '../components/EstimateShared';
 
 const SERIES_LABELS = {
   'ultraman': '初代',
@@ -17,40 +27,11 @@ const SERIES_LABELS = {
   'custom': '自定义',
 };
 
-const DEFAULT_FEES = {
-  source: 'direct',
-  sell_price: '1000',
-  profit_rate: '20',
-  handling_fee: '10',
-  japan_domestic_shipping: '90',
-  intl_shipping: '70',
-  logistics_fee: '10',
-  box_fee: '5',
-  packing_fee: '5',
-  huabei: '0',
-  refund_amount: '0',
-};
-
+// 录入弹窗的渠道默认费用（按 stage 阶段付款，与反算的 ESTIMATE_DEFAULTS 是不同字段集）
 const SOURCE_DEFAULTS = {
   direct: { stage2_handling: 10, stage2_domestic_ship: 90, stage3_intl_ship: 70, logistics_fee: 10, box_fee: 5, packing_fee: 5 },
   proxy:  { stage2_handling: 0,  stage2_domestic_ship: 0,  stage3_intl_ship: 70, logistics_fee: 10, box_fee: 5, packing_fee: 5 },
 };
-
-const num = (v) => (v === '' || v === null || v === undefined) ? 0 : Number(v);
-
-function Field({ label, v, onChange }) {
-  return (
-    <label className="block">
-      <span className="text-[9px] text-[#6b7085] block mb-0.5">{label}</span>
-      <input
-        type="number"
-        value={v}
-        onChange={e => onChange(e.target.value)}
-        className="input text-xs w-full"
-      />
-    </label>
-  );
-}
 
 function SeriesTab({ s, active, onClick }) {
   return (
@@ -148,21 +129,38 @@ function CharacterCard({ c, onClick, isFav }) {
 }
 
 function EstimateForm({ item, onClose, onUseForAdd, onSaveAsReference }) {
-  const [form, setForm] = useState({ ...DEFAULT_FEES });
+  const [form, setForm] = useState({
+    source: 'direct',
+    sell_price: '1000',
+    profitMode: 'rate',
+    profit_rate: '20',
+    profit_amount: '',
+    ...ESTIMATE_DEFAULTS.direct,
+    huabei: '0',
+    refund_amount: '0',
+    japan_price_includes_tax: false,
+    showAdvanced: false,
+  });
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const onSourceChange = (s) => setForm(f => ({ ...f, source: s, ...ESTIMATE_DEFAULTS[s] }));
 
   const calc = async () => {
+    const sell = num(form.sell_price);
+    if (!(sell > 0)) {
+      setResult({ error: '请填写目标售价' });
+      return;
+    }
     setLoading(true);
     try {
       const body = {
         source: form.source,
-        sell_price: num(form.sell_price),
-        profit_rate: num(form.profit_rate) / 100,
+        sell_price: sell,
         handling_fee: num(form.handling_fee),
         japan_domestic_shipping: num(form.japan_domestic_shipping),
+        japan_price_includes_tax: form.japan_price_includes_tax,
         intl_shipping: num(form.intl_shipping),
         logistics_fee: num(form.logistics_fee),
         box_fee: num(form.box_fee),
@@ -170,6 +168,11 @@ function EstimateForm({ item, onClose, onUseForAdd, onSaveAsReference }) {
         huabei: num(form.huabei),
         refund_amount: num(form.refund_amount),
       };
+      if (form.profitMode === 'rate') {
+        body.profit_rate = num(form.profit_rate) / 100;
+      } else {
+        body.profit_amount = num(form.profit_amount);
+      }
       const r = await api.post('/toys/estimate', body);
       setResult(r);
     } catch (e) {
@@ -179,67 +182,124 @@ function EstimateForm({ item, onClose, onUseForAdd, onSaveAsReference }) {
     }
   };
 
+  const handleReset = () => {
+    setForm(f => ({
+      source: f.source,
+      sell_price: '1000',
+      profitMode: 'rate',
+      profit_rate: '20',
+      profit_amount: '',
+      ...ESTIMATE_DEFAULTS[f.source],
+      huabei: '0',
+      refund_amount: '0',
+      japan_price_includes_tax: false,
+      showAdvanced: false,
+    }));
+    setResult(null);
+  };
+
+  const showFooterActions = result && !result.error && (onUseForAdd || onSaveAsReference);
+
   return (
-    <div className="mt-2 p-3 rounded-lg bg-black/30 border border-white/10 space-y-2 text-xs">
-      <div className="grid grid-cols-3 gap-2">
-        <Field label="目标售价" v={form.sell_price} onChange={v => update('sell_price', v)} />
-        <Field label="利润率%" v={form.profit_rate} onChange={v => update('profit_rate', v)} />
-        <Field label="国际运费" v={form.intl_shipping} onChange={v => update('intl_shipping', v)} />
+    <form
+      onSubmit={(e) => { e.preventDefault(); calc(); }}
+      className="space-y-3"
+    >
+      <div className="card space-y-3">
+        <div className="text-xs text-[#6b7085] uppercase tracking-widest">基本参数</div>
+
+        <SourcePicker value={form.source} onChange={onSourceChange} />
+
+        {form.source === 'direct' && (
+          <TaxModePicker
+            value={form.japan_price_includes_tax}
+            onChange={(v) => update('japan_price_includes_tax', v)}
+          />
+        )}
+
+        <div>
+          <label className="text-xs text-[#6b7085] mb-1.5 block">目标售价 (¥)</label>
+          <input
+            className="input text-sm"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="例如 1000"
+            value={form.sell_price}
+            onChange={e => update('sell_price', e.target.value)}
+          />
+        </div>
+
+        <div>
+          <label className="text-xs text-[#6b7085] mb-1.5 block">期望利润</label>
+          <ProfitModePicker mode={form.profitMode} onChange={(m) => update('profitMode', m)} />
+          <ProfitInputs
+            mode={form.profitMode}
+            rate={form.profit_rate}
+            amount={form.profit_amount}
+            onChange={update}
+          />
+        </div>
+
+        <p className="text-[10px] text-[#6b7085]">
+          平台手续费按售价 1.6% 自动算 (从售价扣减)
+        </p>
       </div>
-      <div className="text-[9px] text-[#6b7085]">
-        费用默认: 手续费 10 + 日本境内 90 + 物流 10 + box 5 + pack 5 (直购)
-      </div>
+
+      <AdvancedFeesPanel
+        form={form}
+        update={update}
+        open={form.showAdvanced}
+        onToggle={() => update('showAdvanced', !form.showAdvanced)}
+      />
+
       <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={calc}
-          disabled={loading}
-          className="px-3 py-1.5 rounded bg-accent text-[#0f1117] text-xs font-medium disabled:opacity-50"
-        >
+        <button type="submit" className="btn-primary flex-1" disabled={loading}>
           {loading ? '计算中…' : '反算购入价'}
         </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-3 py-1.5 rounded bg-white/5 text-[#a0a4b8] text-xs"
-        >
-          收起
-        </button>
+        <button type="button" className="btn-ghost" onClick={handleReset}>重置</button>
+        <button type="button" className="btn-ghost" onClick={onClose}>收起</button>
       </div>
+
       {result && !result.error && (
-        <div className={`p-2 rounded ${result.feasible ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
-          <div className="text-[10px] text-[#6b7085]">建议购入价上限</div>
-          <div className="text-lg font-bold text-accent">¥{result.base_price?.toFixed(0)}</div>
-          {!result.feasible && <div className="text-[10px] text-red-400 mt-1">{result.warning}</div>}
-          {result.feasible && onUseForAdd && (
-            <button
-              type="button"
-              onClick={() => onUseForAdd(result.base_price)}
-              className="mt-2 w-full px-3 py-1.5 rounded bg-emerald-500 text-[#0f1117] text-xs font-semibold hover:bg-emerald-400"
-            >
-              ➕ 用 ¥{result.base_price?.toFixed(0)} 录入库存
-            </button>
-          )}
-          {result.feasible && onSaveAsReference && (
-            <button
-              type="button"
-              disabled={saving}
-              onClick={async () => {
-                setSaving(true);
-                try { await onSaveAsReference(result.base_price); }
-                finally { setSaving(false); }
-              }}
-              className="mt-2 w-full px-3 py-1.5 rounded bg-yellow-500 text-[#0f1117] text-xs font-semibold hover:bg-yellow-400 disabled:opacity-50"
-            >
-              {saving ? '保存中…' : `★ 保存为购入参考价 ¥${result.base_price?.toFixed(0)}`}
-            </button>
-          )}
-        </div>
+        <ResultCard
+          result={result}
+          footer={
+            showFooterActions && (
+              <>
+                {onUseForAdd && result.feasible && (
+                  <button
+                    type="button"
+                    onClick={() => onUseForAdd(result.base_price)}
+                    className="w-full px-3 py-2 rounded-lg bg-emerald-500 text-[#0f1117] text-xs font-semibold hover:bg-emerald-400"
+                  >
+                    ➕ 用 ¥{result.base_price.toFixed(0)} 录入库存
+                  </button>
+                )}
+                {onSaveAsReference && result.feasible && (
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={async () => {
+                      setSaving(true);
+                      try { await onSaveAsReference(result.base_price); }
+                      finally { setSaving(false); }
+                    }}
+                    className="w-full px-3 py-2 rounded-lg bg-yellow-500 text-[#0f1117] text-xs font-semibold hover:bg-yellow-400 disabled:opacity-50"
+                  >
+                    {saving ? '保存中…' : `★ 保存为购入参考价 ¥${result.base_price.toFixed(0)}`}
+                  </button>
+                )}
+              </>
+            )
+          }
+        />
       )}
+
       {result?.error && (
         <div className="text-red-400 text-[10px]">{result.error}</div>
       )}
-    </div>
+    </form>
   );
 }
 
