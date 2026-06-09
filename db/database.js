@@ -47,6 +47,9 @@ function migrate() {
   if (!colNames.has('baltan_ref_id')) {
     changes.push("ALTER TABLE toys ADD COLUMN baltan_ref_id TEXT");
   }
+  if (!colNames.has('expected_arrival_date')) {
+    changes.push("ALTER TABLE toys ADD COLUMN expected_arrival_date TEXT");
+  }
   if (!tableNames.has('shipping_rules')) {
     changes.push(`CREATE TABLE shipping_rules (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

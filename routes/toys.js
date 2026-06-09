@@ -114,6 +114,7 @@ router.post('/', async (req, res) => {
       'stage1_date','stage1_amount','stage1_note','stage1_jpy','stage1_handling','stage1_domestic_ship',
       'stage2_date','stage2_amount','stage2_note','stage2_handling','stage2_domestic_ship',
       'stage3_date','stage3_amount','stage3_note','stage3_intl_ship','stage3_tax',
+      'expected_arrival_date',
       'shipment_id','total_cost','profit','baltan_ref_id','notes'
     ];
 

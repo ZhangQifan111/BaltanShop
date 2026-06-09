@@ -658,7 +658,7 @@ export default function Warehouse() {
       const q = search.toLowerCase();
       if (!t.name?.toLowerCase().includes(q) && !t.category?.toLowerCase().includes(q)) return false;
     }
-    return t.status !== 'procurement' && t.status !== 'transit';
+    return t.status !== 'procurement' && t.status !== 'transit' && t.status !== 'preorder';
   });
 
   const handleSell = async (updates) => {

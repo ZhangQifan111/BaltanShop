@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
     const r = await db.get(`
       SELECT
         COUNT(*) AS total,
-        SUM(CASE WHEN status IN ('procurement','transit')
+        SUM(CASE WHEN status IN ('procurement','transit','preorder')
                   OR (procurement_stage IS NOT NULL AND procurement_stage != 'stocked')
                  THEN 1 ELSE 0 END) AS in_transit,
         SUM(CASE WHEN status = 'stock' THEN 1 ELSE 0 END) AS in_stock,
@@ -23,7 +23,7 @@ router.get('/', async (req, res) => {
         SUM(CASE WHEN procurement_stage = 'stage1' THEN 1 ELSE 0 END) AS stage1,
         SUM(CASE WHEN procurement_stage = 'stage2' THEN 1 ELSE 0 END) AS stage2,
         SUM(CASE WHEN procurement_stage = 'stage3' THEN 1 ELSE 0 END) AS stage3,
-        SUM(CASE WHEN status IN ('procurement','transit')
+        SUM(CASE WHEN status IN ('procurement','transit','preorder')
                   OR (procurement_stage IS NOT NULL AND procurement_stage != 'stocked')
                  THEN cost ELSE 0 END) AS total_cost_transit,
         SUM(CASE WHEN status = 'stock' THEN cost ELSE 0 END) AS total_cost_stock,

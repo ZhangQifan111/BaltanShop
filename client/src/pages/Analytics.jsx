@@ -15,7 +15,7 @@ export default function Analytics() {
   // 来源分布
   const sourceData = ['direct', 'proxy', 'domestic', 'secondhand'].map(s => ({
     name: { direct: '直购', proxy: '代购', domestic: '国内', secondhand: '二手' }[s],
-    value: toys.filter(t => t.source === s && t.status !== 'procurement' && t.status !== 'transit').length,
+    value: toys.filter(t => t.source === s && t.status !== 'procurement' && t.status !== 'transit' && t.status !== 'preorder').length,
     fill: { direct: '#f0a030', proxy: '#60a5fa', domestic: '#34d399', secondhand: '#a78bfa' }[s],
   })).filter(d => d.value > 0);
 

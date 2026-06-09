@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS toys (
   name TEXT NOT NULL,
   category TEXT DEFAULT '其他',
   source TEXT DEFAULT 'direct',   -- direct/proxy/domestic/secondhand
-  status TEXT DEFAULT 'procurement', -- procurement/transit/stock/sold/done/returned
+  status TEXT DEFAULT 'procurement', -- procurement/transit/stock/sold/done/returned/preorder
 
   -- 采购基础
   supplier_id INTEGER,
@@ -79,6 +79,9 @@ CREATE TABLE IF NOT EXISTS toys (
   stage3_note TEXT,
   stage3_intl_ship REAL DEFAULT 0,
   stage3_tax REAL DEFAULT 0,
+
+  -- 预计到货日（采购中提示用）
+  expected_arrival_date TEXT,
 
   -- 发货批次
   shipment_id INTEGER,
