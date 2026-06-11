@@ -1393,6 +1393,7 @@ export default function Monster() {
   };
 
   const favCount = favorites.length;
+  const ownedCount = favorites.filter(f => f.linked_toy_id).length;
 
   return (
     <div className="space-y-4">
@@ -1440,7 +1441,7 @@ export default function Monster() {
                   : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/20')
               }
             >
-              {viewMode === 'owned' ? '🏠 已拥有视图' : `🏠 已拥有 (${favToys.filter(t => t.linked_toy_id).length})`}
+              {viewMode === 'owned' ? '🏠 已拥有视图' : `🏠 已拥有 (${ownedCount})`}
             </button>
             {viewMode === 'all' && (
               <button
