@@ -1295,6 +1295,16 @@ export default function Monster() {
     setShowCustomToyForm(false);
   };
 
+  // 统一返回：角色详情 → 角色列表；收藏/已拥有视图 → 全部视图
+  const handleBack = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (currentCharacter) {
+      backToCharacters();
+    } else if (viewMode !== 'all') {
+      setViewMode('all');
+    }
+  };
+
   const openFormModal = (type, item, initialAmount = '', variant = 'add') => {
     setFormModal(prev => {
       // 同一玩具同一类型再次点击 → 关闭
@@ -1407,6 +1417,18 @@ export default function Monster() {
         </p>
       </div>
 
+      {/* 醒目返回按钮 - 任何子界面（角色详情 / 收藏 / 已拥有）都显示 */}
+      {(currentCharacter || viewMode !== 'all') && (
+        <button
+          type="button"
+          onClick={handleBack}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-accent text-[#0f1117] border-2 border-accent/80 hover:bg-accent/90 text-sm font-bold transition-all shadow-md shadow-accent/30 active:scale-95"
+        >
+          <span className="text-lg leading-none">←</span>
+          返回怪兽图鉴
+        </button>
+      )}
+
       {/* series tabs + 收藏切换 + 第三方角色入口 */}
       {currentCharacter === null && (
         <div className="space-y-2">
@@ -1464,18 +1486,12 @@ export default function Monster() {
         </div>
       )}
 
-      {/* 面包屑（角色页） */}
+      {/* 面包屑（角色页）- 仅显示当前位置，返回按钮已提到顶部 */}
       {currentCharacter && (
-        <div className="flex items-center gap-2 text-xs">
-          <button
-            type="button"
-            onClick={backToCharacters}
-            className="text-accent hover:underline"
-          >
-            ← 返回 {SERIES_LABELS[currentSeries] || currentSeries}
-          </button>
+        <div className="flex items-center gap-2 text-xs text-[#a0a4b8]">
+          <span className="text-[#6b7085]">{SERIES_LABELS[currentSeries] || currentSeries}</span>
           <span className="text-[#6b7085]">/</span>
-          <span className="text-[#a0a4b8] font-medium">
+          <span className="font-medium">
             {currentCharacter.character_name_zh || currentCharacter.character_name_ja || currentCharacter.character_slug}
           </span>
           <span className="text-[#6b7085]">· {toys.length} 件</span>
