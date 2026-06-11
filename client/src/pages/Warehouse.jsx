@@ -412,6 +412,135 @@ function SellModal({ toy, onConfirm, onCancel }) {
   );
 }
 
+/* ─── 录入历史销售 ─── */
+function HistoricalSaleModal({ onCancel, categories }) {
+  const { addToy, setToast } = useStore();
+  const [form, setForm] = useState({
+    name: '',
+    category: '',
+    source: '',
+    sell_price: '',
+    sell_date: new Date().toISOString().slice(0, 10),
+    include_worry_free: false,
+    include_huabei: false,
+  });
+
+  const price = +form.sell_price || 0;
+  const softwareFee = Math.round(price * 0.01 * 100) / 100;
+  const basicFee = Math.round(price * 0.006 * 100) / 100;
+  const worryFreeFee = form.include_worry_free ? Math.round(price * 0.025 * 100) / 100 : 0;
+  const huabeiFee = form.include_huabei ? Math.round(price * 0.03 * 100) / 100 : 0;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim()) return setToast('请填写名称');
+    if (price <= 0) return setToast('请填写售价');
+    try {
+      await addToy({
+        name: form.name.trim(),
+        category: form.category || '其他',
+        source: form.source || 'direct',
+        sell_price: price,
+        sell_date: form.sell_date,
+        status: 'sold',
+        procurement_stage: null,
+        software_service_fee: softwareFee,
+        basic_software_service_fee: basicFee,
+        worry_free_service_fee: worryFreeFee,
+        huabei: huabeiFee,
+        purchase_date: form.sell_date,
+        notes: '历史销售',
+      });
+      setToast('已录入');
+      onCancel();
+    } catch (e) {
+      setToast('录入失败: ' + e.message);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4" onClick={onCancel}>
+      <div className="bg-[#1a1d27] rounded-xl border border-white/10 p-6 w-full max-w-sm space-y-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div>
+          <h3 className="text-base font-bold">录入历史销售</h3>
+          <p className="text-[10px] text-[#6b7085] mt-1">快速补录一笔已售出商品的出售记录。购入价留空，对账时到「已售」tab 点编辑补 stage1/2/3 即可。</p>
+        </div>
+
+        <form className="space-y-3" onSubmit={handleSubmit}>
+          <div>
+            <label className="text-[10px] text-[#6b7085] block mb-1">商品名称 *</label>
+            <input className="input" placeholder="例: M1号巴尔坦" value={form.name}
+              onChange={e => setForm({ ...form, name: e.target.value })} autoFocus />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-[#6b7085] block mb-1">品类</label>
+              <select className="input text-xs" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
+                <option value="">未指定</option>
+                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] text-[#6b7085] block mb-1">来源</label>
+              <select className="input text-xs" value={form.source} onChange={e => setForm({ ...form, source: e.target.value })}>
+                <option value="">未指定</option>
+                <option value="direct">直购</option>
+                <option value="proxy">代购</option>
+                <option value="secondhand">二手</option>
+                <option value="domestic">国内</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-[#6b7085] block mb-1">售出价格 * (¥)</label>
+              <input className="input" type="number" placeholder="0" value={form.sell_price}
+                onChange={e => setForm({ ...form, sell_price: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-[10px] text-[#6b7085] block mb-1">卖出日</label>
+              <input className="input text-xs" type="date" value={form.sell_date}
+                onChange={e => setForm({ ...form, sell_date: e.target.value })} />
+            </div>
+          </div>
+
+          <div className="bg-black/30 rounded-lg p-3 space-y-1.5 text-xs">
+            <div className="text-[10px] text-[#6b7085] mb-1">平台费（自动按售价算）</div>
+            <div className="flex justify-between text-[#6b7085]"><span>软件服务费 (1%)</span><span>¥{softwareFee.toFixed(2)}</span></div>
+            <div className="flex justify-between text-[#6b7085]"><span>基础软件服务费 (0.6%)</span><span>¥{basicFee.toFixed(2)}</span></div>
+            <div className="border-t border-white/5 my-1" />
+            <div className="flex justify-between items-center">
+              <label className="flex items-center gap-1.5 cursor-pointer flex-1">
+                <input type="checkbox" className="accent-orange-500"
+                  checked={form.include_worry_free}
+                  onChange={e => setForm({ ...form, include_worry_free: e.target.checked })} />
+                <span>无忧卖服务费 (2.5%)</span>
+              </label>
+              <span className={form.include_worry_free ? 'text-[#d0d4e8]' : 'text-[#6b7085]'}>¥{worryFreeFee.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <label className="flex items-center gap-1.5 cursor-pointer flex-1">
+                <input type="checkbox" className="accent-orange-500"
+                  checked={form.include_huabei}
+                  onChange={e => setForm({ ...form, include_huabei: e.target.checked })} />
+                <span>花呗扣款 (3%)</span>
+              </label>
+              <span className={form.include_huabei ? 'text-[#d0d4e8]' : 'text-[#6b7085]'}>¥{huabeiFee.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button type="submit" className="btn-primary flex-1">确认录入</button>
+            <button type="button" className="btn-ghost" onClick={onCancel}>取消</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 /* ─── 编辑弹窗 ─── */
 function EditModal({ toy, onConfirm, onCancel, categories }) {
   const [form, setForm] = useState({
@@ -658,6 +787,7 @@ export default function Warehouse() {
   const [editing, setEditing] = useState(null);
   const [returning, setReturning] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [showHistorical, setShowHistorical] = useState(false);
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
@@ -698,9 +828,14 @@ export default function Warehouse() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-bold">仓库</h2>
-        <p className="text-xs text-[#6b7085]">{filtered.length} 件商品</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold">仓库</h2>
+          <p className="text-xs text-[#6b7085]">{filtered.length} 件商品</p>
+        </div>
+        <button className="btn-primary text-sm" onClick={() => setShowHistorical(true)}>
+          + 录入历史销售
+        </button>
       </div>
 
       <input
@@ -754,6 +889,13 @@ export default function Warehouse() {
           categories={categories}
           onConfirm={handleEdit}
           onCancel={() => setEditing(null)}
+        />
+      )}
+
+      {showHistorical && (
+        <HistoricalSaleModal
+          categories={categories}
+          onCancel={() => setShowHistorical(false)}
         />
       )}
 
