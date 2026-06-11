@@ -36,27 +36,42 @@ router.get('/', async (req, res) => {
       FROM (
         SELECT
           status, procurement_stage, sell_price,
-          CASE source
-            WHEN 'direct' THEN COALESCE(japan_price_cny, 0)
-            WHEN 'secondhand' THEN COALESCE(japan_price_cny, 0)
-            WHEN 'proxy' THEN COALESCE(proxy_price, 0) + COALESCE(proxy_intl_shipping, 0) + COALESCE(proxy_domestic_shipping, 0)
-            WHEN 'domestic' THEN COALESCE(domestic_price, 0) + COALESCE(domestic_shipping, 0)
-            ELSE 0
+          stage1_amount, stage2_amount, stage3_amount,
+          source, refund_amount, huabei,
+          japan_price_cny, handling_fee, japan_domestic_shipping, japan_consumption_tax,
+          intl_shipping, import_duty, proxy_price, proxy_intl_shipping, proxy_domestic_shipping,
+          domestic_price, domestic_shipping,
+          logistics_fee, box_fee, packing_fee,
+          purchase_date, created_at,
+          CASE
+            WHEN COALESCE(stage1_amount, 0) + COALESCE(stage2_amount, 0) + COALESCE(stage3_amount, 0) > 0
+              THEN COALESCE(stage1_amount, 0) + COALESCE(stage2_amount, 0) + COALESCE(stage3_amount, 0)
+            ELSE CASE source
+              WHEN 'direct' THEN COALESCE(japan_price_cny, 0)
+              WHEN 'secondhand' THEN COALESCE(japan_price_cny, 0)
+              WHEN 'proxy' THEN COALESCE(proxy_price, 0) + COALESCE(proxy_intl_shipping, 0) + COALESCE(proxy_domestic_shipping, 0)
+              WHEN 'domestic' THEN COALESCE(domestic_price, 0) + COALESCE(domestic_shipping, 0)
+              ELSE 0
+            END
+            + COALESCE(handling_fee, 0) + COALESCE(japan_domestic_shipping, 0) + COALESCE(japan_consumption_tax, 0)
+            + COALESCE(intl_shipping, 0) + COALESCE(import_duty, 0)
           END
-          + COALESCE(handling_fee, 0) + COALESCE(japan_domestic_shipping, 0) + COALESCE(japan_consumption_tax, 0)
-          + COALESCE(intl_shipping, 0) + COALESCE(import_duty, 0)
           + COALESCE(logistics_fee, 0) + COALESCE(box_fee, 0) + COALESCE(packing_fee, 0) AS cost,
           CASE WHEN sell_price IS NOT NULL AND sell_price > 0
             THEN sell_price - COALESCE(refund_amount, 0) - COALESCE(huabei, 0)
-                 - (CASE source
-                    WHEN 'direct' THEN COALESCE(japan_price_cny, 0)
-                    WHEN 'secondhand' THEN COALESCE(japan_price_cny, 0)
-                    WHEN 'proxy' THEN COALESCE(proxy_price, 0) + COALESCE(proxy_intl_shipping, 0) + COALESCE(proxy_domestic_shipping, 0)
-                    WHEN 'domestic' THEN COALESCE(domestic_price, 0) + COALESCE(domestic_shipping, 0)
-                    ELSE 0
+                 - (CASE
+                    WHEN COALESCE(stage1_amount, 0) + COALESCE(stage2_amount, 0) + COALESCE(stage3_amount, 0) > 0
+                      THEN COALESCE(stage1_amount, 0) + COALESCE(stage2_amount, 0) + COALESCE(stage3_amount, 0)
+                    ELSE CASE source
+                      WHEN 'direct' THEN COALESCE(japan_price_cny, 0)
+                      WHEN 'secondhand' THEN COALESCE(japan_price_cny, 0)
+                      WHEN 'proxy' THEN COALESCE(proxy_price, 0) + COALESCE(proxy_intl_shipping, 0) + COALESCE(proxy_domestic_shipping, 0)
+                      WHEN 'domestic' THEN COALESCE(domestic_price, 0) + COALESCE(domestic_shipping, 0)
+                      ELSE 0
+                    END
+                    + COALESCE(handling_fee, 0) + COALESCE(japan_domestic_shipping, 0) + COALESCE(japan_consumption_tax, 0)
+                    + COALESCE(intl_shipping, 0) + COALESCE(import_duty, 0)
                   END
-                  + COALESCE(handling_fee, 0) + COALESCE(japan_domestic_shipping, 0) + COALESCE(japan_consumption_tax, 0)
-                  + COALESCE(intl_shipping, 0) + COALESCE(import_duty, 0)
                   + COALESCE(logistics_fee, 0) + COALESCE(box_fee, 0) + COALESCE(packing_fee, 0))
             ELSE NULL
           END AS profit,

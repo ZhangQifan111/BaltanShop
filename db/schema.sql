@@ -58,6 +58,9 @@ CREATE TABLE IF NOT EXISTS toys (
   sell_date TEXT,
   huabei REAL DEFAULT 0,
   refund_amount REAL DEFAULT 0,
+  software_service_fee REAL DEFAULT 0,      -- 平台软件服务费 (1%)
+  basic_software_service_fee REAL DEFAULT 0, -- 基础软件服务费 (0.6%)
+  worry_free_service_fee REAL DEFAULT 0,     -- 无忧卖服务费 (2.5%)
 
   -- 采购阶段（在途用）
   procurement_stage TEXT DEFAULT 'stage1', -- stage1/stage2/stage3/stocked

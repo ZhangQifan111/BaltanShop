@@ -50,6 +50,15 @@ function migrate() {
   if (!colNames.has('expected_arrival_date')) {
     changes.push("ALTER TABLE toys ADD COLUMN expected_arrival_date TEXT");
   }
+  if (!colNames.has('software_service_fee')) {
+    changes.push("ALTER TABLE toys ADD COLUMN software_service_fee REAL DEFAULT 0");
+  }
+  if (!colNames.has('basic_software_service_fee')) {
+    changes.push("ALTER TABLE toys ADD COLUMN basic_software_service_fee REAL DEFAULT 0");
+  }
+  if (!colNames.has('worry_free_service_fee')) {
+    changes.push("ALTER TABLE toys ADD COLUMN worry_free_service_fee REAL DEFAULT 0");
+  }
   if (!tableNames.has('shipping_rules')) {
     changes.push(`CREATE TABLE shipping_rules (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

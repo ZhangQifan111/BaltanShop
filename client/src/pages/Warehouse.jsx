@@ -81,7 +81,8 @@ function ToyCard({ toy, onSell, onEdit, onDelete, onReturn, onDone }) {
           {toy.packing_fee > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">包装费</span><span>¥{toy.packing_fee}</span></div>}
           {toy.stage1_amount > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">①买价</span><span>¥{toy.stage1_amount}</span></div>}
           {toy.stage2_amount > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">②转运</span><span>¥{toy.stage2_amount}</span></div>}
-          {toy.stage3_amount > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">③国际</span><span>¥{toy.stage3_amount}</span></div>}
+          {toy.stage3_intl_ship > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">③国际运费</span><span>¥{toy.stage3_intl_ship}</span></div>}
+          {toy.stage3_tax > 0 && <div className="flex justify-between pl-2"><span className="text-[#6b7085]">③税费</span><span>¥{toy.stage3_tax}</span></div>}
           {toy.sell_price > 0 && <div className="flex justify-between text-green-400"><span className="text-[#6b7085]">售价</span><span>¥{toy.sell_price}</span></div>}
           {toy.profit != null && <div className="flex justify-between font-bold" style={{ color: toy.profit >= 0 ? '#34d399' : '#f87171' }}><span className="text-[#6b7085]">利润</span><span>{toy.profit >= 0 ? '+' : ''}¥{toy.profit.toFixed(0)}</span></div>}
           {toy.notes && <div className="flex justify-between text-[#6b7085]"><span>备注</span><span className="text-right max-w-[60%] truncate">{toy.notes}</span></div>}
@@ -207,7 +208,7 @@ function SellModal({ toy, onConfirm, onCancel }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4" onClick={onCancel}>
-      <div className="bg-[#1a1d27] rounded-xl border border-white/10 p-6 w-full max-w-sm space-y-4" onClick={e => e.stopPropagation()}>
+      <div className="bg-[#1a1d27] rounded-xl border border-white/10 p-6 w-full max-w-sm space-y-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <h3 className="text-base font-bold">出售 {toy.name}</h3>
 
         <form className="space-y-3" onSubmit={handleSubmit}>
@@ -419,7 +420,8 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
     notes: toy.notes || '',
     stage1_amount: toy.stage1_amount ?? '',
     stage2_amount: toy.stage2_amount ?? '',
-    stage3_amount: toy.stage3_amount ?? '',
+    stage3_intl_ship: toy.stage3_intl_ship ?? '',
+    stage3_tax: toy.stage3_tax ?? ((toy.stage3_amount || 0) - (toy.stage3_intl_ship || 0)) || '',
     sell_price: toy.sell_price ?? '',
     sell_date: toy.sell_date || '',
     return_cost: toy.return_cost ?? '',
@@ -434,7 +436,13 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
     const updates = { name: form.name.trim(), category: form.category, notes: form.notes };
     if (form.stage1_amount !== '') updates.stage1_amount = +form.stage1_amount;
     if (form.stage2_amount !== '') updates.stage2_amount = +form.stage2_amount;
-    if (form.stage3_amount !== '') updates.stage3_amount = +form.stage3_amount;
+    if (form.stage3_intl_ship !== '' || form.stage3_tax !== '') {
+      const ship = form.stage3_intl_ship === '' ? 0 : +form.stage3_intl_ship;
+      const tax = form.stage3_tax === '' ? 0 : +form.stage3_tax;
+      updates.stage3_intl_ship = ship;
+      updates.stage3_tax = tax;
+      updates.stage3_amount = ship + tax;
+    }
     // 售价编辑：仅 sold/done 状态可修改
     if ((toy.status === 'sold' || toy.status === 'done') && form.sell_price !== '') {
       updates.sell_price = +form.sell_price;
@@ -478,7 +486,7 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
           </div>
 
           {/* 阶段成本（可编辑） */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">①买价</label>
               <input className="input text-xs" type="number" placeholder="0" value={form.stage1_amount} onChange={e => setForm({ ...form, stage1_amount: e.target.value })} />
@@ -488,8 +496,12 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
               <input className="input text-xs" type="number" placeholder="0" value={form.stage2_amount} onChange={e => setForm({ ...form, stage2_amount: e.target.value })} />
             </div>
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">③国际</label>
-              <input className="input text-xs" type="number" placeholder="0" value={form.stage3_amount} onChange={e => setForm({ ...form, stage3_amount: e.target.value })} />
+              <label className="text-[10px] text-[#6b7085] block mb-1">③国际运费</label>
+              <input className="input text-xs" type="number" placeholder="0" value={form.stage3_intl_ship} onChange={e => setForm({ ...form, stage3_intl_ship: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-[10px] text-[#6b7085] block mb-1">③税费</label>
+              <input className="input text-xs" type="number" placeholder="0" value={form.stage3_tax} onChange={e => setForm({ ...form, stage3_tax: e.target.value })} />
             </div>
           </div>
 
@@ -662,8 +674,12 @@ export default function Warehouse() {
   });
 
   const handleSell = async (updates) => {
-    await updateToy(selling.id, { ...selling, ...updates });
-    setSelling(null);
+    try {
+      await updateToy(selling.id, { ...selling, ...updates });
+      setSelling(null);
+    } catch (e) {
+      setToast('出售失败: ' + e.message);
+    }
   };
 
   const handleReturn = (toy) => {

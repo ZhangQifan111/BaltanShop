@@ -1,5 +1,5 @@
 import useStore from '../stores/useStore';
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 const COLORS = ['#f0a030', '#60a5fa', '#a78bfa', '#34d399', '#f87171'];
 
@@ -69,20 +69,18 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {monthData[0].value > 0 && (
+      {(monthData[0].value > 0 || monthData[1].value > 0) && (
         <div className="card">
           <div className="text-xs text-[#6b7085] uppercase tracking-widest mb-4">本月概览</div>
-          <div className="h-40">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthData} layout="vertical" margin={{ left: 80 }}>
-                <XAxis type="number" hide />
-                <YAxis type="category" dataKey="label" tick={{ fill: '#6b7085', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(v) => [`¥${v.toLocaleString()}`, '']} contentStyle={{ background: '#1a1d27', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#d0d4e8' }} />
-                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                  {monthData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="space-y-3">
+            <div className="flex items-baseline justify-between">
+              <span className="text-sm text-[#a0a4b8]">本月成本</span>
+              <span className="text-2xl font-bold" style={{ color: '#f0a030' }}>¥{(stats.month?.cost || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex items-baseline justify-between border-t border-white/5 pt-3">
+              <span className="text-sm text-[#a0a4b8]">本月销售额</span>
+              <span className="text-2xl font-bold" style={{ color: '#34d399' }}>¥{(stats.month?.sell || 0).toLocaleString()}</span>
+            </div>
           </div>
         </div>
       )}

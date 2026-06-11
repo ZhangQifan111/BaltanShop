@@ -18,6 +18,12 @@ const TABS = [
 
 const ARRIVAL_WARN_DAYS = 3;
 
+/** 代购费已含税，不再叠加 13% 消费税；直购/二手照常 */
+function computeStage3Tax(stage1Amount, source) {
+  if (source === 'proxy') return 0;
+  return Math.round((stage1Amount || 0) * 0.13 * 100) / 100;
+}
+
 /** 计算到货提示：{ days, label, tone } | null */
 function getArrivalInfo(expectedDate) {
   if (!expectedDate) return null;
@@ -93,7 +99,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
     });
   };
 
-  const tax = Math.round((toy.stage1_amount || 0) * 0.13 * 100) / 100;
+  const tax = computeStage3Tax(toy.stage1_amount, toy.source);
   const stage2Total = (stage2_handling || 0) + (stage2_domestic_ship || 0);
   const allSelected = [toy, ...(allToys || []).filter(t => selectedIds.has(t.id))];
   const totalWeight = allSelected.reduce((s, t) => s + (t.logistics_weight || 0), 0);
@@ -105,7 +111,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
   }
 
   const currentShare = calcShare(toy);
-  const currentTax = Math.round((toy.stage1_amount || 0) * 0.13 * 100) / 100;
+  const currentTax = computeStage3Tax(toy.stage1_amount, toy.source);
   const currentS3Total = currentShare + currentTax;
 
   const handleConfirm = async () => {
@@ -124,7 +130,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
     if (isS3) {
       const batch = allSelected.map(t => {
         const share = calcShare(t);
-        const tTax = Math.round((t.stage1_amount || 0) * 0.13 * 100) / 100;
+        const tTax = computeStage3Tax(t.stage1_amount, t.source);
         return {
           ...t,
           procurement_stage: 'stage3',
@@ -230,7 +236,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
                   const t = (allToys || []).find(x => x.id === id);
                   if (!t) return null;
                   const share = calcShare(t);
-                  const tTax = Math.round((t.stage1_amount || 0) * 0.13 * 100) / 100;
+                  const tTax = computeStage3Tax(t.stage1_amount, t.source);
                   return (
                     <div key={id} className="flex justify-between text-[10px]">
                       <span className="text-[#6b7085] truncate flex-1">{t.name}</span>
@@ -270,7 +276,7 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys }) {
       updates.stage2_amount = (updates.stage2_handling || 0) + (updates.stage2_domestic_ship || 0);
     }
     if (toy.procurement_stage === 'stage3') {
-      updates.stage3_tax = Math.round((updates.stage1_amount || 0) * 0.13 * 100) / 100;
+      updates.stage3_tax = computeStage3Tax(updates.stage1_amount, toy.source);
       updates.stage3_amount = (updates.stage3_intl_ship || 0) + updates.stage3_tax;
     }
     await onUpdate(toy.id, updates);
@@ -290,11 +296,16 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys }) {
     });
   };
 
+  const [editingPreorderAmount, setEditingPreorderAmount] = useState(false);
+  const [preorderAmountInput, setPreorderAmountInput] = useState(toy.stage1_amount || '');
+  const savePreorderAmount = async () => {
+    const v = preorderAmountInput === '' ? 0 : +preorderAmountInput;
+    await onUpdate(toy.id, { ...toy, stage1_amount: v });
+    setEditingPreorderAmount(false);
+  };
+
   const stage2SubLabel = (toy.stage2_handling > 0 || toy.stage2_domestic_ship > 0)
     ? `手续费¥${toy.stage2_handling} + 物流¥${toy.stage2_domestic_ship}`
-    : null;
-  const stage3SubLabel = (toy.stage3_intl_ship > 0 || toy.stage3_tax > 0)
-    ? `运费¥${toy.stage3_intl_ship} + 税¥${toy.stage3_tax}`
     : null;
 
   return (
@@ -331,10 +342,30 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys }) {
           </div>
           <div className="text-right">
             {isPreorder ? (
-              <>
-                <div className="text-lg font-bold text-pink-300">📌</div>
-                <div className="text-[9px] text-[#6b7085]">未到货</div>
-              </>
+              editingPreorderAmount ? (
+                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                  <input
+                    className="input text-xs w-24 text-right"
+                    type="number"
+                    value={preorderAmountInput}
+                    placeholder="已付金额"
+                    onChange={e => setPreorderAmountInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') savePreorderAmount(); if (e.key === 'Escape') setEditingPreorderAmount(false); }}
+                    autoFocus
+                  />
+                  <button className="text-xs text-pink-300 px-1" onClick={savePreorderAmount}>✓</button>
+                </div>
+              ) : toy.stage1_amount > 0 ? (
+                <div className="cursor-pointer hover:opacity-80" onClick={(e) => { e.stopPropagation(); setEditingPreorderAmount(true); setPreorderAmountInput(toy.stage1_amount); }} title="点击修改金额">
+                  <div className="text-lg font-bold text-pink-300">¥{toy.stage1_amount.toFixed(0)}</div>
+                  <div className="text-[9px] text-[#6b7085]">已付 (未到货)</div>
+                </div>
+              ) : (
+                <div className="cursor-pointer hover:opacity-80" onClick={(e) => { e.stopPropagation(); setEditingPreorderAmount(true); setPreorderAmountInput(''); }} title="点击填写已付金额">
+                  <div className="text-lg font-bold text-pink-300">📌</div>
+                  <div className="text-[9px] text-[#6b7085]">未到货 · 点填金额</div>
+                </div>
+              )
             ) : (
               <>
                 <div className="text-lg font-bold text-accent">¥{totalCost.toFixed(0)}</div>
@@ -357,11 +388,10 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys }) {
               <div className="text-sm font-bold text-[#d0d4e8]">¥{toy.stage2_amount || 0}</div>
               {stage2SubLabel && <div className="text-[8px] text-[#6b7085] mt-0.5 truncate">{stage2SubLabel}</div>}
             </div>
-            <div className={`rounded-lg p-2 text-center ${toy.stage3_amount > 0 ? 'bg-black/20' : 'bg-black/10 border border-dashed border-white/10'}`}>
+            <div className={`rounded-lg p-2 text-center ${toy.stage3_intl_ship > 0 ? 'bg-black/20' : 'bg-black/10 border border-dashed border-white/10'}`}>
               <div className="text-[9px] text-[#6b7085] mb-1">③ 国际运输</div>
-              <div className="text-sm font-bold text-[#d0d4e8]">¥{toy.stage3_amount || 0}</div>
-              {stage3SubLabel && <div className="text-[8px] text-[#6b7085] mt-0.5 truncate">{stage3SubLabel}</div>}
-              {toy.stage3_tax > 0 && <div className="text-[8px] text-[#6b7085]">税¥{toy.stage3_tax}</div>}
+              <div className="text-sm font-bold text-[#d0d4e8]">¥{toy.stage3_intl_ship || 0}</div>
+              {toy.stage3_tax > 0 && <div className="text-[8px] text-[#6b7085] mt-0.5">+税 ¥{toy.stage3_tax}</div>}
             </div>
           </div>
         )}
@@ -449,7 +479,7 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys }) {
                     </div>
                     <div>
                       <label className="text-[10px] text-[#6b7085] block mb-1">税费 (¥，13%)</label>
-                      <input className="input text-xs bg-black/20 cursor-default" type="number" value={((form.stage1_amount || 0) * 0.13).toFixed(2)} readOnly />
+                      <input className="input text-xs bg-black/20 cursor-default" type="number" value={computeStage3Tax(form.stage1_amount, toy.source).toFixed(2)} readOnly />
                     </div>
                   </div>
                 </div>
@@ -532,7 +562,7 @@ export default function Procurement() {
       const body = { ...form };
       if (body.status === 'preorder') {
         body.procurement_stage = null;
-        body.stage1_amount = 0;
+        body.stage1_amount = body.stage1_amount === '' || body.stage1_amount == null ? 0 : +body.stage1_amount;
       }
       await addToy(body);
       setShowForm(false);
@@ -585,12 +615,12 @@ export default function Procurement() {
                 <option value="domestic">国内</option>
               </select>
             </div>
-            {!isPreorderForm && (
-              <div>
-                <label className="text-[10px] text-[#6b7085] block mb-1">①买价 (¥)</label>
-                <input className="input text-xs" type="number" value={form.stage1_amount ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage1_amount: e.target.value === '' ? '' : +e.target.value })} />
-              </div>
-            )}
+            <div>
+              <label className="text-[10px] text-[#6b7085] block mb-1">
+                {isPreorderForm ? '已付金额 (¥)' : '①买价 (¥)'}
+              </label>
+              <input className="input text-xs" type="number" value={form.stage1_amount ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage1_amount: e.target.value === '' ? '' : +e.target.value })} />
+            </div>
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">
                 {isPreorderForm ? '上市/到货日' : '购入日期'}
