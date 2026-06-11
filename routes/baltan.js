@@ -6,6 +6,7 @@ const db = require('../db/database');
 const { refreshDatabase } = require('../utils/scrapeMonsters');
 const { downloadAll, UPLOAD_ROOT } = require('../utils/downloadMonsters');
 const { CHARACTER_NAME_ZH } = require('../utils/characterNames');
+const { enrichToy } = require('../utils/calcCost');
 const path = require('path');
 const fs = require('fs');
 
@@ -317,7 +318,7 @@ router.post('/favorites/toys', async (req, res) => {
 
     const placeholders = slugs.map(() => '?').join(',');
     const refs = await db.all(
-      `SELECT r.*, f.reference_price
+      `SELECT r.*, f.reference_price, f.linked_toy_id
        FROM baltan_reference r
        LEFT JOIN monster_favorites f ON r.character_slug = f.character_slug AND r.ref_id = f.ref_id
        WHERE r.character_slug IN (${placeholders})
@@ -332,6 +333,17 @@ router.post('/favorites/toys', async (req, res) => {
     for (const t of exactMatched) {
       if (!ownedByRef.has(t.baltan_ref_id)) ownedByRef.set(t.baltan_ref_id, []);
       ownedByRef.get(t.baltan_ref_id).push(t);
+    }
+
+    // 拉取已 linked 的 toy 详情（给"已拥有"视图用）
+    const linkedToyIds = favorites.map(f => f.linked_toy_id).filter(Boolean);
+    let linkedToyMap = new Map();
+    if (linkedToyIds.length) {
+      const linkedToys = await db.all(
+        `SELECT * FROM toys WHERE id IN (${linkedToyIds.map(() => '?').join(',')})`,
+        linkedToyIds
+      );
+      linkedToyMap = new Map(linkedToys.map(t => [t.id, enrichToy(t)]));
     }
 
     const items = refs.map(r => ({
@@ -349,6 +361,8 @@ router.post('/favorites/toys', async (req, res) => {
       character_name_zh: r.character_name_zh || CHARACTER_NAME_ZH[r.character_slug] || null,
       is_custom: r.is_custom || 0,
       reference_price: r.reference_price,
+      linked_toy_id: r.linked_toy_id || null,
+      linked_toy: r.linked_toy_id ? (linkedToyMap.get(r.linked_toy_id) || null) : null,
       owned: ownedByRef.get(r.ref_id) || [],
       fuzzy_count: 0,
     }));
@@ -357,6 +371,50 @@ router.post('/favorites/toys', async (req, res) => {
       .map(f => refMap.get(`${f.character_slug}::${f.ref_id}`))
       .filter(Boolean);
     res.json({ toys: ordered });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 把一个收藏单品关联到某条 toys 记录（设 favorite.linked_toy_id）
+router.post('/favorites/link-toy', async (req, res) => {
+  try {
+    const { character_slug, ref_id, toy_id } = req.body || {};
+    if (!character_slug || !ref_id || !toy_id) {
+      return res.status(400).json({ error: 'character_slug, ref_id, toy_id 都必填' });
+    }
+    const toy = await db.get('SELECT id FROM toys WHERE id = ?', [toy_id]);
+    if (!toy) return res.status(404).json({ error: 'toys 记录不存在' });
+
+    // 仅在收藏已存在时更新；不自动创建
+    const existing = await db.get(
+      'SELECT 1 FROM monster_favorites WHERE character_slug = ? AND ref_id = ?',
+      [character_slug, ref_id]
+    );
+    if (!existing) return res.status(404).json({ error: '该单品未被收藏，无法关联' });
+
+    await db.run(
+      'UPDATE monster_favorites SET linked_toy_id = ? WHERE character_slug = ? AND ref_id = ?',
+      [toy_id, character_slug, ref_id]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 解除关联（清空 favorite.linked_toy_id，不动 toys.baltan_ref_id）
+router.post('/favorites/unlink-toy', async (req, res) => {
+  try {
+    const { character_slug, ref_id } = req.body || {};
+    if (!character_slug || !ref_id) {
+      return res.status(400).json({ error: 'character_slug, ref_id 都必填' });
+    }
+    await db.run(
+      'UPDATE monster_favorites SET linked_toy_id = NULL WHERE character_slug = ? AND ref_id = ?',
+      [character_slug, ref_id]
+    );
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

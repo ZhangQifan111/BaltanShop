@@ -134,6 +134,9 @@ function migrate() {
     if (!favCols.has('reference_price')) {
       changes.push("ALTER TABLE monster_favorites ADD COLUMN reference_price REAL");
     }
+    if (!favCols.has('linked_toy_id')) {
+      changes.push("ALTER TABLE monster_favorites ADD COLUMN linked_toy_id INTEGER");
+    }
   }
   // 一次性迁移：旧 ref_id 格式纯数字 "01" (无 prefix) 改为 "{slug}-{nn}"，并补 series/slug/name
   if (tableNames.has('baltan_reference')) {

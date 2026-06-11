@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import useStore from '../stores/useStore';
 import ImageModal from '../components/ImageModal';
@@ -300,6 +301,118 @@ function EstimateForm({ item, onClose, onUseForAdd, onSaveAsReference }) {
         <div className="text-red-400 text-[10px]">{result.error}</div>
       )}
     </form>
+  );
+}
+
+const TOY_STATUS_LABELS = { stock: '在库', sold: '已发货', done: '已完成', procurement: '采购中', transit: '在途', preorder: '预购', returned: '已退' };
+
+function LinkPickerModal({ character_slug, ref_id, currentLinkedId, onLinked, onUnlinked, onClose }) {
+  const { toys, setToast } = useStore();
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(null);
+
+  const filtered = toys
+    .filter(t => {
+      if (!search.trim()) return true;
+      const q = search.toLowerCase();
+      return t.name?.toLowerCase().includes(q) || t.category?.toLowerCase().includes(q);
+    })
+    .slice(0, 100);
+
+  const handleLink = async (toy) => {
+    setLoading(toy.id);
+    try {
+      await api.post('/monster/favorites/link-toy', { character_slug, ref_id, toy_id: toy.id });
+      setToast('已关联 ' + toy.name);
+      onLinked();
+    } catch (e) {
+      setToast('关联失败: ' + e.message);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleUnlink = async () => {
+    setLoading('unlink');
+    try {
+      await api.post('/monster/favorites/unlink-toy', { character_slug, ref_id });
+      setToast('已解除关联');
+      onUnlinked();
+    } catch (e) {
+      setToast('解除失败: ' + e.message);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-[#1a1d27] rounded-xl border border-white/10 p-5 w-full max-w-md space-y-3 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-bold">关联已有库存</h3>
+          {currentLinkedId && (
+            <button
+              type="button"
+              onClick={handleUnlink}
+              disabled={loading === 'unlink'}
+              className="text-xs text-red-300 hover:underline disabled:opacity-50"
+            >
+              {loading === 'unlink' ? '解除中…' : '解除当前关联'}
+            </button>
+          )}
+        </div>
+        <p className="text-[10px] text-[#6b7085] -mt-1">挑一件已有的 toys 记录关联到这个 ref。选了之后该收藏会自动从「收藏」视图搬到「已拥有」视图。</p>
+
+        <input
+          className="input text-sm"
+          placeholder="🔍 搜索商品名称 / 品类…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          autoFocus
+        />
+
+        <div className="space-y-1 max-h-96 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <div className="text-xs text-[#6b7085] text-center py-6">没有匹配的商品</div>
+          ) : filtered.map(toy => {
+            const isCurrent = toy.id === currentLinkedId;
+            const status = TOY_STATUS_LABELS[toy.status] || toy.status;
+            return (
+              <button
+                key={toy.id}
+                type="button"
+                onClick={() => !isCurrent && handleLink(toy)}
+                disabled={isCurrent || loading !== null}
+                className={
+                  'w-full text-left px-3 py-2 rounded-lg border text-xs flex justify-between items-center gap-2 transition-colors ' +
+                  (isCurrent
+                    ? 'border-emerald-500/50 bg-emerald-500/10 cursor-default'
+                    : 'border-white/5 hover:bg-white/5 cursor-pointer')
+                }
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="truncate">{toy.name}</div>
+                  <div className="text-[10px] text-[#6b7085] mt-0.5">
+                    {status} · {toy.source === 'direct' ? '直购' : toy.source === 'proxy' ? '代购' : toy.source === 'domestic' ? '国内' : toy.source === 'secondhand' ? '二手' : toy.source} · ¥{(toy.total_cost || 0).toFixed(0)}
+                  </div>
+                </div>
+                {isCurrent ? (
+                  <span className="text-emerald-300 text-[10px] shrink-0">✓ 已关联</span>
+                ) : loading === toy.id ? (
+                  <span className="text-[10px] shrink-0">关联中…</span>
+                ) : (
+                  <span className="text-emerald-300 text-[10px] shrink-0">选择</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button type="button" className="btn-ghost flex-1" onClick={onClose}>完成</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -822,8 +935,22 @@ function ToyFormModal({ item, type, onClose, onAdded, addToy, initialAmount = ''
   );
 }
 
-function ToyCard({ it, onZoom, onOpenForm, addToy, isFav, onToggleFav, referencePrice, onEditReference, onClearReference }) {
+function ToyCard({ it, onZoom, onOpenForm, addToy, isFav, onToggleFav, referencePrice, onEditReference, onClearReference, onOpenLinkPicker }) {
   const hasOwned = it.owned && it.owned.length > 0;
+  const isLinked = !!it.linked_toy_id;
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!addMenuOpen) return;
+    const onClick = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setAddMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [addMenuOpen]);
 
   return (
     <div
@@ -874,6 +1001,12 @@ function ToyCard({ it, onZoom, onOpenForm, addToy, isFav, onToggleFav, reference
             ))}
           </div>
         )}
+        {isLinked && it.linked_toy && (
+          <div className="text-[10px] text-emerald-300 flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 w-fit">
+            <span>🏠</span>
+            <span className="truncate max-w-[120px]">{it.linked_toy.name}</span>
+          </div>
+        )}
         {referencePrice !== undefined ? (
           <div className="mt-auto">
             <ReferencePriceTag
@@ -903,12 +1036,111 @@ function ToyCard({ it, onZoom, onOpenForm, addToy, isFav, onToggleFav, reference
             🧮 反算
           </button>
         )}
+        <div className="relative flex-1" ref={menuRef}>
+          <button
+            type="button"
+            onClick={() => setAddMenuOpen(o => !o)}
+            className={
+              'w-full text-xs font-semibold py-1.5 rounded border ' +
+              (isLinked
+                ? 'bg-emerald-500/20 text-emerald-200 border-emerald-500/50'
+                : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/25')
+            }
+          >
+            {isLinked ? '🏠 已关联' : (hasOwned ? '➕ 再录' : '➕ 录入')} ▾
+          </button>
+          {addMenuOpen && (
+            <div className="absolute bottom-full left-0 right-0 mb-1 bg-[#1a1d27] border border-white/10 rounded-lg shadow-lg z-20 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => { setAddMenuOpen(false); onOpenForm('add'); }}
+                className="w-full text-left px-3 py-2 text-xs text-[#d0d4e8] hover:bg-white/5"
+              >
+                ➕ 新建库存
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAddMenuOpen(false); onOpenLinkPicker && onOpenLinkPicker(); }}
+                className="w-full text-left px-3 py-2 text-xs text-emerald-300 hover:bg-white/5 border-t border-white/5"
+              >
+                📦 关联已有库存
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OwnedCard({ it, onZoom, isFav, onToggleFav, onOpenLinkPicker, onUnlink }) {
+  const toy = it.linked_toy;
+  const status = TOY_STATUS_LABELS[toy.status] || toy.status;
+  const sourceLabel = toy.source === 'direct' ? '直购' : toy.source === 'proxy' ? '代购' : toy.source === 'domestic' ? '国内' : toy.source === 'secondhand' ? '二手' : toy.source;
+  const profit = toy.profit;
+  const profitTone = profit == null ? 'text-[#6b7085]' : profit >= 0 ? 'text-green-400' : 'text-red-400';
+  const [unlinking, setUnlinking] = useState(false);
+  const handleUnlink = async () => {
+    if (!confirm('确定解除关联？这只会断开 monster 收藏与该 toy 的关联，不会删除玩具本身。')) return;
+    setUnlinking(true);
+    try { await onUnlink(); }
+    finally { setUnlinking(false); }
+  };
+
+  return (
+    <div className="card overflow-hidden flex flex-col relative ring-2 ring-emerald-500/60 shadow-lg shadow-emerald-500/15">
+      {it.image_url ? (
+        <button type="button" onClick={onZoom} className="bg-black/30 cursor-zoom-in hover:opacity-80 transition-opacity">
+          <img src={it.image_url} alt={`${it.character_name_zh || it.character_slug} ${it.source}`}
+            className="block w-full h-auto object-contain" style={{ aspectRatio: '100 / 147' }} loading="lazy" />
+        </button>
+      ) : (
+        <div className="w-full bg-black/30 flex items-center justify-center text-[10px] text-[#6b7085]" style={{ aspectRatio: '100 / 147' }}>无图</div>
+      )}
+      <div className="absolute top-2 right-2 z-10">
+        <StarButton active={isFav} onClick={onToggleFav} />
+      </div>
+      <div className="p-2.5 flex-1 flex flex-col gap-1.5 min-w-0">
+        <div className="flex items-baseline gap-1.5 flex-wrap">
+          <span className="text-xs text-accent">#{it.ref_id.split('-').pop()}</span>
+          <span className="text-[10px] text-[#6b7085] truncate">{it.source}</span>
+        </div>
+
+        <div className="text-[10px] text-[#a0a4b8] bg-emerald-500/10 border border-emerald-500/30 rounded px-1.5 py-1 space-y-0.5">
+          <div className="font-medium text-emerald-300 truncate" title={toy.name}>{toy.name}</div>
+          <div className="flex flex-wrap gap-x-1.5 gap-y-0.5">
+            <span className="text-[#d0d4e8]">{status}</span>
+            <span>·</span>
+            <span>{sourceLabel}</span>
+          </div>
+          <div className="flex flex-wrap gap-x-1.5 gap-y-0.5 tabular-nums">
+            <span>成本 ¥{(toy.total_cost || 0).toFixed(0)}</span>
+            {toy.sell_price > 0 && <span>· 售价 ¥{toy.sell_price}</span>}
+            {profit != null && <span className={profitTone}>· 利润 {profit >= 0 ? '+' : ''}¥{profit.toFixed(0)}</span>}
+          </div>
+        </div>
+      </div>
+      <div className="px-2.5 pb-2.5 flex gap-1.5 border-t border-white/5 pt-1.5">
+        <Link
+          to="/warehouse"
+          className="flex-1 text-xs font-semibold py-1.5 rounded bg-accent/15 text-accent border border-accent/40 hover:bg-accent/25 text-center"
+        >
+          跳到仓库
+        </Link>
         <button
           type="button"
-          onClick={() => onOpenForm('add')}
+          onClick={onOpenLinkPicker}
           className="flex-1 text-xs font-semibold py-1.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25"
         >
-          {hasOwned ? '➕ 再录' : '➕ 录入'}
+          换关联
+        </button>
+        <button
+          type="button"
+          onClick={handleUnlink}
+          disabled={unlinking}
+          className="text-xs px-2 py-1.5 rounded text-red-300 hover:bg-red-500/10 disabled:opacity-50"
+        >
+          {unlinking ? '…' : '解除'}
         </button>
       </div>
     </div>
@@ -960,10 +1192,11 @@ export default function Monster() {
   const [loading, setLoading] = useState(false);
   const [formModal, setFormModal] = useState(null); // { type: 'add'|'estimate', item, initialAmount, variant: 'add'|'reference' } | null
 
-  const [viewMode, setViewMode] = useState('all'); // 'all' | 'favorites'
+  const [viewMode, setViewMode] = useState('all'); // 'all' | 'favorites' | 'owned'
   const [favorites, setFavorites] = useState([]); // [{character_slug, ref_id, note, created_at}]
   const [favToys, setFavToys] = useState([]);
   const [favLoading, setFavLoading] = useState(false);
+  const [linkPicker, setLinkPicker] = useState(null); // {character_slug, ref_id, linked_toy_id} | null
 
   const [showCustomToyForm, setShowCustomToyForm] = useState(false);
   const [showCustomCharForm, setShowCustomCharForm] = useState(false);
@@ -993,7 +1226,7 @@ export default function Monster() {
   }, []);
 
   useEffect(() => {
-    if (viewMode !== 'favorites') return;
+    if (viewMode === 'all') return;
     if (!favorites.length) { setFavToys([]); return; }
     (async () => {
       setFavLoading(true);
@@ -1009,7 +1242,7 @@ export default function Monster() {
   }, [viewMode, favorites]);
 
   const refreshFavToys = async () => {
-    if (viewMode !== 'favorites') return;
+    if (viewMode === 'all') return;
     try {
       const r = await api.post('/monster/favorites/toys', {});
       setFavToys(r.toys || []);
@@ -1017,7 +1250,7 @@ export default function Monster() {
   };
 
   useEffect(() => {
-    if (!currentSeries || viewMode === 'favorites') return;
+    if (!currentSeries || viewMode !== 'all') return;
     setCurrentCharacter(null);
     setToys([]);
     setFormModal(null);
@@ -1197,6 +1430,18 @@ export default function Monster() {
             >
               {viewMode === 'favorites' ? '★ 收藏视图' : `☆ 收藏 (${favCount})`}
             </button>
+            <button
+              type="button"
+              onClick={() => setViewMode(viewMode === 'owned' ? 'all' : 'owned')}
+              className={
+                'text-xs px-3 py-1.5 rounded-full transition-all font-medium ' +
+                (viewMode === 'owned'
+                  ? 'bg-emerald-500 text-[#0f1117] font-semibold shadow-md shadow-emerald-500/30'
+                  : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/20')
+              }
+            >
+              {viewMode === 'owned' ? '🏠 已拥有视图' : `🏠 已拥有 (${favToys.filter(t => t.linked_toy_id).length})`}
+            </button>
             {viewMode === 'all' && (
               <button
                 type="button"
@@ -1250,30 +1495,75 @@ export default function Monster() {
         </div>
       )}
 
-      {/* 玩具网格（收藏模式） */}
-      {viewMode === 'favorites' && currentCharacter === null && (
+      {/* 玩具网格（收藏/已拥有模式） */}
+      {(viewMode === 'favorites' || viewMode === 'owned') && currentCharacter === null && (
         favLoading ? (
           <div className="text-xs text-[#6b7085]">加载中…</div>
-        ) : favToys.length === 0 ? (
-          <div className="text-xs text-[#6b7085]">还没有收藏。进入角色页后，点玩具卡右上角的 <span className="text-yellow-400">☆</span> 收藏喜欢的单品。</div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {favToys.map(it => (
-              <ToyCard
-                key={it.ref_id}
-                it={it}
-                onZoom={() => setViewing(it)}
-                onOpenForm={(type) => openFormModal(type, it, '', type === 'estimate' ? 'reference' : 'add')}
-                addToy={addToy}
-                isFav={isToyFav(it.character_slug, it.ref_id)}
-                onToggleFav={() => toggleFav(it.character_slug, it.ref_id)}
-                referencePrice={it.reference_price}
-                onEditReference={() => openFormModal('estimate', it, '', 'reference')}
-                onClearReference={() => clearReferencePrice(it.character_slug, it.ref_id)}
-              />
-            ))}
-          </div>
-        )
+        ) : (() => {
+          const list = viewMode === 'favorites'
+            ? favToys.filter(t => !t.linked_toy_id)
+            : favToys.filter(t => t.linked_toy_id);
+          if (list.length === 0) {
+            return (
+              <div className="text-xs text-[#6b7085]">
+                {viewMode === 'favorites'
+                  ? '还没有收藏。进入角色页后，点玩具卡右上角的 ☆ 收藏喜欢的单品。'
+                  : '还没有已拥有的收藏。点收藏卡上的「➕ 录入 ▾ → 📦 关联已有库存」就能搬过来。'}
+              </div>
+            );
+          }
+          return (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              {list.map(it => {
+                if (viewMode === 'owned') {
+                  return (
+                    <OwnedCard
+                      key={it.ref_id}
+                      it={it}
+                      onZoom={() => setViewing(it)}
+                      isFav={isToyFav(it.character_slug, it.ref_id)}
+                      onToggleFav={() => toggleFav(it.character_slug, it.ref_id)}
+                      onOpenLinkPicker={() => setLinkPicker({ character_slug: it.character_slug, ref_id: it.ref_id, linked_toy_id: it.linked_toy_id })}
+                      onUnlink={async () => {
+                        try {
+                          await api.post('/monster/favorites/unlink-toy', { character_slug: it.character_slug, ref_id: it.ref_id });
+                          setToast('已解除关联');
+                          refreshFavToys();
+                        } catch (e) { setToast('解除失败: ' + e.message); }
+                      }}
+                    />
+                  );
+                }
+                return (
+                  <ToyCard
+                    key={it.ref_id}
+                    it={it}
+                    onZoom={() => setViewing(it)}
+                    onOpenForm={(type) => openFormModal(type, it, '', type === 'estimate' ? 'reference' : 'add')}
+                    onOpenLinkPicker={() => setLinkPicker({ character_slug: it.character_slug, ref_id: it.ref_id, linked_toy_id: it.linked_toy_id })}
+                    addToy={addToy}
+                    isFav={isToyFav(it.character_slug, it.ref_id)}
+                    onToggleFav={() => toggleFav(it.character_slug, it.ref_id)}
+                    referencePrice={it.reference_price}
+                    onEditReference={() => openFormModal('estimate', it, '', 'reference')}
+                    onClearReference={() => clearReferencePrice(it.character_slug, it.ref_id)}
+                  />
+                );
+              })}
+            </div>
+          );
+        })()
+      )}
+
+      {linkPicker && (
+        <LinkPickerModal
+          character_slug={linkPicker.character_slug}
+          ref_id={linkPicker.ref_id}
+          currentLinkedId={linkPicker.linked_toy_id}
+          onLinked={() => { setLinkPicker(null); refreshFavToys(); }}
+          onUnlinked={() => { setLinkPicker(null); refreshFavToys(); }}
+          onClose={() => setLinkPicker(null)}
+        />
       )}
 
       {/* 玩具列表（角色页） */}

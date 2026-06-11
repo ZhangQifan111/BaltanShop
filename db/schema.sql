@@ -210,6 +210,7 @@ CREATE TABLE IF NOT EXISTS monster_favorites (
   ref_id TEXT NOT NULL DEFAULT '',
   note TEXT,
   reference_price REAL,
+  linked_toy_id INTEGER,
   created_at TEXT DEFAULT (datetime('now')),
   PRIMARY KEY (character_slug, ref_id)
 );
