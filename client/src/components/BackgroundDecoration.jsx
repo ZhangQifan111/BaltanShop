@@ -28,7 +28,7 @@ export default function BackgroundDecoration() {
       <img
         src="/uploads/monster/alienbaltan/alienbaltan-01-toy.png"
         alt=""
-        className="absolute left-0 top-[60%] -translate-y-1/2 w-[300px] md:w-[420px] h-auto max-h-[70vh] opacity-35 pointer-events-none"
+        className="absolute left-0 top-[55%] -translate-y-1/2 w-[300px] md:w-[420px] h-auto max-h-[70vh] opacity-35 pointer-events-none"
         loading="lazy"
         decoding="async"
       />
@@ -55,7 +55,7 @@ export default function BackgroundDecoration() {
       <img
         src="/uploads/monster/ultraman/ultraman-01-toy.png"
         alt=""
-        className="absolute right-0 top-[60%] -translate-y-1/2 w-[300px] md:w-[420px] h-auto max-h-[70vh] opacity-35 -scale-x-100 pointer-events-none"
+        className="absolute right-0 top-[55%] -translate-y-1/2 w-[300px] md:w-[420px] h-auto max-h-[70vh] opacity-35 -scale-x-100 pointer-events-none"
         loading="lazy"
         decoding="async"
       />
