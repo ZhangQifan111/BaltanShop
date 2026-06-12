@@ -59,17 +59,26 @@ export default function BackgroundDecoration() {
         <line x1="50" y1="110" x2="50" y2="140" />
       </svg>
 
-      {/* 巴尔坦星人 - 直接用收藏里的实物图 */}
-      <img
-        src="/uploads/monster/alienbaltan/alienbaltan-01-big.png"
-        alt=""
+      {/* 巴尔坦星人 - 实物图，裁掉底部文字条 */}
+      <div
         className="absolute bottom-12 left-6 hidden md:block"
         style={{
           width: '14rem',
-          opacity: 0.22,
-          mixBlendMode: 'screen',
+          height: '16rem',
+          overflow: 'hidden',
         }}
-      />
+      >
+        <img
+          src="/uploads/monster/alienbaltan/alienbaltan-01-big.png"
+          alt=""
+          style={{
+            width: '100%',
+            display: 'block',
+            opacity: 0.22,
+            mixBlendMode: 'screen',
+          }}
+        />
+      </div>
     </div>
   );
 }
