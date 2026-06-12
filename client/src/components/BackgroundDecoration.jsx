@@ -28,8 +28,9 @@ export default function BackgroundDecoration() {
       <img
         src="/uploads/monster/alienbaltan/alienbaltan-01-toy.png"
         alt=""
-        className="absolute left-0 top-1/2 -translate-y-1/2 w-[480px] h-auto opacity-25"
-        style={{ mixBlendMode: 'screen' }}
+        className="absolute left-0 top-1/2 -translate-y-1/2 w-[480px] h-auto opacity-40 pointer-events-none"
+        loading="lazy"
+        decoding="async"
       />
 
       {/* Starfield */}
@@ -54,8 +55,9 @@ export default function BackgroundDecoration() {
       <img
         src="/uploads/monster/ultraman/ultraman-01-toy.png"
         alt=""
-        className="absolute right-0 top-1/2 -translate-y-1/2 w-[480px] h-auto opacity-25 -scale-x-100"
-        style={{ mixBlendMode: 'screen' }}
+        className="absolute right-0 top-1/2 -translate-y-1/2 w-[480px] h-auto opacity-40 -scale-x-100 pointer-events-none"
+        loading="lazy"
+        decoding="async"
       />
     </div>
   );
