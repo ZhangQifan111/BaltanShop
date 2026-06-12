@@ -24,11 +24,11 @@ export default function BackgroundDecoration() {
       className="fixed inset-0 pointer-events-none z-0 overflow-hidden"
       aria-hidden="true"
     >
-      {/* 巴尔坦星人 - 实物图（已裁掉文字条），左侧单张 */}
+      {/* 巴尔坦星人 - 实物图（已裁掉文字条），左下锚定，避免遮挡顶部 tab */}
       <img
         src="/uploads/monster/alienbaltan/alienbaltan-01-toy.png"
         alt=""
-        className="absolute left-0 top-1/2 -translate-y-1/2 w-[480px] h-auto opacity-40 pointer-events-none"
+        className="absolute left-0 bottom-0 w-[260px] md:w-[360px] h-auto opacity-35 pointer-events-none"
         loading="lazy"
         decoding="async"
       />
@@ -51,11 +51,11 @@ export default function BackgroundDecoration() {
         ))}
       </svg>
 
-      {/* 奥特曼 - 实物图（已裁掉文字条），右侧单张，镜像面向巴尔坦 */}
+      {/* 奥特曼 - 实物图（已裁掉文字条），右下锚定，镜像面向巴尔坦 */}
       <img
         src="/uploads/monster/ultraman/ultraman-01-toy.png"
         alt=""
-        className="absolute right-0 top-1/2 -translate-y-1/2 w-[480px] h-auto opacity-40 -scale-x-100 pointer-events-none"
+        className="absolute right-0 bottom-0 w-[260px] md:w-[360px] h-auto opacity-35 -scale-x-100 pointer-events-none"
         loading="lazy"
         decoding="async"
       />
