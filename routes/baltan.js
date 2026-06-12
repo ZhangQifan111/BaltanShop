@@ -455,6 +455,50 @@ router.post('/favorites/reference-price', async (req, res) => {
 
 // === 自定义玩具 / 角色 ===
 
+// 上传本地图片到 uploads/monster/<slug>/，返回本地路径
+// 用于 CustomCharacterForm / CustomToyForm 的"选本地文件"入口
+router.post('/upload-image', async (req, res) => {
+  try {
+    const { character_slug, data, ext } = req.body || {};
+    if (!character_slug) return res.status(400).json({ error: 'character_slug required' });
+    if (!data) return res.status(400).json({ error: 'data (base64) required' });
+
+    // data 可能是 data URL "data:image/png;base64,XXX"，也可能是裸 base64
+    let b64 = data;
+    let useExt = (ext || 'png').toLowerCase();
+    const dm = typeof data === 'string' && data.match(/^data:image\/(\w+);base64,(.+)$/);
+    if (dm) { useExt = dm[1].toLowerCase(); b64 = dm[2]; }
+
+    if (!['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(useExt === 'jpeg' ? 'jpg' : useExt)) {
+      return res.status(400).json({ error: `unsupported image type: ${useExt}` });
+    }
+    if (useExt === 'jpeg') useExt = 'jpg';
+
+    // 唯一文件名：slug-upload-<timestamp>-<rand>.<ext>
+    // 不预先分配 ref_id —— 表单提交时由 /custom-* 路由自己生成
+    const safeSlug = character_slug.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    const fname = `${safeSlug}-upload-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${useExt}`;
+
+    const dir = path.join(ROOT_LOCAL, safeSlug);
+    fs.mkdirSync(dir, { recursive: true });
+    const buf = Buffer.from(b64, 'base64');
+    if (buf.length === 0) return res.status(400).json({ error: 'empty file' });
+    const filePath = path.join(dir, fname);
+    fs.writeFileSync(filePath, buf);
+    // 同步一份 -big（和 custom-toy/character 行为一致）
+    fs.copyFileSync(filePath, path.join(dir, fname.replace(/\.(png|jpg|jpeg|webp|gif)$/, '-big.$1')));
+
+    res.json({
+      ok: true,
+      filename: fname,
+      image_url: `/uploads/monster/${safeSlug}/${fname}`,
+      image_big_url: `/uploads/monster/${safeSlug}/${fname.replace(/\.(png|jpg|jpeg|webp|gif)$/, '-big.$1')}`,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // 在已有角色下新增一个第三方玩具
 router.post('/custom-toy', async (req, res) => {
   try {

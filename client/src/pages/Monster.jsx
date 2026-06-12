@@ -683,6 +683,65 @@ function AddForm({ item, onClose, onAdded, addToy, initialAmount = '' }) {
   );
 }
 
+function ImageUploader({ value, onChange, characterSlug, setToast }) {
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!characterSlug || !characterSlug.trim()) {
+      setToast('请先填角色 slug 再上传图');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setToast('图片超过 5MB，请压缩后再传');
+      return;
+    }
+    setUploading(true);
+    try {
+      const b64 = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = () => reject(new Error('读取文件失败'));
+        r.readAsDataURL(file);
+      });
+      const r = await api.post('/monster/upload-image', {
+        character_slug: characterSlug.trim(),
+        data: b64,
+      });
+      onChange(r.image_url);
+      setToast('已上传到 ' + r.image_url.split('/').pop());
+    } catch (err) {
+      setToast('上传失败: ' + err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <input type="text" value={value || ''} onChange={e => onChange(e.target.value)}
+        placeholder="https://… 或点下方按钮传本地"
+        className="input text-xs w-full" />
+      <div className="flex items-center gap-2">
+        <label className={
+          'cursor-pointer text-[10px] px-2 py-1 rounded border ' +
+          (uploading
+            ? 'bg-white/5 text-[#6b7085] border-white/10 cursor-wait'
+            : 'bg-white/5 text-[#a0a4b8] hover:bg-white/10 border-white/10')
+        }>
+          {uploading ? '↑ 上传中…' : '📁 上传本地文件'}
+          <input type="file" accept="image/*" onChange={handleFile} disabled={uploading} className="hidden" />
+        </label>
+        {value && (
+          <img src={value} alt="" className="h-10 w-10 object-cover rounded border border-white/10 bg-black/30" />
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CustomToyForm({ defaultCharacter, onClose, onAdded, setToast }) {
   const [form, setForm] = useState({
     name: '',
@@ -740,10 +799,13 @@ function CustomToyForm({ defaultCharacter, onClose, onAdded, setToast }) {
         </div>
       </div>
       <div>
-        <span className="text-[9px] text-[#6b7085] block mb-0.5">图片 URL（http(s) 会被下载到本地）</span>
-        <input type="text" value={form.image_url} onChange={e => update('image_url', e.target.value)}
-          placeholder="https://…  （留空则无图）"
-          className="input text-xs w-full" />
+        <span className="text-[9px] text-[#6b7085] block mb-0.5">图片（贴 URL 或选本地文件）</span>
+        <ImageUploader
+          value={form.image_url}
+          onChange={v => update('image_url', v)}
+          characterSlug={defaultCharacter.character_slug}
+          setToast={setToast}
+        />
       </div>
       <div>
         <span className="text-[9px] text-[#6b7085] block mb-0.5">考据链接（可选）</span>
@@ -847,10 +909,13 @@ function CustomCharacterForm({ defaultSeries, onClose, onAdded, setToast }) {
             className="input text-xs w-full" />
         </div>
         <div>
-          <span className="text-[9px] text-[#6b7085] block mb-0.5">图片 URL</span>
-          <input type="text" value={form.image_url} onChange={e => update('image_url', e.target.value)}
-            placeholder="https://…（留空则无图）"
-            className="input text-xs w-full" />
+          <span className="text-[9px] text-[#6b7085] block mb-0.5">首个玩具图片（贴 URL 或选本地文件）</span>
+          <ImageUploader
+            value={form.image_url}
+            onChange={v => update('image_url', v)}
+            characterSlug={form.character_slug}
+            setToast={setToast}
+          />
         </div>
       </div>
       {err && <div className="text-red-400 text-[10px]">{err}</div>}
