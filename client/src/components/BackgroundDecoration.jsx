@@ -11,7 +11,7 @@ function makeStars(count, seed = 1337) {
       cx: rand() * 1000,
       cy: rand() * 1000,
       r: 0.3 + rand() * 1.2,
-      o: 0.15 + rand() * 0.55,
+      o: 0.25 + rand() * 0.6,
     });
   }
   return stars;
@@ -44,23 +44,24 @@ export default function BackgroundDecoration() {
 
       {/* 奥特曼变身胶囊 (Beta Capsule) - 右上 */}
       <svg
-        className="absolute -top-10 -right-20 w-72 text-accent opacity-[0.06] hidden md:block"
-        style={{ height: '32rem' }}
+        className="absolute -top-16 -right-24 w-80 text-accent opacity-[0.18] hidden md:block"
+        style={{ height: '36rem' }}
         viewBox="0 0 100 220"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2.5"
+        strokeWidth="3"
         strokeLinecap="round"
       >
         <rect x="25" y="20" width="50" height="180" rx="25" />
         <line x1="28" y1="45" x2="72" y2="45" />
         <line x1="28" y1="55" x2="72" y2="55" />
-        <circle cx="50" cy="80" r="4" fill="currentColor" stroke="none" />
+        <circle cx="50" cy="80" r="5" fill="currentColor" stroke="none" />
+        <line x1="50" y1="110" x2="50" y2="140" />
       </svg>
 
       {/* 巴尔坦钳子 (Baltan claws) - 底部中央偏上，避开底栏 */}
       <svg
-        className="absolute bottom-28 left-1/2 -translate-x-1/2 w-80 h-24 text-accent opacity-[0.07] hidden md:block"
+        className="absolute bottom-28 left-1/2 -translate-x-1/2 w-96 h-28 text-accent opacity-[0.18] hidden md:block"
         viewBox="0 0 200 60"
         fill="currentColor"
       >
@@ -69,10 +70,10 @@ export default function BackgroundDecoration() {
         {/* 右钳（镜像） */}
         <path d="M 192 38 Q 172 6 130 16 Q 110 24 116 40 Q 122 54 170 52 Q 192 48 192 38 Z" />
         {/* 中间身体 */}
-        <ellipse cx="100" cy="36" rx="10" ry="14" />
+        <ellipse cx="100" cy="36" rx="11" ry="16" />
         {/* 眼睛（掏空） */}
-        <circle cx="96" cy="33" r="1.6" fill="#0f1117" />
-        <circle cx="104" cy="33" r="1.6" fill="#0f1117" />
+        <circle cx="95" cy="32" r="2" fill="#0f1117" />
+        <circle cx="105" cy="32" r="2" fill="#0f1117" />
       </svg>
     </div>
   );
