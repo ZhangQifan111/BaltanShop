@@ -1201,6 +1201,7 @@ export default function Monster() {
   const [showCustomToyForm, setShowCustomToyForm] = useState(false);
   const [showCustomCharForm, setShowCustomCharForm] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState(null); // { kind: 'running'|'success'|'error', message: string }
 
   const setToast = useStore(s => s.setToast);
   const addToy = useStore(s => s.addToy);
@@ -1209,19 +1210,22 @@ export default function Monster() {
   const handleSync = async () => {
     if (syncing) return;
     setSyncing(true);
+    setSyncStatus({ kind: 'running', message: '正在爬取图鉴数据（约 1 分钟）...' });
     try {
-      setToast('正在爬取图鉴数据...');
       const r1 = await api.post('/baltan/refresh');
-      setToast(`数据已刷新 (${r1.count} 条)，正在检查图片...`);
+      setSyncStatus({ kind: 'running', message: `数据已刷新 (${r1.count} 条)，正在检查图片...` });
       const r2 = await api.post('/baltan/download-images');
       const errMsg = r2.errors?.length ? `，错误 ${r2.errors.length}` : '';
-      setToast(`同步完成：新下 ${r2.downloaded} 张，跳过 ${r2.skipped} 张${errMsg}`);
+      setSyncStatus({
+        kind: r2.errors?.length ? 'error' : 'success',
+        message: `同步完成：新下 ${r2.downloaded} 张，跳过 ${r2.skipped} 张${errMsg}`
+      });
       // 数据可能新增了角色/玩具，刷新视图
       await reloadSeries();
       if (currentSeries) await reloadCharacters();
       if (currentCharacter) await loadToys(currentCharacter);
     } catch (e) {
-      setToast('同步失败: ' + e.message);
+      setSyncStatus({ kind: 'error', message: '同步失败: ' + e.message });
     } finally {
       setSyncing(false);
     }
@@ -1512,6 +1516,35 @@ export default function Monster() {
               {syncing ? '⟳ 同步中…' : '🔄 同步图鉴'}
             </button>
           </div>
+          {syncStatus && (
+            <div
+              className={
+                'flex items-center gap-2 px-3 py-2 rounded-lg text-xs border ' +
+                (syncStatus.kind === 'running'
+                  ? 'bg-cyan-500/10 text-cyan-200 border-cyan-500/40'
+                  : syncStatus.kind === 'success'
+                  ? 'bg-emerald-500/10 text-emerald-200 border-emerald-500/40'
+                  : 'bg-red-500/10 text-red-200 border-red-500/40')
+              }
+            >
+              {syncStatus.kind === 'running' && (
+                <span className="inline-block w-3 h-3 border-2 border-cyan-300/30 border-t-cyan-300 rounded-full animate-spin" />
+              )}
+              {syncStatus.kind === 'success' && <span className="text-emerald-300">✓</span>}
+              {syncStatus.kind === 'error' && <span className="text-red-300">✗</span>}
+              <span className="flex-1">{syncStatus.message}</span>
+              {syncStatus.kind !== 'running' && (
+                <button
+                  type="button"
+                  onClick={() => setSyncStatus(null)}
+                  className="text-current/60 hover:text-current text-base leading-none px-1"
+                  title="关闭"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )}
           {showCustomCharForm && (
             <CustomCharacterForm
               defaultSeries={currentSeries}
