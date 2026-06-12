@@ -138,13 +138,14 @@ router.post('/refresh', async (req, res) => {
 
 router.post('/download-images', async (req, res) => {
   try {
-    const { series = null } = req.query;
+    const { series = null, force = '0' } = req.query;
+    const forceFlag = force === '1' || force === 'true';
     const where = series ? 'WHERE series = ?' : '';
     const params = series ? [series] : [];
     const refs = await db.all(`SELECT * FROM baltan_reference ${where} ORDER BY series, character_slug, ref_id`, params);
     const results = await downloadAll(refs, 8, (done, total) => {
       if (done % 20 === 0 || done === total) console.log(`[download] ${done}/${total}`);
-    });
+    }, { force: forceFlag });
     let updated = 0;
     // 不管 skipped 与否，都 UPDATE 一次 DB 路径（保证 DB 永远指向新本地路径）
     for (const ref of refs) {
@@ -162,12 +163,15 @@ router.post('/download-images', async (req, res) => {
     }
     const total = results.reduce((s, r) => s + (r.thumb?.size || 0) + (r.big?.size || 0), 0);
     const skipped = results.filter(r => r.thumb?.skipped).length;
+    const downloaded = results.filter(r => r.thumb && !r.thumb.skipped).length;
     const errorList = results.filter(r => r.errors.length).map(r => ({ ref_id: r.ref_id, errors: r.errors }));
     res.json({
       ok: true,
       count: results.length,
-      updated,
+      downloaded,
       skipped,
+      updated,
+      force: forceFlag,
       total_bytes: total,
       upload_dir: UPLOAD_ROOT,
       errors: errorList

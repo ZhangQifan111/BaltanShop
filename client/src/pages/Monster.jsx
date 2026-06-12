@@ -1200,9 +1200,32 @@ export default function Monster() {
 
   const [showCustomToyForm, setShowCustomToyForm] = useState(false);
   const [showCustomCharForm, setShowCustomCharForm] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const setToast = useStore(s => s.setToast);
   const addToy = useStore(s => s.addToy);
+
+  // 同步图鉴：先刷新 DB，再下载缺失/URL 变化的图
+  const handleSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      setToast('正在爬取图鉴数据...');
+      const r1 = await api.post('/baltan/refresh');
+      setToast(`数据已刷新 (${r1.count} 条)，正在检查图片...`);
+      const r2 = await api.post('/baltan/download-images');
+      const errMsg = r2.errors?.length ? `，错误 ${r2.errors.length}` : '';
+      setToast(`同步完成：新下 ${r2.downloaded} 张，跳过 ${r2.skipped} 张${errMsg}`);
+      // 数据可能新增了角色/玩具，刷新视图
+      await reloadSeries();
+      if (currentSeries) await reloadCharacters();
+      if (currentCharacter) await loadToys(currentCharacter);
+    } catch (e) {
+      setToast('同步失败: ' + e.message);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -1474,6 +1497,20 @@ export default function Monster() {
                 + 第三方角色
               </button>
             )}
+            <button
+              type="button"
+              onClick={handleSync}
+              disabled={syncing}
+              className={
+                'text-xs px-3 py-1.5 rounded-full transition-colors border ' +
+                (syncing
+                  ? 'bg-white/5 text-[#6b7085] border-white/10 cursor-wait'
+                  : 'bg-cyan-500/10 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/20')
+              }
+              title="从 ultrakaijyu.com 重新爬数据并下载缺失/变更的图片"
+            >
+              {syncing ? '⟳ 同步中…' : '🔄 同步图鉴'}
+            </button>
           </div>
           {showCustomCharForm && (
             <CustomCharacterForm

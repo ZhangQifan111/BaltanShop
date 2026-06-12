@@ -27,25 +27,48 @@ function downloadOnce(url, dest) {
   });
 }
 
-async function downloadOne(ref) {
+// 读旁路文件（记录图片下载自哪个 URL），用于判断是否需要重下
+function readSourceUrl(sidecarPath) {
+  try {
+    return fs.readFileSync(sidecarPath, 'utf8').trim();
+  } catch {
+    return null;
+  }
+}
+
+async function downloadOne(ref, opts = {}) {
+  const { force = false } = opts;
   if (!ref.character_slug) return { ref_id: ref.ref_id, skipped: true, errors: ['no character_slug'] };
   const dir = path.join(UPLOAD_ROOT, ref.character_slug);
   fs.mkdirSync(dir, { recursive: true });
   const thumbPath = path.join(dir, `${ref.ref_id}.png`);
+  const thumbSidecar = `${thumbPath}.url`;
   const bigPath = path.join(dir, `${ref.ref_id}-big.png`);
+  const bigSidecar = `${bigPath}.url`;
   const out = { ref_id: ref.ref_id, thumb: null, big: null, errors: [] };
 
-  // thumb 和 big 并行下载
+  // 单图决策：file 存在 && sidecar 存在 && URL 一致 → 跳过（最新）
+  //          file 存在 && sidecar 不存在 → 跳过（legacy，不打扰）
+  //          其他 → 下载并写 sidecar
+  async function fetchIfNeeded(filePath, sidecarPath, url) {
+    const fileExists = fs.existsSync(filePath) && fs.statSync(filePath).size > 0;
+    const sidecarUrl = readSourceUrl(sidecarPath);
+    const isLegacy = fileExists && sidecarUrl === null;
+    const isUpToDate = fileExists && sidecarUrl !== null && sidecarUrl === url;
+
+    if (!force && (isUpToDate || isLegacy)) {
+      return { path: filePath, size: fs.statSync(filePath).size, skipped: true };
+    }
+    const size = await downloadOnce(url, filePath);
+    fs.writeFileSync(sidecarPath, url);
+    return { path: filePath, size, skipped: false };
+  }
+
   const tasks = [];
   if (ref.image_url) {
     tasks.push((async () => {
       try {
-        if (fs.existsSync(thumbPath) && fs.statSync(thumbPath).size > 0) {
-          out.thumb = { path: thumbPath, size: fs.statSync(thumbPath).size, skipped: true };
-        } else {
-          const size = await downloadOnce(ref.image_url, thumbPath);
-          out.thumb = { path: thumbPath, size, skipped: false };
-        }
+        out.thumb = await fetchIfNeeded(thumbPath, thumbSidecar, ref.image_url);
       } catch (e) {
         out.errors.push(`thumb: ${e.message}`);
       }
@@ -54,12 +77,7 @@ async function downloadOne(ref) {
   if (ref.image_big_url && ref.image_big_url !== ref.image_url) {
     tasks.push((async () => {
       try {
-        if (fs.existsSync(bigPath) && fs.statSync(bigPath).size > 0) {
-          out.big = { path: bigPath, size: fs.statSync(bigPath).size, skipped: true };
-        } else {
-          const size = await downloadOnce(ref.image_big_url, bigPath);
-          out.big = { path: bigPath, size, skipped: false };
-        }
+        out.big = await fetchIfNeeded(bigPath, bigSidecar, ref.image_big_url);
       } catch (e) {
         out.errors.push(`big: ${e.message}`);
       }
@@ -69,14 +87,14 @@ async function downloadOne(ref) {
   return out;
 }
 
-async function downloadAll(refs, concurrency = 8, onProgress = () => {}) {
+async function downloadAll(refs, concurrency = 8, onProgress = () => {}, opts = {}) {
   const results = [];
   let done = 0;
   const queue = refs.slice();
   async function worker() {
     while (queue.length) {
       const ref = queue.shift();
-      const r = await downloadOne(ref);
+      const r = await downloadOne(ref, opts);
       results.push(r);
       done += 1;
       if (done % 10 === 0 || done === refs.length) onProgress(done, refs.length);
