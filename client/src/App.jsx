@@ -9,6 +9,7 @@ import Estimate from './pages/Estimate';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import Monster from './pages/Monster';
+import BackgroundDecoration from './components/BackgroundDecoration';
 
 const NAV = [
   { path: '/', label: '总览', icon: '🏠' },
@@ -25,7 +26,8 @@ function Layout({ children }) {
   const { toast } = useStore();
 
   return (
-    <div className="min-h-screen bg-bg text-[#d0d4e8] font-mono">
+    <div className="min-h-screen bg-bg text-[#d0d4e8] font-mono relative">
+      <BackgroundDecoration />
       {/* Header */}
       <header className="sticky top-0 z-50 bg-bg/95 backdrop-blur border-b border-white/[0.06] px-4 py-3">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
