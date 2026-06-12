@@ -1000,11 +1000,27 @@ function ToyFormModal({ item, type, onClose, onAdded, addToy, initialAmount = ''
   );
 }
 
-function ToyCard({ it, onZoom, onOpenForm, addToy, isFav, onToggleFav, referencePrice, onEditReference, onClearReference, onOpenLinkPicker }) {
+function ToyCard({ it, onZoom, onOpenForm, addToy, isFav, onToggleFav, referencePrice, onEditReference, onClearReference, onOpenLinkPicker, onDelete, setToast }) {
   const hasOwned = it.owned && it.owned.length > 0;
   const isLinked = !!it.linked_toy_id;
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const menuRef = useRef(null);
+
+  const handleDelete = async () => {
+    if (isLinked) {
+      setToast('该玩具已关联库存，请先解除关联再删');
+      return;
+    }
+    if (!confirm(`确定删除自定义玩具「${it.source || it.ref_id}」？此操作只删图鉴条目，不会动到已有库存。`)) return;
+    setDeleting(true);
+    try {
+      await onDelete();
+    } catch (e) {
+      setToast('删除失败: ' + e.message);
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     if (!addMenuOpen) return;
@@ -1130,6 +1146,16 @@ function ToyCard({ it, onZoom, onOpenForm, addToy, isFav, onToggleFav, reference
               >
                 📦 关联已有库存
               </button>
+              {it.is_custom ? (
+                <button
+                  type="button"
+                  onClick={() => { setAddMenuOpen(false); handleDelete(); }}
+                  disabled={deleting}
+                  className="w-full text-left px-3 py-2 text-xs text-red-300 hover:bg-red-500/10 border-t border-white/5 disabled:opacity-50"
+                >
+                  {deleting ? '删除中…' : '🗑️ 删除自定义玩具'}
+                </button>
+              ) : null}
             </div>
           )}
         </div>
@@ -1433,6 +1459,13 @@ export default function Monster() {
     }
   };
 
+  const handleDeleteCustomToy = async (character_slug, ref_id) => {
+    await api.del(`/baltan/custom-toy?character_slug=${encodeURIComponent(character_slug)}&ref_id=${encodeURIComponent(ref_id)}`);
+    setToast('已删除自定义玩具');
+    // 局部移除：避免重新拉接口（同时会丢掉 reference_price 等本地点状态）
+    setToys(prev => prev.filter(t => !(t.character_slug === character_slug && t.ref_id === ref_id)));
+  };
+
   // 角色卡仅作"该角色下有单品已收藏"的视觉提示（黄色 ring），不参与 toggle
   const isCharFav = (slug) => favorites.some(f => f.character_slug === slug);
   const isToyFav = (slug, refId) => favorites.some(f => f.character_slug === slug && f.ref_id === refId);
@@ -1699,6 +1732,8 @@ export default function Monster() {
                     referencePrice={it.reference_price}
                     onEditReference={() => openFormModal('estimate', it, '', 'reference')}
                     onClearReference={() => clearReferencePrice(it.character_slug, it.ref_id)}
+                    onDelete={() => handleDeleteCustomToy(it.character_slug, it.ref_id)}
+                    setToast={setToast}
                   />
                 );
               })}
@@ -1756,6 +1791,8 @@ export default function Monster() {
                   addToy={addToy}
                   isFav={isToyFav(it.character_slug, it.ref_id)}
                   onToggleFav={() => toggleFav(it.character_slug, it.ref_id)}
+                  onDelete={() => handleDeleteCustomToy(it.character_slug, it.ref_id)}
+                  setToast={setToast}
                 />
               ))}
             </div>

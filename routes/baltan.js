@@ -550,6 +550,50 @@ router.post('/custom-toy', async (req, res) => {
   }
 });
 
+// 删除一个第三方玩具（仅删 ref，不动库存）
+router.delete('/custom-toy', async (req, res) => {
+  try {
+    const { character_slug, ref_id } = req.query;
+    if (!character_slug || !ref_id) {
+      return res.status(400).json({ error: 'character_slug and ref_id required' });
+    }
+    const row = db.getSync(
+      'SELECT ref_id, character_slug, is_custom, image_url, image_big_url FROM baltan_reference WHERE character_slug = ? AND ref_id = ?',
+      [character_slug, ref_id]
+    );
+    if (!row) return res.status(404).json({ error: 'ref 不存在' });
+    if (row.is_custom !== 1) {
+      return res.status(403).json({ error: '只能删除自定义（第三方）玩具' });
+    }
+    // 关联库存检查：toys.baltan_ref_id 命中即拒绝
+    const linked = db.allSync(
+      'SELECT id, name FROM toys WHERE baltan_ref_id = ?',
+      [ref_id]
+    );
+    if (linked.length) {
+      return res.status(409).json({
+        error: '该玩具已关联库存，请先解除关联',
+        linked_toys: linked,
+      });
+    }
+    db.runSync(
+      'DELETE FROM baltan_reference WHERE character_slug = ? AND ref_id = ?',
+      [character_slug, ref_id]
+    );
+    // 顺手清掉磁盘上的图（仅删本 ref 的 thumb/big，目录里其他文件不动）
+    for (const url of [row.image_url, row.image_big_url]) {
+      if (!url || url.startsWith('http')) continue;
+      const local = path.join(ROOT_LOCAL, url.replace(/^\/uploads\/monster\//, ''));
+      const sidecar = `${local}.url`;
+      try { fs.unlinkSync(local); } catch {}
+      try { fs.unlinkSync(sidecar); } catch {}
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // 新增一个独立的第三方角色（自动创建第一个玩具）
 router.post('/custom-character', async (req, res) => {
   try {
