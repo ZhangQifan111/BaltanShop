@@ -24,11 +24,25 @@ export default function BackgroundDecoration() {
       className="fixed inset-0 pointer-events-none z-0 overflow-hidden"
       aria-hidden="true"
     >
-      {/* 巴尔坦星人 - 实物图（已裁掉文字条），左侧偏下居中，留顶给 tab */}
+      {/* 巴尔坦星人 - 实物图（已裁掉文字条），左侧偏下居中。
+          mask-image: luminance 把图本身的亮度当 alpha——亮处（玩具）保留，
+          暗处（黑底）变透明，不再覆盖背后内容。 */}
       <img
         src="/uploads/monster/alienbaltan/alienbaltan-01-toy.png"
         alt=""
-        className="absolute left-0 top-[45%] -translate-y-1/2 w-[300px] md:w-[420px] h-auto max-h-[70vh] opacity-35 pointer-events-none"
+        className="absolute left-0 top-[45%] -translate-y-1/2 w-[300px] md:w-[420px] h-auto opacity-100 pointer-events-none"
+        style={{
+          WebkitMaskImage: 'url(/uploads/monster/alienbaltan/alienbaltan-01-toy.png)',
+          maskImage: 'url(/uploads/monster/alienbaltan/alienbaltan-01-toy.png)',
+          WebkitMaskMode: 'luminance',
+          maskMode: 'luminance',
+          WebkitMaskSize: 'contain',
+          maskSize: 'contain',
+          WebkitMaskRepeat: 'no-repeat',
+          maskRepeat: 'no-repeat',
+          WebkitMaskPosition: 'center',
+          maskPosition: 'center',
+        }}
         loading="lazy"
         decoding="async"
       />
@@ -51,11 +65,24 @@ export default function BackgroundDecoration() {
         ))}
       </svg>
 
-      {/* 奥特曼 - 实物图（已裁掉文字条），右侧偏下居中，留顶给 tab，镜像面向巴尔坦 */}
+      {/* 奥特曼 - 实物图（已裁掉文字条），右侧偏下居中。
+          同样 luminance mask + 镜像。 */}
       <img
         src="/uploads/monster/ultraman/ultraman-01-toy.png"
         alt=""
-        className="absolute right-0 top-[45%] -translate-y-1/2 w-[300px] md:w-[420px] h-auto max-h-[70vh] opacity-35 -scale-x-100 pointer-events-none"
+        className="absolute right-0 top-[45%] -translate-y-1/2 w-[300px] md:w-[420px] h-auto opacity-100 -scale-x-100 pointer-events-none"
+        style={{
+          WebkitMaskImage: 'url(/uploads/monster/ultraman/ultraman-01-toy.png)',
+          maskImage: 'url(/uploads/monster/ultraman/ultraman-01-toy.png)',
+          WebkitMaskMode: 'luminance',
+          maskMode: 'luminance',
+          WebkitMaskSize: 'contain',
+          maskSize: 'contain',
+          WebkitMaskRepeat: 'no-repeat',
+          maskRepeat: 'no-repeat',
+          WebkitMaskPosition: 'center',
+          maskPosition: 'center',
+        }}
         loading="lazy"
         decoding="async"
       />
