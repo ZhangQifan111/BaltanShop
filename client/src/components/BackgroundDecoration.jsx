@@ -61,62 +61,72 @@ export default function BackgroundDecoration() {
 
       {/* 巴尔坦星人 (Baltan character) - 左下角，跟右上胶囊对角呼应 */}
       <svg
-        className="absolute bottom-24 left-6 text-accent opacity-[0.2] hidden md:block"
-        style={{ width: '16rem', height: '22rem' }}
+        className="absolute bottom-12 left-6 text-accent opacity-[0.22] hidden md:block"
+        style={{ width: '15rem', height: '20rem' }}
         viewBox="0 0 240 320"
         fill="currentColor"
       >
-        {/* 触角（分叉向外，带圆头） */}
-        <g stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none">
-          <line x1="102" y1="20" x2="95" y2="62" />
-          <line x1="138" y1="20" x2="145" y2="62" />
-        </g>
-        <circle cx="102" cy="18" r="3" />
-        <circle cx="138" cy="18" r="3" />
+        {/* 头顶 V 形尖角冠 */}
+        <path d="M 108 0 L 120 20 L 132 0 L 132 30 L 108 30 Z" />
 
-        {/* 头部（甲壳：顶部宽 + 左右两角） */}
-        <path d="M 60 75 Q 60 58 78 54 L 162 54 Q 180 58 180 75 L 178 100 Q 170 110 120 110 Q 70 110 62 100 Z" />
+        {/* 头部（甲壳形） */}
+        <path d="M 85 38 L 155 38 L 160 58 Q 164 80 152 90 L 88 90 Q 76 80 80 58 Z" />
 
-        {/* 眼睛（黑点） */}
-        <circle cx="98" cy="80" r="5" fill="#0f1117" />
-        <circle cx="142" cy="80" r="5" fill="#0f1117" />
+        {/* 大圆眼睛 */}
+        <circle cx="103" cy="64" r="7" fill="#0f1117" />
+        <circle cx="137" cy="64" r="7" fill="#0f1117" />
 
-        {/* 身体（楔形：上宽下窄） */}
-        <path d="M 72 122 L 168 122 L 152 228 Q 120 236 88 228 Z" />
+        {/* 颈部 */}
+        <rect x="113" y="90" width="14" height="8" />
 
-        {/* 左钳（C 形，开口朝向身体，分上下颚） */}
-        <path d="M 72 142
-                 C 50 128, 18 132, 14 162
-                 C 12 196, 42 202, 66 192
-                 C 72 187, 76 178, 72 170
-                 L 60 170
-                 C 64 184, 50 186, 42 178
-                 C 32 168, 36 152, 54 146
-                 L 72 142 Z" />
+        {/* 肩膀（较宽） */}
+        <path d="M 62 104 Q 62 96 80 96 L 160 96 Q 178 96 178 104 L 170 124 L 70 124 Z" />
 
-        {/* 右钳（镜像） */}
-        <path d="M 168 142
-                 C 190 128, 222 132, 226 162
-                 C 228 196, 198 202, 174 192
-                 C 168 187, 164 178, 168 170
-                 L 180 170
-                 C 176 184, 190 186, 198 178
-                 C 208 168, 204 152, 186 146
-                 L 168 142 Z" />
+        {/* 躯干（上宽下窄的肌肉型） */}
+        <path d="M 70 124 L 170 124 L 162 212 L 78 212 Z" />
 
-        {/* 钳子 V 型分叉（上下颚交汇处的尖牙） */}
-        <path d="M 52 160 L 66 170 L 52 180" stroke="#0f1117" strokeWidth="2" fill="none" strokeLinecap="round" />
-        <path d="M 188 160 L 174 170 L 188 180" stroke="#0f1117" strokeWidth="2" fill="none" strokeLinecap="round" />
+        {/* 躯干节段线（甲虫壳质感） */}
+        <line x1="85" y1="148" x2="155" y2="148" stroke="#0f1117" strokeWidth="1.5" />
+        <line x1="82" y1="172" x2="158" y2="172" stroke="#0f1117" strokeWidth="1.5" />
+        <line x1="80" y1="196" x2="160" y2="196" stroke="#0f1117" strokeWidth="1.5" />
 
-        {/* 多条细足 */}
-        <g stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none">
-          <line x1="92" y1="232" x2="86" y2="290" />
-          <line x1="104" y1="236" x2="100" y2="295" />
-          <line x1="116" y1="238" x2="114" y2="300" />
-          <line x1="124" y1="238" x2="126" y2="300" />
-          <line x1="136" y1="236" x2="140" y2="295" />
-          <line x1="148" y1="232" x2="154" y2="290" />
-        </g>
+        {/* 左臂（粗曲线） */}
+        <path d="M 66 120 Q 38 145 22 190"
+          stroke="currentColor" strokeWidth="12" fill="none" strokeLinecap="round" />
+
+        {/* 右臂（镜像） */}
+        <path d="M 174 120 Q 202 145 218 190"
+          stroke="currentColor" strokeWidth="12" fill="none" strokeLinecap="round" />
+
+        {/* 左蟹钳（C 形，分上下颚） */}
+        <path d="M 22 185
+                 C 6 178, -2 195, 4 210
+                 C 10 224, 26 226, 36 214
+                 C 42 207, 42 200, 38 196
+                 L 28 196
+                 C 31 203, 23 206, 16 200
+                 C 10 195, 14 182, 22 178 Z" />
+
+        {/* 右蟹钳（镜像） */}
+        <path d="M 218 185
+                 C 234 178, 242 195, 236 210
+                 C 230 224, 214 226, 204 214
+                 C 198 207, 198 200, 202 196
+                 L 212 196
+                 C 209 203, 217 206, 224 200
+                 C 230 195, 226 182, 218 178 Z" />
+
+        {/* 髋部（轻微收窄） */}
+        <path d="M 78 212 L 162 212 L 156 234 L 84 234 Z" />
+
+        {/* 左腿 */}
+        <path d="M 90 234 L 112 234 L 110 304 L 92 304 Z" />
+        {/* 右腿 */}
+        <path d="M 128 234 L 150 234 L 148 304 L 130 304 Z" />
+
+        {/* 脚 */}
+        <ellipse cx="101" cy="310" rx="14" ry="5" />
+        <ellipse cx="139" cy="310" rx="14" ry="5" />
       </svg>
     </div>
   );
