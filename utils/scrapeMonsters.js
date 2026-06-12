@@ -91,10 +91,10 @@ function parseCharacterPage(html, series, characterSlug) {
     // 如果 title 提取失败, fallback 到玩具标签去尾数字 (旧逻辑)
     if (!characterNameJa) characterNameJa = nameWithNum.replace(/\d+\s*$/, '').trim();
 
-    // 缩略图: <img src="../_src/.../thumb.png" width="100" height="147">
-    const thumbMatch = td.match(/<img\s+src="(\.\.\/_src\/[^"]+\.png[^"]*)"/);
-    // 大图: <a href="../_src/.../big.png" class="bindzoom">
-    const bigMatch = td.match(/<a\s+href="(\.\.\/_src\/[^"]+\.png[^"]*)"/);
+    // 缩略图: <img src="../_src/.../thumb.{png|jpg}" width="100" height="147">
+    const thumbMatch = td.match(/<img\s+src="(\.\.\/_src\/[^"]+\.(?:png|jpg)[^"]*)"/);
+    // 大图: <a href="../_src/.../big.{png|jpg}" class="bindzoom">
+    const bigMatch = td.match(/<a\s+href="(\.\.\/_src\/[^"]+\.(?:png|jpg)[^"]*)"/);
     const imageUrl = thumbMatch ? `${BASE}${thumbMatch[1].replace(/^\.\.\//, '/')}` : null;
     const imageBigUrl = bigMatch ? `${BASE}${bigMatch[1].replace(/^\.\.\//, '/')}` : null;
 
