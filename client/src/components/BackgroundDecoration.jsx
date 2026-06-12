@@ -24,18 +24,12 @@ export default function BackgroundDecoration() {
       className="fixed inset-0 pointer-events-none z-0 overflow-hidden"
       aria-hidden="true"
     >
-      {/* 巴尔坦星人 - 实物图（已裁掉文字条），全屏平铺 */}
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundImage:
-            'url(/uploads/monster/alienbaltan/alienbaltan-01-toy.png)',
-          backgroundRepeat: 'repeat',
-          backgroundSize: '500px auto',
-          backgroundPosition: '0 0',
-          opacity: 0.15,
-          mixBlendMode: 'screen',
-        }}
+      {/* 巴尔坦星人 - 实物图（已裁掉文字条），左侧单张 */}
+      <img
+        src="/uploads/monster/alienbaltan/alienbaltan-01-toy.png"
+        alt=""
+        className="absolute left-0 top-1/2 -translate-y-1/2 w-[480px] h-auto opacity-25"
+        style={{ mixBlendMode: 'screen' }}
       />
 
       {/* Starfield */}
@@ -56,22 +50,13 @@ export default function BackgroundDecoration() {
         ))}
       </svg>
 
-      {/* 奥特曼变身胶囊 (Beta Capsule) - 右上 */}
-      <svg
-        className="absolute -top-16 -right-24 w-80 text-accent opacity-[0.18] hidden md:block"
-        style={{ height: '36rem' }}
-        viewBox="0 0 100 220"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-      >
-        <rect x="25" y="20" width="50" height="180" rx="25" />
-        <line x1="28" y1="45" x2="72" y2="45" />
-        <line x1="28" y1="55" x2="72" y2="55" />
-        <circle cx="50" cy="80" r="5" fill="currentColor" stroke="none" />
-        <line x1="50" y1="110" x2="50" y2="140" />
-      </svg>
+      {/* 奥特曼 - 实物图（已裁掉文字条），右侧单张，镜像面向巴尔坦 */}
+      <img
+        src="/uploads/monster/ultraman/ultraman-01-toy.png"
+        alt=""
+        className="absolute right-0 top-1/2 -translate-y-1/2 w-[480px] h-auto opacity-25 -scale-x-100"
+        style={{ mixBlendMode: 'screen' }}
+      />
     </div>
   );
 }
