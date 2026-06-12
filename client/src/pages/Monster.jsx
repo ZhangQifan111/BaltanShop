@@ -1132,6 +1132,16 @@ function ToyCard({ it, onZoom, onOpenForm, addToy, isFav, onToggleFav, reference
           </button>
           {addMenuOpen && (
             <div className="absolute bottom-full left-0 right-0 mb-1 bg-[#1a1d27] border border-white/10 rounded-lg shadow-lg z-20 overflow-hidden">
+              {it.is_custom ? (
+                <button
+                  type="button"
+                  onClick={() => { setAddMenuOpen(false); handleDelete(); }}
+                  disabled={deleting}
+                  className="w-full text-left px-3 py-2 text-xs text-red-300 bg-red-500/10 hover:bg-red-500/20 border-b border-red-500/30 disabled:opacity-50"
+                >
+                  {deleting ? '删除中…' : '🗑️ 删除此自定义玩具'}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => { setAddMenuOpen(false); onOpenForm('add'); }}
@@ -1146,16 +1156,6 @@ function ToyCard({ it, onZoom, onOpenForm, addToy, isFav, onToggleFav, reference
               >
                 📦 关联已有库存
               </button>
-              {it.is_custom ? (
-                <button
-                  type="button"
-                  onClick={() => { setAddMenuOpen(false); handleDelete(); }}
-                  disabled={deleting}
-                  className="w-full text-left px-3 py-2 text-xs text-red-300 hover:bg-red-500/10 border-t border-white/5 disabled:opacity-50"
-                >
-                  {deleting ? '删除中…' : '🗑️ 删除自定义玩具'}
-                </button>
-              ) : null}
             </div>
           )}
         </div>
