@@ -24,6 +24,20 @@ export default function BackgroundDecoration() {
       className="fixed inset-0 pointer-events-none z-0 overflow-hidden"
       aria-hidden="true"
     >
+      {/* 巴尔坦星人 - 实物图（已裁掉文字条），全屏平铺 */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage:
+            'url(/uploads/monster/alienbaltan/alienbaltan-01-toy.png)',
+          backgroundRepeat: 'repeat',
+          backgroundSize: '500px auto',
+          backgroundPosition: '0 0',
+          opacity: 0.15,
+          mixBlendMode: 'screen',
+        }}
+      />
+
       {/* Starfield */}
       <svg
         className="absolute inset-0 w-full h-full"
@@ -58,27 +72,6 @@ export default function BackgroundDecoration() {
         <circle cx="50" cy="80" r="5" fill="currentColor" stroke="none" />
         <line x1="50" y1="110" x2="50" y2="140" />
       </svg>
-
-      {/* 巴尔坦星人 - 实物图，裁掉底部文字条 */}
-      <div
-        className="absolute bottom-12 left-6 hidden md:block"
-        style={{
-          width: '14rem',
-          height: '16rem',
-          overflow: 'hidden',
-        }}
-      >
-        <img
-          src="/uploads/monster/alienbaltan/alienbaltan-01-big.png"
-          alt=""
-          style={{
-            width: '100%',
-            display: 'block',
-            opacity: 0.22,
-            mixBlendMode: 'screen',
-          }}
-        />
-      </div>
     </div>
   );
 }
