@@ -1287,7 +1287,8 @@ export default function Monster() {
   const [favorites, setFavorites] = useState([]); // [{character_slug, ref_id, note, created_at}]
   const [favToys, setFavToys] = useState([]);
   const [favLoading, setFavLoading] = useState(false);
-  const [linkPicker, setLinkPicker] = useState(null); // {character_slug, ref_id, linked_toy_id} | null
+  const [linkPicker, setLinkPicker] = useState(null);
+  const [deletingChar, setDeletingChar] = useState(false);
 
   const [showCustomToyForm, setShowCustomToyForm] = useState(false);
   const [showCustomCharForm, setShowCustomCharForm] = useState(false);
@@ -1471,6 +1472,37 @@ export default function Monster() {
         const r = await api.get(`/baltan/characters?series=${encodeURIComponent(currentSeries)}`);
         setCharacters(r.characters || []);
       } catch {}
+    }
+  };
+
+  const handleDeleteCustomCharacter = async () => {
+    if (!currentCharacter) return;
+    if (currentCharacter.has_custom !== 1) {
+      setToast('该系列含抓取数据，不能整系列删除');
+      return;
+    }
+    const name = currentCharacter.character_name_zh || currentCharacter.character_name_ja || currentCharacter.character_slug;
+    if (!confirm(`确定删除整个第三方系列「${name}」？该角色下所有玩具条目（${toys.length} 件）会一并删除。如有关联库存需先解除。`)) return;
+    setDeletingChar(true);
+    try {
+      const r = await api.del(`/baltan/custom-character?character_slug=${encodeURIComponent(currentCharacter.character_slug)}`);
+      setToast(`已删除系列「${name}」(${r.deleted_refs} 件)`);
+      // 清状态：返回外层
+      setCurrentCharacter(null);
+      setToys([]);
+      setShowCustomToyForm(false);
+      setShowCustomCharForm(false);
+      // 重拉外层角色列表
+      if (currentSeries) {
+        try {
+          const cr = await api.get(`/baltan/characters?series=${encodeURIComponent(currentSeries)}`);
+          setCharacters(cr.characters || []);
+        } catch {}
+      }
+    } catch (e) {
+      setToast('删除失败: ' + e.message);
+    } finally {
+      setDeletingChar(false);
     }
   };
 
@@ -1768,13 +1800,25 @@ export default function Monster() {
             <div className="text-[10px] text-[#6b7085]">
               反算购入价 · 录入库存
             </div>
-            <button
-              type="button"
-              onClick={() => setShowCustomToyForm(o => !o)}
-              className="text-xs px-3 py-1.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25"
-            >
-              {showCustomToyForm ? '收起' : '+ 第三方玩具'}
-            </button>
+            <div className="flex items-center gap-2">
+              {currentCharacter.has_custom ? (
+                <button
+                  type="button"
+                  onClick={handleDeleteCustomCharacter}
+                  disabled={deletingChar}
+                  className="text-xs px-3 py-1.5 rounded-full bg-red-500/15 text-red-300 border border-red-500/40 hover:bg-red-500/25 disabled:opacity-50"
+                >
+                  {deletingChar ? '删除中…' : '🗑️ 删除系列'}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setShowCustomToyForm(o => !o)}
+                className="text-xs px-3 py-1.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25"
+              >
+                {showCustomToyForm ? '收起' : '+ 第三方玩具'}
+              </button>
+            </div>
           </div>
           {showCustomToyForm && (
             <CustomToyForm

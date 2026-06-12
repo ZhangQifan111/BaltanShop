@@ -647,4 +647,66 @@ router.post('/custom-character', async (req, res) => {
   }
 });
 
+// 一键删除整个第三方系列（仅当该 series 下该 character_slug 的所有 ref 都是 is_custom=1）
+router.delete('/custom-character', async (req, res) => {
+  try {
+    const { character_slug } = req.query;
+    if (!character_slug) return res.status(400).json({ error: 'character_slug required' });
+
+    const refs = db.allSync(
+      'SELECT ref_id, is_custom, image_url, image_big_url FROM baltan_reference WHERE character_slug = ?',
+      [character_slug]
+    );
+    if (refs.length === 0) return res.status(404).json({ error: '角色不存在' });
+
+    const nonCustom = refs.filter(r => r.is_custom !== 1);
+    if (nonCustom.length > 0) {
+      return res.status(403).json({
+        error: '该系列含抓取数据（is_custom=0），不能整系列删除',
+        non_custom_refs: nonCustom.map(r => r.ref_id),
+      });
+    }
+
+    // 任一 ref 关联库存即拒绝
+    const refIds = refs.map(r => r.ref_id);
+    const placeholders = refIds.map(() => '?').join(',');
+    const linked = db.allSync(
+      `SELECT id, name, baltan_ref_id FROM toys WHERE baltan_ref_id IN (${placeholders})`,
+      refIds
+    );
+    if (linked.length) {
+      return res.status(409).json({
+        error: '该系列下还有关联库存，请先全部解除关联',
+        linked_toys: linked,
+      });
+    }
+
+    db.runSync('DELETE FROM baltan_reference WHERE character_slug = ?', [character_slug]);
+
+    // 清磁盘：每个 ref 的 thumb/big + sidecar；然后尝试 rmdir 空目录
+    for (const r of refs) {
+      for (const url of [r.image_url, r.image_big_url]) {
+        if (!url || url.startsWith('http')) continue;
+        const local = path.join(ROOT_LOCAL, url.replace(/^\/uploads\/monster\//, ''));
+        const sidecar = `${local}.url`;
+        try { fs.unlinkSync(local); } catch {}
+        try { fs.unlinkSync(sidecar); } catch {}
+        // 顺手清 -big 副本：图片在写入时常有 main + -big 两份，但 ref 里 image_big_url
+        // 可能没单独指向 -big（upload 走 /uploads/ 路径时只存原图）；按命名约定补一次
+        const big = local.replace(/\.(png|jpg|jpeg|webp|gif)$/, '-big.$1');
+        try { fs.unlinkSync(big); } catch {}
+        try { fs.unlinkSync(`${big}.url`); } catch {}
+      }
+    }
+    try {
+      const dir = path.join(ROOT_LOCAL, character_slug);
+      fs.rmdirSync(dir);
+    } catch {}
+
+    res.json({ ok: true, deleted_refs: refIds.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
