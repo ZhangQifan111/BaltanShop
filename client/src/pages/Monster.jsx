@@ -1462,8 +1462,16 @@ export default function Monster() {
   const handleDeleteCustomToy = async (character_slug, ref_id) => {
     await api.del(`/baltan/custom-toy?character_slug=${encodeURIComponent(character_slug)}&ref_id=${encodeURIComponent(ref_id)}`);
     setToast('已删除自定义玩具');
-    // 局部移除：避免重新拉接口（同时会丢掉 reference_price 等本地点状态）
     setToys(prev => prev.filter(t => !(t.character_slug === character_slug && t.ref_id === ref_id)));
+    // 重新拉一次角色列表：避免外层卡片还显示着已被删图的 thumbnail_url（导致"图裂"）
+    //  - 若该角色下已无 ref，GROUP BY 不再有这一行，角色自动从外层消失
+    //  - 若还有 ref，会用新 MIN(image_url) 重算缩略图
+    if (currentSeries) {
+      try {
+        const r = await api.get(`/baltan/characters?series=${encodeURIComponent(currentSeries)}`);
+        setCharacters(r.characters || []);
+      } catch {}
+    }
   };
 
   // 角色卡仅作"该角色下有单品已收藏"的视觉提示（黄色 ring），不参与 toggle
