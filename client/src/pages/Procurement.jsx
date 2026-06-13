@@ -576,12 +576,15 @@ export default function Procurement() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="order-2 md:order-1">
           <h2 className="text-lg font-bold">采购</h2>
           <p className="text-xs text-[#6b7085]">{inProcurement.length} 件在途/预购中</p>
         </div>
-        <button className="btn-primary text-xs" onClick={() => setShowForm(!showForm)}>
+        <button
+          className="btn-primary text-xs order-1 md:order-2 shrink-0"
+          onClick={() => setShowForm(!showForm)}
+        >
           + 新增
         </button>
       </div>

@@ -828,12 +828,15 @@ export default function Warehouse() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="order-2 md:order-1">
           <h2 className="text-lg font-bold">仓库</h2>
           <p className="text-xs text-[#6b7085]">{filtered.length} 件商品</p>
         </div>
-        <button className="btn-primary text-sm" onClick={() => setShowHistorical(true)}>
+        <button
+          className="btn-primary text-sm order-1 md:order-2 shrink-0"
+          onClick={() => setShowHistorical(true)}
+        >
           + 录入历史销售
         </button>
       </div>
