@@ -76,7 +76,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
   const isS2 = next === 'stage2';
   const isS3 = next === 'stage3';
 
-  const [stage2_handling, setStage2_handling] = useState(toy.stage2_handling ?? '');
+  const [stage2_handling, setStage2_handling] = useState(toy.stage2_handling ?? 5);
   const [stage2_domestic_ship, setStage2_domestic_ship] = useState(toy.stage2_domestic_ship ?? '');
   const [stage3_intl_ship, setStage3_intl_ship] = useState(toy.stage3_intl_ship ?? '');
   const [weight, setWeight] = useState(toy.logistics_weight ?? '');
@@ -165,7 +165,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
               </div>
               <div>
                 <label className="text-[10px] text-[#6b7085] block mb-1">手续费 (¥)</label>
-                <input className="input text-xs" type="number" min="0" value={stage2_handling ?? ''} placeholder="0" onChange={e => setStage2_handling(e.target.value === '' ? '' : +e.target.value)} />
+                <input className="input text-xs" type="number" min="0" value={stage2_handling ?? ''} placeholder="5" onChange={e => setStage2_handling(e.target.value === '' ? '' : +e.target.value)} />
               </div>
               <div>
                 <label className="text-[10px] text-[#6b7085] block mb-1">国内物流费 (¥)</label>
