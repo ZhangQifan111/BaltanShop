@@ -22,7 +22,7 @@ export function FeeRow({ label, field, value, onChange, placeholder = '0' }) {
       <label className="text-[10px] text-[#6b7085] mb-1 block">{label}</label>
       <input
         className="input text-xs"
-        type="number"
+        type="text" inputmode="decimal"
         step="0.01"
         min="0"
         placeholder={placeholder}
@@ -123,7 +123,7 @@ export function ProfitInputs({ mode, rate, amount, onChange }) {
       <div className="relative">
         <input
           className="input text-sm pr-8"
-          type="number"
+          type="text" inputmode="decimal"
           step="0.1"
           min="0"
           max="100"
@@ -138,7 +138,7 @@ export function ProfitInputs({ mode, rate, amount, onChange }) {
   return (
     <input
       className="input text-sm"
-      type="number"
+      type="text" inputmode="decimal"
       step="0.01"
       min="0"
       placeholder="例如 300"

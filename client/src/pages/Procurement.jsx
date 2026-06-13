@@ -167,15 +167,15 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
             <div className="space-y-3">
               <div>
                 <label className="text-[10px] text-[#6b7085] block mb-1">重量 (kg)</label>
-                <input className="input text-xs" type="number" min="0" step="0.1" value={weight ?? ''} placeholder="0" onChange={e => setWeight(e.target.value === '' ? '' : +e.target.value)} />
+                <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.1" value={weight ?? ''} placeholder="0" onChange={e => setWeight(e.target.value === '' ? '' : +e.target.value)} />
               </div>
               <div>
                 <label className="text-[10px] text-[#6b7085] block mb-1">手续费 (¥)</label>
-                <input className="input text-xs" type="number" min="0" value={stage2_handling ?? ''} placeholder="5" onChange={e => setStage2_handling(e.target.value === '' ? '' : +e.target.value)} />
+                <input className="input text-xs" type="text" inputmode="decimal" min="0" value={stage2_handling ?? ''} placeholder="5" onChange={e => setStage2_handling(e.target.value === '' ? '' : +e.target.value)} />
               </div>
               <div>
                 <label className="text-[10px] text-[#6b7085] block mb-1">国内物流费 (¥)</label>
-                <input className="input text-xs" type="number" min="0" value={stage2_domestic_ship ?? ''} placeholder="0" onChange={e => setStage2_domestic_ship(e.target.value === '' ? '' : +e.target.value)} />
+                <input className="input text-xs" type="text" inputmode="decimal" min="0" value={stage2_domestic_ship ?? ''} placeholder="0" onChange={e => setStage2_domestic_ship(e.target.value === '' ? '' : +e.target.value)} />
               </div>
             </div>
             <div className="bg-black/30 rounded-lg p-3 text-center">
@@ -189,7 +189,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
             <p className="text-xs text-[#6b7085]">填写国内运费：</p>
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">国内运费 (¥)</label>
-              <input className="input text-xs" type="number" min="0" value={stage2_domestic_ship ?? ''} placeholder="0" onChange={e => setStage2_domestic_ship(e.target.value === '' ? '' : +e.target.value)} />
+              <input className="input text-xs" type="text" inputmode="decimal" min="0" value={stage2_domestic_ship ?? ''} placeholder="0" onChange={e => setStage2_domestic_ship(e.target.value === '' ? '' : +e.target.value)} />
             </div>
             <div className="bg-black/30 rounded-lg p-3 text-center mt-3">
               <span className="text-[10px] text-[#6b7085]">阶段②小计：</span>
@@ -224,7 +224,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
               <label className="text-[10px] text-[#6b7085] block mb-1">
                 整批总国际运费 (¥){selectedIds.size > 0 && <span className="text-orange-400">（含 {selectedIds.size + 1} 件）</span>}
               </label>
-              <input className="input text-xs" type="number" min="0" value={total_ship_fee} placeholder="0"
+              <input className="input text-xs" type="text" inputmode="decimal" min="0" value={total_ship_fee} placeholder="0"
                 onChange={e => setTotal_ship_fee(e.target.value)} />
             </div>
 
@@ -377,7 +377,7 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys }) {
                 <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                   <input
                     className="input text-xs w-24 text-right"
-                    type="number"
+                    type="text" inputmode="decimal"
                     value={preorderAmountInput}
                     placeholder="已付金额"
                     onChange={e => setPreorderAmountInput(e.target.value)}
@@ -479,7 +479,7 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys }) {
                   <div className="text-[10px] font-bold text-[#f0a030] mb-2">① 买货</div>
                   <div>
                     <label className="text-[10px] text-[#6b7085] block mb-1">买价 (¥)</label>
-                    <input className="input text-xs" type="number" value={form.stage1_amount ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage1_amount: e.target.value === '' ? '' : +e.target.value })} />
+                    <input className="input text-xs" type="text" inputmode="decimal" value={form.stage1_amount ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage1_amount: e.target.value === '' ? '' : +e.target.value })} />
                   </div>
                 </div>
                 <div className="bg-black/20 rounded-lg p-3 border border-[#60a5fa]/20">
@@ -488,16 +488,16 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys }) {
                     {toy.source === 'direct' && (
                       <div>
                         <label className="text-[10px] text-[#6b7085] block mb-1">重量 (kg)</label>
-                        <input className="input text-xs" type="number" min="0" step="0.1" value={form.logistics_weight ?? ''} placeholder="0" onChange={e => setForm({ ...form, logistics_weight: e.target.value === '' ? '' : +e.target.value })} />
+                        <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.1" value={form.logistics_weight ?? ''} placeholder="0" onChange={e => setForm({ ...form, logistics_weight: e.target.value === '' ? '' : +e.target.value })} />
                       </div>
                     )}
                     <div>
                       <label className="text-[10px] text-[#6b7085] block mb-1">手续费 (¥)</label>
-                      <input className="input text-xs" type="number" value={form.stage2_handling ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage2_handling: e.target.value === '' ? '' : +e.target.value })} />
+                      <input className="input text-xs" type="text" inputmode="decimal" value={form.stage2_handling ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage2_handling: e.target.value === '' ? '' : +e.target.value })} />
                     </div>
                     <div>
                       <label className="text-[10px] text-[#6b7085] block mb-1">国内物流费 (¥)</label>
-                      <input className="input text-xs" type="number" value={form.stage2_domestic_ship ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage2_domestic_ship: e.target.value === '' ? '' : +e.target.value })} />
+                      <input className="input text-xs" type="text" inputmode="decimal" value={form.stage2_domestic_ship ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage2_domestic_ship: e.target.value === '' ? '' : +e.target.value })} />
                     </div>
                   </div>
                 </div>
@@ -506,11 +506,11 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys }) {
                   <div className="space-y-2">
                     <div>
                       <label className="text-[10px] text-[#6b7085] block mb-1">国际运费 (¥)</label>
-                      <input className="input text-xs" type="number" value={form.stage3_intl_ship ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage3_intl_ship: e.target.value === '' ? '' : +e.target.value })} />
+                      <input className="input text-xs" type="text" inputmode="decimal" value={form.stage3_intl_ship ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage3_intl_ship: e.target.value === '' ? '' : +e.target.value })} />
                     </div>
                     <div>
                       <label className="text-[10px] text-[#6b7085] block mb-1">税费 (¥，13%)</label>
-                      <input className="input text-xs bg-black/20 cursor-default" type="number" value={computeStage3Tax(form.stage1_amount, toy.source, form.stage3_tax_mode || toy.stage3_tax_mode).toFixed(2)} readOnly />
+                      <input className="input text-xs bg-black/20 cursor-default" type="text" inputmode="decimal" value={computeStage3Tax(form.stage1_amount, toy.source, form.stage3_tax_mode || toy.stage3_tax_mode).toFixed(2)} readOnly />
                     </div>
                     {toy.source !== 'proxy' && (
                       <div className="flex gap-1 pt-1">
@@ -671,7 +671,7 @@ export default function Procurement() {
               <label className="text-[10px] text-[#6b7085] block mb-1">
                 {isPreorderForm ? '已付金额 (¥)' : '①买价 (¥)'}
               </label>
-              <input className="input text-xs" type="number" value={form.stage1_amount ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage1_amount: e.target.value === '' ? '' : +e.target.value })} />
+              <input className="input text-xs" type="text" inputmode="decimal" value={form.stage1_amount ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage1_amount: e.target.value === '' ? '' : +e.target.value })} />
             </div>
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">

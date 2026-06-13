@@ -44,11 +44,11 @@ export default function Shipments() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">总重量 (kg)</label>
-              <input className="input text-xs" type="number" step="0.1" value={form.total_weight} onChange={e => setForm({ ...form, total_weight: +e.target.value })} />
+              <input className="input text-xs" type="text" inputmode="decimal" step="0.1" value={form.total_weight} onChange={e => setForm({ ...form, total_weight: +e.target.value })} />
             </div>
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">国际运费 (¥)</label>
-              <input className="input text-xs" type="number" value={form.total_intl_shipping} onChange={e => setForm({ ...form, total_intl_shipping: +e.target.value })} />
+              <input className="input text-xs" type="text" inputmode="decimal" value={form.total_intl_shipping} onChange={e => setForm({ ...form, total_intl_shipping: +e.target.value })} />
             </div>
           </div>
           <div className="flex gap-2">

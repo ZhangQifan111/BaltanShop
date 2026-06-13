@@ -101,7 +101,7 @@ export default function Estimate() {
             <label className="text-xs text-[#6b7085] mb-1.5 block">目标售价 (¥)</label>
             <input
               className="input text-sm"
-              type="number"
+              type="text" inputmode="decimal"
               step="0.01"
               min="0"
               placeholder="例如 1000"

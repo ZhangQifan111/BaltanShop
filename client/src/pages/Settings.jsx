@@ -91,7 +91,7 @@ export default function Settings() {
             <option value="huabei">花呗</option>
             <option value="other">其他</option>
           </select>
-          <input className="input text-xs w-20" type="number" step="0.1" placeholder="费率%" value={newRule.rate} onChange={e => setNewRule({ ...newRule, rate: e.target.value })} />
+          <input className="input text-xs w-20" type="text" inputmode="decimal" step="0.1" placeholder="费率%" value={newRule.rate} onChange={e => setNewRule({ ...newRule, rate: e.target.value })} />
           <button type="submit" className="btn-primary text-xs">添加</button>
         </form>
         <div className="space-y-2">

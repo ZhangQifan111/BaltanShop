@@ -223,7 +223,7 @@ function SellModal({ toy, onConfirm, onCancel }) {
           {/* 售出价格 */}
           <div>
             <label className="text-[10px] text-[#6b7085] block mb-1">售出价格 (¥)</label>
-            <input className="input" type="number" placeholder="输入售价" value={form.sell_price}
+            <input className="input" type="text" inputmode="decimal" placeholder="输入售价" value={form.sell_price}
               onChange={e => setForm({ ...form, sell_price: e.target.value })} autoFocus />
           </div>
 
@@ -285,7 +285,7 @@ function SellModal({ toy, onConfirm, onCancel }) {
                         </div>
                         <div>
                           <label className="text-[10px] text-[#6b7085] block mb-1">重量 (kg)</label>
-                          <input className="input text-xs" type="number" min="0" step="0.1" placeholder="0"
+                          <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.1" placeholder="0"
                             value={form.logistics_weight}
                             onChange={e => setForm(f => ({ ...f, logistics_weight: e.target.value }))} />
                         </div>
@@ -330,7 +330,7 @@ function SellModal({ toy, onConfirm, onCancel }) {
                   {/* 打包费（手动填） */}
                   <div>
                     <label className="text-[10px] text-[#6b7085] block mb-1">打包费 (¥)</label>
-                    <input className="input text-xs" type="number" min="0" placeholder="0"
+                    <input className="input text-xs" type="text" inputmode="decimal" min="0" placeholder="0"
                       value={packingFee || ''}
                       onChange={e => setPackingFee(+e.target.value || 0)} />
                   </div>
@@ -350,22 +350,22 @@ function SellModal({ toy, onConfirm, onCancel }) {
             <div className="text-[10px] text-[#6b7085] font-bold mb-1">平台扣费明细（可手动改实际扣款）</div>
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-0.5">软件服务费（1%）</label>
-              <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+              <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                 value={form.software_service_fee} onChange={e => setForm({ ...form, software_service_fee: e.target.value })} />
             </div>
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-0.5">基础软件服务费（0.6%）</label>
-              <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+              <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                 value={form.basic_software_service_fee} onChange={e => setForm({ ...form, basic_software_service_fee: e.target.value })} />
             </div>
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-0.5">无忧卖服务费（2.5%，默认 0）</label>
-              <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+              <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                 value={form.worry_free_service_fee} onChange={e => setForm({ ...form, worry_free_service_fee: e.target.value })} />
             </div>
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-0.5">花呗扣款（3%，默认 0）</label>
-              <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+              <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                 value={form.huabei} onChange={e => setForm({ ...form, huabei: e.target.value })} />
             </div>
             <div className="border-t border-white/5 pt-1.5 flex justify-between font-bold text-[#d0d4e8]">
@@ -378,7 +378,7 @@ function SellModal({ toy, onConfirm, onCancel }) {
           {(toy.status === 'sold' || toy.status === 'done') && (
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">纠纷退款 (¥)（可选）</label>
-              <input className="input" type="number" placeholder="如有纠纷退款，填写金额"
+              <input className="input" type="text" inputmode="decimal" placeholder="如有纠纷退款，填写金额"
                 value={form.dispute_fee}
                 onChange={e => setForm({ ...form, dispute_fee: e.target.value })} />
             </div>
@@ -498,7 +498,7 @@ function HistoricalSaleModal({ onCancel, categories }) {
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">售出价格 * (¥)</label>
-              <input className="input" type="number" placeholder="0" value={form.sell_price}
+              <input className="input" type="text" inputmode="decimal" placeholder="0" value={form.sell_price}
                 onChange={e => setForm({ ...form, sell_price: e.target.value })} />
             </div>
             <div>
@@ -644,19 +644,19 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">①买价</label>
-              <input className="input text-xs" type="number" placeholder="0" value={form.stage1_amount} onChange={e => setForm({ ...form, stage1_amount: e.target.value })} />
+              <input className="input text-xs" type="text" inputmode="decimal" placeholder="0" value={form.stage1_amount} onChange={e => setForm({ ...form, stage1_amount: e.target.value })} />
             </div>
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">②转运</label>
-              <input className="input text-xs" type="number" placeholder="0" value={form.stage2_amount} onChange={e => setForm({ ...form, stage2_amount: e.target.value })} />
+              <input className="input text-xs" type="text" inputmode="decimal" placeholder="0" value={form.stage2_amount} onChange={e => setForm({ ...form, stage2_amount: e.target.value })} />
             </div>
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">③国际运费</label>
-              <input className="input text-xs" type="number" placeholder="0" value={form.stage3_intl_ship} onChange={e => setForm({ ...form, stage3_intl_ship: e.target.value })} />
+              <input className="input text-xs" type="text" inputmode="decimal" placeholder="0" value={form.stage3_intl_ship} onChange={e => setForm({ ...form, stage3_intl_ship: e.target.value })} />
             </div>
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">③税费</label>
-              <input className="input text-xs" type="number" placeholder="0" value={form.stage3_tax} onChange={e => setForm({ ...form, stage3_tax: e.target.value })} />
+              <input className="input text-xs" type="text" inputmode="decimal" placeholder="0" value={form.stage3_tax} onChange={e => setForm({ ...form, stage3_tax: e.target.value })} />
             </div>
             {toy.source !== 'proxy' && (
               <div className="col-span-2 mt-1">
@@ -689,27 +689,27 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
                 <div className="text-[10px] text-[#6b7085] font-bold mb-1">购入成本明细</div>
                 <div>
                   <label className="text-[10px] text-[#6b7085] block mb-0.5">①买价</label>
-                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                  <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.stage1_amount} onChange={e => setForm({ ...form, stage1_amount: e.target.value })} />
                 </div>
                 <div>
                   <label className="text-[10px] text-[#6b7085] block mb-0.5 pl-2">②手续费</label>
-                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                  <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.stage2_handling} onChange={e => setForm({ ...form, stage2_handling: e.target.value })} />
                 </div>
                 <div>
                   <label className="text-[10px] text-[#6b7085] block mb-0.5 pl-2">②国内物流费</label>
-                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                  <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.stage2_domestic_ship} onChange={e => setForm({ ...form, stage2_domestic_ship: e.target.value })} />
                 </div>
                 <div>
                   <label className="text-[10px] text-[#6b7085] block mb-0.5 pl-2">③国际运费</label>
-                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                  <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.stage3_intl_ship} onChange={e => setForm({ ...form, stage3_intl_ship: e.target.value })} />
                 </div>
                 <div>
                   <label className="text-[10px] text-[#6b7085] block mb-0.5 pl-2">③税费</label>
-                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                  <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.stage3_tax} onChange={e => setForm({ ...form, stage3_tax: e.target.value })} />
                 </div>
                 <div className="border-t border-white/5 pt-1.5 flex justify-between font-bold text-[#d0d4e8]">
@@ -718,7 +718,7 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
                 </div>
                 <div>
                   <label className="text-[10px] text-[#6b7085] block mb-0.5">退换货成本</label>
-                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                  <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.return_cost} onChange={e => setForm({ ...form, return_cost: e.target.value })} />
                 </div>
               </div>
@@ -728,22 +728,22 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
                 <div className="text-[10px] text-[#6b7085] font-bold mb-1">平台扣费明细</div>
                 <div>
                   <label className="text-[10px] text-[#6b7085] block mb-0.5">软件服务费（1%）</label>
-                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                  <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.software_service_fee} onChange={e => setForm({ ...form, software_service_fee: e.target.value })} />
                 </div>
                 <div>
                   <label className="text-[10px] text-[#6b7085] block mb-0.5">基础软件服务费（0.6%）</label>
-                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                  <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.basic_software_service_fee} onChange={e => setForm({ ...form, basic_software_service_fee: e.target.value })} />
                 </div>
                 <div>
                   <label className="text-[10px] text-[#6b7085] block mb-0.5">无忧卖服务费（2.5%）</label>
-                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                  <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.worry_free_service_fee} onChange={e => setForm({ ...form, worry_free_service_fee: e.target.value })} />
                 </div>
                 <div>
                   <label className="text-[10px] text-[#6b7085] block mb-0.5">花呗扣款（3%）</label>
-                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                  <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.huabei} onChange={e => setForm({ ...form, huabei: e.target.value })} />
                 </div>
               </div>
@@ -762,7 +762,7 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
               {/* 售价（可编辑） */}
               <div>
                 <label className="text-[10px] text-[#6b7085] block mb-1">售出价格 (¥)</label>
-                <input className="input text-xs" type="number" placeholder="0" value={form.sell_price} onChange={e => setForm({ ...form, sell_price: e.target.value })} />
+                <input className="input text-xs" type="text" inputmode="decimal" placeholder="0" value={form.sell_price} onChange={e => setForm({ ...form, sell_price: e.target.value })} />
               </div>
               <div>
                 <label className="text-[10px] text-[#6b7085] block mb-1">售出日期</label>
@@ -788,7 +788,7 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
           {toy.return_cost > 0 && (
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">退换货成本 (¥)</label>
-              <input className="input text-xs" type="number" placeholder="0" value={form.return_cost} onChange={e => setForm({ ...form, return_cost: e.target.value })} />
+              <input className="input text-xs" type="text" inputmode="decimal" placeholder="0" value={form.return_cost} onChange={e => setForm({ ...form, return_cost: e.target.value })} />
             </div>
           )}
 
@@ -835,7 +835,7 @@ function ReturnModal({ toy, onConfirm, onCancel }) {
             <label className="text-[10px] text-[#6b7085] block mb-1">回收成本 (¥)</label>
             <input
               className="input"
-              type="number"
+              type="text" inputmode="decimal"
               placeholder="退货产生的运费/打包费等"
               value={form.return_cost}
               onChange={e => setForm({ ...form, return_cost: e.target.value })}

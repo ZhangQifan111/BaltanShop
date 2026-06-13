@@ -222,7 +222,7 @@ function EstimateForm({ item, onClose, onUseForAdd, onSaveAsReference }) {
           <label className="text-xs text-[#6b7085] mb-1.5 block">目标售价 (¥)</label>
           <input
             className="input text-sm"
-            type="number"
+            type="text" inputmode="decimal"
             step="0.01"
             min="0"
             placeholder="例如 1000"
@@ -523,7 +523,7 @@ function AddForm({ item, onClose, onAdded, addToy, initialAmount = '' }) {
               {isDirect ? '商品价 (¥)' : '代购价 (¥)'}
             </span>
             <input
-              type="number"
+              type="text" inputmode="decimal"
               value={form.stage1_amount}
               onChange={e => update('stage1_amount', e.target.value)}
               placeholder="0"
@@ -548,7 +548,7 @@ function AddForm({ item, onClose, onAdded, addToy, initialAmount = '' }) {
           <div>
             <span className="text-[9px] text-[#6b7085] block mb-0.5">手续费 (¥)</span>
             <input
-              type="number"
+              type="text" inputmode="decimal"
               value={form.stage2_handling}
               onChange={e => update('stage2_handling', e.target.value)}
               className="input text-xs w-full"
@@ -559,7 +559,7 @@ function AddForm({ item, onClose, onAdded, addToy, initialAmount = '' }) {
               {isDirect ? '日本境内运费 (¥)' : '国内运费 (¥)'}
             </span>
             <input
-              type="number"
+              type="text" inputmode="decimal"
               value={form.stage2_domestic_ship}
               onChange={e => update('stage2_domestic_ship', e.target.value)}
               className="input text-xs w-full"
@@ -583,7 +583,7 @@ function AddForm({ item, onClose, onAdded, addToy, initialAmount = '' }) {
           <div>
             <span className="text-[9px] text-[#6b7085] block mb-0.5">国际运费 (¥)</span>
             <input
-              type="number"
+              type="text" inputmode="decimal"
               value={form.stage3_intl_ship}
               onChange={e => update('stage3_intl_ship', e.target.value)}
               className="input text-xs w-full"
@@ -617,7 +617,7 @@ function AddForm({ item, onClose, onAdded, addToy, initialAmount = '' }) {
           <div>
             <span className="text-[9px] text-[#6b7085] block mb-0.5">国内物流 (¥)</span>
             <input
-              type="number"
+              type="text" inputmode="decimal"
               value={form.logistics_fee}
               onChange={e => update('logistics_fee', e.target.value)}
               className="input text-xs w-full"
@@ -626,7 +626,7 @@ function AddForm({ item, onClose, onAdded, addToy, initialAmount = '' }) {
           <div>
             <span className="text-[9px] text-[#6b7085] block mb-0.5">纸箱费 (¥)</span>
             <input
-              type="number"
+              type="text" inputmode="decimal"
               value={form.box_fee}
               onChange={e => update('box_fee', e.target.value)}
               className="input text-xs w-full"
@@ -635,7 +635,7 @@ function AddForm({ item, onClose, onAdded, addToy, initialAmount = '' }) {
           <div>
             <span className="text-[9px] text-[#6b7085] block mb-0.5">打包费 (¥)</span>
             <input
-              type="number"
+              type="text" inputmode="decimal"
               value={form.packing_fee}
               onChange={e => update('packing_fee', e.target.value)}
               className="input text-xs w-full"
