@@ -30,7 +30,7 @@ export default function BackgroundDecoration() {
       <img
         src="/uploads/monster/alienbaltan/alienbaltan-01-toy.png"
         alt=""
-        className="absolute left-0 top-[45%] -translate-y-1/2 w-[300px] md:w-[420px] h-auto opacity-100 pointer-events-none"
+        className="hidden md:block absolute left-0 top-[45%] -translate-y-1/2 w-[420px] h-auto opacity-100 pointer-events-none"
         style={{
           WebkitMaskImage: 'url(/uploads/monster/alienbaltan/alienbaltan-01-toy.png)',
           maskImage: 'url(/uploads/monster/alienbaltan/alienbaltan-01-toy.png)',
@@ -70,7 +70,7 @@ export default function BackgroundDecoration() {
       <img
         src="/uploads/monster/ultraman/ultraman-01-toy.png"
         alt=""
-        className="absolute right-0 top-[45%] -translate-y-1/2 w-[300px] md:w-[420px] h-auto opacity-100 -scale-x-100 pointer-events-none"
+        className="hidden md:block absolute right-0 top-[45%] -translate-y-1/2 w-[420px] h-auto opacity-100 -scale-x-100 pointer-events-none"
         style={{
           WebkitMaskImage: 'url(/uploads/monster/ultraman/ultraman-01-toy.png)',
           maskImage: 'url(/uploads/monster/ultraman/ultraman-01-toy.png)',
