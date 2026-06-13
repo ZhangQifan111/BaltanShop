@@ -581,8 +581,12 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
     updates.stage2_amount = s2h + s2s;
     if (form.stage3_intl_ship !== '' || form.stage3_tax !== '') {
       const ship = form.stage3_intl_ship === '' ? 0 : +form.stage3_intl_ship;
-      const tax = form.stage3_tax === '' ? 0 : +form.stage3_tax;
       updates.stage3_intl_ship = ship;
+      updates.stage3_tax_mode = form.stage3_tax_mode || 'normal';
+      // 包税线路强制 0 税（与 Procurement 推进弹窗的 computeStage3Tax 同源）
+      const tax = (form.stage3_tax_mode === 'tax_included' && toy.source !== 'proxy')
+        ? 0
+        : (form.stage3_tax === '' ? 0 : +form.stage3_tax);
       updates.stage3_tax = tax;
       updates.stage3_amount = ship + tax;
     }
@@ -668,7 +672,7 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
                   <button
                     type="button"
                     className={`flex-1 text-xs py-1.5 rounded border ${form.stage3_tax_mode === 'tax_included' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300' : 'bg-black/20 border-white/10 text-[#6b7085]'}`}
-                    onClick={() => setForm({ ...form, stage3_tax_mode: 'tax_included' })}
+                    onClick={() => setForm({ ...form, stage3_tax_mode: 'tax_included', stage3_tax: 0 })}
                   >
                     包税线路（无税）
                   </button>
