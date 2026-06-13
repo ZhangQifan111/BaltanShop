@@ -551,6 +551,8 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
     notes: toy.notes || '',
     stage1_amount: toy.stage1_amount ?? '',
     stage2_amount: toy.stage2_amount ?? '',
+    stage2_handling: toy.stage2_handling ?? '',
+    stage2_domestic_ship: toy.stage2_domestic_ship ?? '',
     stage3_intl_ship: toy.stage3_intl_ship ?? '',
     stage3_tax: toy.stage3_tax ?? ((toy.stage3_amount || 0) - (toy.stage3_intl_ship || 0)) || '',
     sell_price: toy.sell_price ?? '',
@@ -570,7 +572,12 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
     if (!form.name.trim()) return;
     const updates = { name: form.name.trim(), category: form.category, notes: form.notes };
     if (form.stage1_amount !== '') updates.stage1_amount = +form.stage1_amount;
-    if (form.stage2_amount !== '') updates.stage2_amount = +form.stage2_amount;
+    // 阶段 2：拆分手续费 / 国内物流；总额由两者自动求和
+    const s2h = form.stage2_handling === '' ? 0 : +form.stage2_handling;
+    const s2s = form.stage2_domestic_ship === '' ? 0 : +form.stage2_domestic_ship;
+    updates.stage2_handling = s2h;
+    updates.stage2_domestic_ship = s2s;
+    updates.stage2_amount = s2h + s2s;
     if (form.stage3_intl_ship !== '' || form.stage3_tax !== '') {
       const ship = form.stage3_intl_ship === '' ? 0 : +form.stage3_intl_ship;
       const tax = form.stage3_tax === '' ? 0 : +form.stage3_tax;
@@ -650,24 +657,43 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
           {/* 已完成/已发货：展示完整费用明细 */}
           {(toy.status === 'sold' || toy.status === 'done') && (
             <>
-              {/* 购入成本明细（只读） */}
-              <div className="bg-black/20 rounded-lg p-3 space-y-1.5 text-xs">
+              {/* 购入成本明细（可编辑） */}
+              <div className="bg-black/20 rounded-lg p-3 space-y-2 text-xs">
                 <div className="text-[10px] text-[#6b7085] font-bold mb-1">购入成本明细</div>
-                <div className="flex justify-between"><span className="text-[#6b7085]">①买价</span><span className="text-[#d0d4e8]">¥{toy.stage1_amount || 0}</span></div>
-                {(toy.stage2_handling > 0 || toy.stage2_domestic_ship > 0) && (
-                  <>
-                    <div className="flex justify-between pl-2"><span className="text-[#6b7085]">手续费</span><span className="text-[#d0d4e8]">¥{toy.stage2_handling || 0}</span></div>
-                    <div className="flex justify-between pl-2"><span className="text-[#6b7085]">国内物流费</span><span className="text-[#d0d4e8]">¥{toy.stage2_domestic_ship || 0}</span></div>
-                  </>
-                )}
-                {(toy.stage3_intl_ship > 0 || toy.stage3_tax > 0) && (
-                  <>
-                    <div className="flex justify-between pl-2"><span className="text-[#6b7085]">国际运费</span><span className="text-[#d0d4e8]">¥{toy.stage3_intl_ship || 0}</span></div>
-                    <div className="flex justify-between pl-2"><span className="text-[#6b7085]">税费</span><span className="text-[#d0d4e8]">¥{toy.stage3_tax || 0}</span></div>
-                  </>
-                )}
-                <div className="border-t border-white/5 pt-1.5 flex justify-between font-bold"><span className="text-[#6b7085]">成本合计</span><span className="text-[#d0d4e8]">¥{totalCost.toFixed(2)}</span></div>
-                {toy.return_cost > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">退换货成本</span><span className="text-[#d0d4e8]">¥{toy.return_cost}</span></div>}
+                <div>
+                  <label className="text-[10px] text-[#6b7085] block mb-0.5">①买价</label>
+                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                    value={form.stage1_amount} onChange={e => setForm({ ...form, stage1_amount: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#6b7085] block mb-0.5 pl-2">②手续费</label>
+                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                    value={form.stage2_handling} onChange={e => setForm({ ...form, stage2_handling: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#6b7085] block mb-0.5 pl-2">②国内物流费</label>
+                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                    value={form.stage2_domestic_ship} onChange={e => setForm({ ...form, stage2_domestic_ship: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#6b7085] block mb-0.5 pl-2">③国际运费</label>
+                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                    value={form.stage3_intl_ship} onChange={e => setForm({ ...form, stage3_intl_ship: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#6b7085] block mb-0.5 pl-2">③税费</label>
+                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                    value={form.stage3_tax} onChange={e => setForm({ ...form, stage3_tax: e.target.value })} />
+                </div>
+                <div className="border-t border-white/5 pt-1.5 flex justify-between font-bold text-[#d0d4e8]">
+                  <span>成本合计</span>
+                  <span>¥{totalCost.toFixed(2)}</span>
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#6b7085] block mb-0.5">退换货成本</label>
+                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                    value={form.return_cost} onChange={e => setForm({ ...form, return_cost: e.target.value })} />
+                </div>
               </div>
 
               {/* 平台扣费明细（可编辑） */}
