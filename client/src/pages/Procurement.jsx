@@ -133,8 +133,8 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
     if (isS3) {
       const batch = allSelected.map(t => {
         const share = calcShare(t);
-        // 当前 toy 用弹窗里选的 mode；批次里其他玩具保留各自原 mode
-        const tTaxMode = t.id === toy.id ? stage3_tax_mode : (t.stage3_tax_mode || 'normal');
+        // 同批次共享运输方式（一条线发货）
+        const tTaxMode = stage3_tax_mode;
         const tTax = computeStage3Tax(t.stage1_amount, t.source, tTaxMode);
         return {
           ...t,
@@ -267,11 +267,11 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
                   const t = (allToys || []).find(x => x.id === id);
                   if (!t) return null;
                   const share = calcShare(t);
-                  const tTax = computeStage3Tax(t.stage1_amount, t.source, t.stage3_tax_mode);
+                  const tTax = computeStage3Tax(t.stage1_amount, t.source, stage3_tax_mode);
                   return (
                     <div key={id} className="flex justify-between text-[10px]">
                       <span className="text-[#6b7085] truncate flex-1">{t.name}</span>
-                      <span className="text-[#d0d4e8] ml-2">¥{share.toFixed(2)} + ¥{tTax.toFixed(2)}税</span>
+                      <span className="text-[#d0d4e8] ml-2">¥{share.toFixed(2)}{tTax > 0 ? ` + ¥${tTax.toFixed(2)}税` : ''}</span>
                     </div>
                   );
                 })}
