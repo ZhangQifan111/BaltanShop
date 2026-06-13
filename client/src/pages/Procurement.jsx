@@ -485,7 +485,7 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys }) {
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="text-[10px] text-[#6b7085] block mb-1">商品名称</label>
                 <input className="input text-xs" value={form.name || ''} onChange={e => setForm({ ...form, name: e.target.value })} />
@@ -588,7 +588,7 @@ export default function Procurement() {
 
       {showForm && (
         <form className="card space-y-3" onSubmit={handleSubmit}>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">商品名称 *</label>
               <input className="input text-xs" placeholder="商品名" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
@@ -676,7 +676,7 @@ export default function Procurement() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {filteredList.map(toy => (
           <ToyRow
             key={toy.id}
