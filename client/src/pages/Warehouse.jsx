@@ -124,16 +124,24 @@ function SellModal({ toy, onConfirm, onCancel }) {
   const { shippingRules, supplies } = useStore();
   const boxSupplies = supplies.filter(s => s.category === 'box');
 
+  // 售出时一次性按 sell_price 算出 4 项平台费作为初始值；用户可在表单里自由修改
+  const initSoftware = (toy.sell_price || 0) * 0.01;
+  const initBasic = (toy.sell_price || 0) * 0.006;
+  const initWorryFree = toy.worry_free_service_fee || 0;
+  const initHuabei = toy.huabei || 0;
+
   const [form, setForm] = useState({
     sell_price: toy.sell_price || '',
-    include_worry_free: toy.worry_free_service_fee > 0 ? true : toy.worry_free_service_fee === 0 && toy.sell_price > 0 ? false : true,
-    include_huabei: toy.huabei > 0 ? true : toy.huabei === 0 && toy.sell_price > 0 ? false : true,
     dispute_fee: '',
     bao_you: toy.logistics_fee > 0 || toy.box_fee > 0 || toy.packing_fee > 0 ? true : false,
     carrier: toy.logistics_fee > 0 ? 'zto' : '',
     logistics_region: toy.logistics_region || '',
     logistics_weight: toy.logistics_weight || '',
     selected_boxes: [],
+    software_service_fee: initSoftware,
+    basic_software_service_fee: initBasic,
+    worry_free_service_fee: initWorryFree,
+    huabei: initHuabei,
   });
 
   const [calcLogisticsFee, setCalcLogisticsFee] = useState(toy.logistics_fee || 0);
@@ -177,10 +185,10 @@ function SellModal({ toy, onConfirm, onCancel }) {
   };
 
   const price = +form.sell_price || 0;
-  const softwareFee = price * 0.01;
-  const basicFee = price * 0.006;
-  const worryFreeFee = form.include_worry_free ? price * 0.025 : 0;
-  const huabeiFee = form.include_huabei ? price * 0.03 : 0;
+  const softwareFee = +form.software_service_fee || 0;
+  const basicFee = +form.basic_software_service_fee || 0;
+  const worryFreeFee = +form.worry_free_service_fee || 0;
+  const huabeiFee = +form.huabei || 0;
   const disputeFee = +form.dispute_fee || 0;
   const totalFees = softwareFee + basicFee + worryFreeFee + huabeiFee;
   const totalLogistics = form.bao_you ? (calcLogisticsFee + calcBoxFee + packingFee) : 0;
@@ -337,37 +345,31 @@ function SellModal({ toy, onConfirm, onCancel }) {
             </div>
           )}
 
-          {/* 手续费明细 */}
-          <div className="bg-black/30 rounded-lg p-3 space-y-1.5 text-xs">
-            <div className="flex justify-between text-[#6b7085]">
-              <span>软件服务费（1%）</span>
-              <span>¥{softwareFee.toFixed(2)}</span>
+          {/* 平台扣费明细（可编辑） */}
+          <div className="bg-black/30 rounded-lg p-3 space-y-2 text-xs">
+            <div className="text-[10px] text-[#6b7085] font-bold mb-1">平台扣费明细（可手动改实际扣款）</div>
+            <div>
+              <label className="text-[10px] text-[#6b7085] block mb-0.5">软件服务费（1%）</label>
+              <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                value={form.software_service_fee} onChange={e => setForm({ ...form, software_service_fee: e.target.value })} />
             </div>
-            <div className="flex justify-between text-[#6b7085]">
-              <span>基础软件服务费（0.6%）</span>
-              <span>¥{basicFee.toFixed(2)}</span>
+            <div>
+              <label className="text-[10px] text-[#6b7085] block mb-0.5">基础软件服务费（0.6%）</label>
+              <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                value={form.basic_software_service_fee} onChange={e => setForm({ ...form, basic_software_service_fee: e.target.value })} />
             </div>
-            <div className="border-t border-white/5 my-1.5" />
-            <div className="flex justify-between items-center">
-              <label className="flex items-center gap-1.5 cursor-pointer flex-1">
-                <input type="checkbox" className="accent-orange-500"
-                  checked={form.include_worry_free}
-                  onChange={e => setForm({ ...form, include_worry_free: e.target.checked })} />
-                <span>无忧卖服务费（2.5%）</span>
-              </label>
-              <span className={form.include_worry_free ? 'text-[#d0d4e8]' : 'text-[#6b7085]'}>¥{worryFreeFee.toFixed(2)}</span>
+            <div>
+              <label className="text-[10px] text-[#6b7085] block mb-0.5">无忧卖服务费（2.5%，默认 0）</label>
+              <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                value={form.worry_free_service_fee} onChange={e => setForm({ ...form, worry_free_service_fee: e.target.value })} />
             </div>
-            <div className="flex justify-between items-center">
-              <label className="flex items-center gap-1.5 cursor-pointer flex-1">
-                <input type="checkbox" className="accent-orange-500"
-                  checked={form.include_huabei}
-                  onChange={e => setForm({ ...form, include_huabei: e.target.checked })} />
-                <span>花呗扣款（3%）</span>
-              </label>
-              <span className={form.include_huabei ? 'text-[#d0d4e8]' : 'text-[#6b7085]'}>¥{huabeiFee.toFixed(2)}</span>
+            <div>
+              <label className="text-[10px] text-[#6b7085] block mb-0.5">花呗扣款（3%，默认 0）</label>
+              <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                value={form.huabei} onChange={e => setForm({ ...form, huabei: e.target.value })} />
             </div>
             <div className="border-t border-white/5 pt-1.5 flex justify-between font-bold text-[#d0d4e8]">
-              <span>手续费合计</span>
+              <span>扣费合计</span>
               <span>¥{totalFees.toFixed(2)}</span>
             </div>
           </div>
@@ -557,6 +559,10 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
     logistics_fee: toy.logistics_fee ?? '',
     box_fee: toy.box_fee ?? '',
     packing_fee: toy.packing_fee ?? '',
+    software_service_fee: toy.software_service_fee ?? '',
+    basic_software_service_fee: toy.basic_software_service_fee ?? '',
+    worry_free_service_fee: toy.worry_free_service_fee ?? '',
+    huabei: toy.huabei ?? '',
   });
 
   const handleSubmit = (e) => {
@@ -581,6 +587,13 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
     if (form.logistics_fee !== '') updates.logistics_fee = +form.logistics_fee;
     if (form.box_fee !== '') updates.box_fee = +form.box_fee;
     if (form.packing_fee !== '') updates.packing_fee = +form.packing_fee;
+    // 平台扣费：仅 sold/done 状态可修改
+    if (toy.status === 'sold' || toy.status === 'done') {
+      updates.software_service_fee = form.software_service_fee === '' ? 0 : +form.software_service_fee;
+      updates.basic_software_service_fee = form.basic_software_service_fee === '' ? 0 : +form.basic_software_service_fee;
+      updates.worry_free_service_fee = form.worry_free_service_fee === '' ? 0 : +form.worry_free_service_fee;
+      updates.huabei = form.huabei === '' ? 0 : +form.huabei;
+    }
     onConfirm(toy.id, updates);
   };
 
@@ -657,13 +670,29 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
                 {toy.return_cost > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">退换货成本</span><span className="text-[#d0d4e8]">¥{toy.return_cost}</span></div>}
               </div>
 
-              {/* 平台扣费明细（只读） */}
-              <div className="bg-black/20 rounded-lg p-3 space-y-1.5 text-xs">
+              {/* 平台扣费明细（可编辑） */}
+              <div className="bg-black/20 rounded-lg p-3 space-y-2 text-xs">
                 <div className="text-[10px] text-[#6b7085] font-bold mb-1">平台扣费明细</div>
-                <div className="flex justify-between"><span className="text-[#6b7085]">软件服务费（1%）</span><span className="text-[#d0d4e8]">¥{toy.software_service_fee || 0}</span></div>
-                <div className="flex justify-between"><span className="text-[#6b7085]">基础软件服务费（0.6%）</span><span className="text-[#d0d4e8]">¥{toy.basic_software_service_fee || 0}</span></div>
-                {(toy.worry_free_service_fee > 0) && <div className="flex justify-between"><span className="text-[#6b7085]">无忧卖服务费（2.5%）</span><span className="text-[#d0d4e8]">¥{toy.worry_free_service_fee}</span></div>}
-                {(toy.huabei > 0) && <div className="flex justify-between"><span className="text-[#6b7085]">花呗扣款（3%）</span><span className="text-[#d0d4e8]">¥{toy.huabei}</span></div>}
+                <div>
+                  <label className="text-[10px] text-[#6b7085] block mb-0.5">软件服务费（1%）</label>
+                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                    value={form.software_service_fee} onChange={e => setForm({ ...form, software_service_fee: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#6b7085] block mb-0.5">基础软件服务费（0.6%）</label>
+                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                    value={form.basic_software_service_fee} onChange={e => setForm({ ...form, basic_software_service_fee: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#6b7085] block mb-0.5">无忧卖服务费（2.5%）</label>
+                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                    value={form.worry_free_service_fee} onChange={e => setForm({ ...form, worry_free_service_fee: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#6b7085] block mb-0.5">花呗扣款（3%）</label>
+                  <input className="input text-xs" type="number" min="0" step="0.01" placeholder="0"
+                    value={form.huabei} onChange={e => setForm({ ...form, huabei: e.target.value })} />
+                </div>
               </div>
 
               {/* 物流支出明细（可编辑） */}
