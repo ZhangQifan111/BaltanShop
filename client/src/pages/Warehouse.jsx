@@ -555,6 +555,7 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
     stage2_domestic_ship: toy.stage2_domestic_ship ?? '',
     stage3_intl_ship: toy.stage3_intl_ship ?? '',
     stage3_tax: toy.stage3_tax ?? ((toy.stage3_amount || 0) - (toy.stage3_intl_ship || 0)) || '',
+    stage3_tax_mode: toy.stage3_tax_mode || 'normal',
     sell_price: toy.sell_price ?? '',
     sell_date: toy.sell_date || '',
     return_cost: toy.return_cost ?? '',
@@ -585,6 +586,7 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
       updates.stage3_tax = tax;
       updates.stage3_amount = ship + tax;
     }
+    updates.stage3_tax_mode = form.stage3_tax_mode || 'normal';
     // 售价编辑：仅 sold/done 状态可修改
     if ((toy.status === 'sold' || toy.status === 'done') && form.sell_price !== '') {
       updates.sell_price = +form.sell_price;
@@ -652,6 +654,27 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
               <label className="text-[10px] text-[#6b7085] block mb-1">③税费</label>
               <input className="input text-xs" type="number" placeholder="0" value={form.stage3_tax} onChange={e => setForm({ ...form, stage3_tax: e.target.value })} />
             </div>
+            {toy.source !== 'proxy' && (
+              <div className="col-span-2 mt-1">
+                <label className="text-[10px] text-[#6b7085] block mb-1">运输方式</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className={`flex-1 text-xs py-1.5 rounded border ${form.stage3_tax_mode === 'normal' ? 'bg-orange-500/20 border-orange-500 text-orange-300' : 'bg-black/20 border-white/10 text-[#6b7085]'}`}
+                    onClick={() => setForm({ ...form, stage3_tax_mode: 'normal' })}
+                  >
+                    正常运输（13%税）
+                  </button>
+                  <button
+                    type="button"
+                    className={`flex-1 text-xs py-1.5 rounded border ${form.stage3_tax_mode === 'tax_included' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300' : 'bg-black/20 border-white/10 text-[#6b7085]'}`}
+                    onClick={() => setForm({ ...form, stage3_tax_mode: 'tax_included' })}
+                  >
+                    包税线路（无税）
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 已完成/已发货：展示完整费用明细 */}

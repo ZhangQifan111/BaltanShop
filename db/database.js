@@ -59,6 +59,9 @@ function migrate() {
   if (!colNames.has('worry_free_service_fee')) {
     changes.push("ALTER TABLE toys ADD COLUMN worry_free_service_fee REAL DEFAULT 0");
   }
+  if (!colNames.has('stage3_tax_mode')) {
+    changes.push("ALTER TABLE toys ADD COLUMN stage3_tax_mode TEXT DEFAULT 'normal'");
+  }
   if (!tableNames.has('shipping_rules')) {
     changes.push(`CREATE TABLE shipping_rules (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -19,8 +19,10 @@ const TABS = [
 const ARRIVAL_WARN_DAYS = 3;
 
 /** 代购费已含税，不再叠加 13% 消费税；直购/二手照常 */
-function computeStage3Tax(stage1Amount, source) {
+/** taxMode='tax_included'（包税线路）→ 0 */
+function computeStage3Tax(stage1Amount, source, taxMode = 'normal') {
   if (source === 'proxy') return 0;
+  if (taxMode === 'tax_included') return 0;
   return Math.round((stage1Amount || 0) * 0.13 * 100) / 100;
 }
 
@@ -79,6 +81,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
   const [stage2_handling, setStage2_handling] = useState(toy.stage2_handling ?? 5);
   const [stage2_domestic_ship, setStage2_domestic_ship] = useState(toy.stage2_domestic_ship ?? '');
   const [stage3_intl_ship, setStage3_intl_ship] = useState(toy.stage3_intl_ship ?? '');
+  const [stage3_tax_mode, setStage3_tax_mode] = useState(toy.stage3_tax_mode || 'normal');
   const [weight, setWeight] = useState(toy.logistics_weight ?? '');
   const [total_ship_fee, setTotal_ship_fee] = useState('');
 
@@ -99,7 +102,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
     });
   };
 
-  const tax = computeStage3Tax(toy.stage1_amount, toy.source);
+  const tax = computeStage3Tax(toy.stage1_amount, toy.source, toy.stage3_tax_mode);
   const stage2Total = (stage2_handling || 0) + (stage2_domestic_ship || 0);
   const allSelected = [toy, ...(allToys || []).filter(t => selectedIds.has(t.id))];
   const totalWeight = allSelected.reduce((s, t) => s + (t.logistics_weight || 0), 0);
@@ -111,7 +114,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
   }
 
   const currentShare = calcShare(toy);
-  const currentTax = computeStage3Tax(toy.stage1_amount, toy.source);
+  const currentTax = computeStage3Tax(toy.stage1_amount, toy.source, stage3_tax_mode);
   const currentS3Total = currentShare + currentTax;
 
   const handleConfirm = async () => {
@@ -130,13 +133,16 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
     if (isS3) {
       const batch = allSelected.map(t => {
         const share = calcShare(t);
-        const tTax = computeStage3Tax(t.stage1_amount, t.source);
+        // 当前 toy 用弹窗里选的 mode；批次里其他玩具保留各自原 mode
+        const tTaxMode = t.id === toy.id ? stage3_tax_mode : (t.stage3_tax_mode || 'normal');
+        const tTax = computeStage3Tax(t.stage1_amount, t.source, tTaxMode);
         return {
           ...t,
           procurement_stage: 'stage3',
           stage3_intl_ship: share,
           stage3_tax: tTax,
           stage3_amount: share + tTax,
+          stage3_tax_mode: tTaxMode,
         };
       });
       for (const item of batch) {
@@ -222,10 +228,35 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
                 onChange={e => setTotal_ship_fee(e.target.value)} />
             </div>
 
+            {toy.source !== 'proxy' && (
+              <div>
+                <label className="text-[10px] text-[#6b7085] block mb-1">运输方式</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className={`flex-1 text-xs py-2 rounded-lg border ${stage3_tax_mode === 'normal' ? 'bg-orange-500/20 border-orange-500 text-orange-300' : 'bg-black/20 border-white/10 text-[#6b7085]'}`}
+                    onClick={() => setStage3_tax_mode('normal')}
+                  >
+                    正常运输（13%税）
+                  </button>
+                  <button
+                    type="button"
+                    className={`flex-1 text-xs py-2 rounded-lg border ${stage3_tax_mode === 'tax_included' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300' : 'bg-black/20 border-white/10 text-[#6b7085]'}`}
+                    onClick={() => setStage3_tax_mode('tax_included')}
+                  >
+                    包税线路（无税）
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="bg-black/30 rounded-lg p-3 space-y-1">
               <div className="flex justify-between text-xs"><span className="text-[#6b7085]">分摊重量</span><span className="text-[#d0d4e8]">{toy.logistics_weight || 0}kg / {totalWeight}kg</span></div>
               <div className="flex justify-between text-xs"><span className="text-[#6b7085]">国际运费分摊</span><span className="text-[#d0d4e8]">¥{currentShare.toFixed(2)}</span></div>
-              <div className="flex justify-between text-xs"><span className="text-[#6b7085]">税费（买价×13%）</span><span className="text-[#d0d4e8]">¥{currentTax.toFixed(2)}</span></div>
+              <div className="flex justify-between text-xs">
+                <span className="text-[#6b7085]">{stage3_tax_mode === 'tax_included' ? '税费（包税线路已含）' : '税费（买价×13%）'}</span>
+                <span className="text-[#d0d4e8]">¥{currentTax.toFixed(2)}</span>
+              </div>
               <div className="flex justify-between text-xs border-t border-white/5 pt-1 font-bold"><span className="text-[#6b7085]">阶段③小计</span><span className="text-accent">¥{currentS3Total.toFixed(2)}</span></div>
             </div>
 
@@ -236,7 +267,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
                   const t = (allToys || []).find(x => x.id === id);
                   if (!t) return null;
                   const share = calcShare(t);
-                  const tTax = computeStage3Tax(t.stage1_amount, t.source);
+                  const tTax = computeStage3Tax(t.stage1_amount, t.source, t.stage3_tax_mode);
                   return (
                     <div key={id} className="flex justify-between text-[10px]">
                       <span className="text-[#6b7085] truncate flex-1">{t.name}</span>
@@ -276,7 +307,7 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys }) {
       updates.stage2_amount = (updates.stage2_handling || 0) + (updates.stage2_domestic_ship || 0);
     }
     if (toy.procurement_stage === 'stage3') {
-      updates.stage3_tax = computeStage3Tax(updates.stage1_amount, toy.source);
+      updates.stage3_tax = computeStage3Tax(updates.stage1_amount, toy.source, updates.stage3_tax_mode || toy.stage3_tax_mode);
       updates.stage3_amount = (updates.stage3_intl_ship || 0) + updates.stage3_tax;
     }
     await onUpdate(toy.id, updates);
@@ -479,8 +510,26 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys }) {
                     </div>
                     <div>
                       <label className="text-[10px] text-[#6b7085] block mb-1">税费 (¥，13%)</label>
-                      <input className="input text-xs bg-black/20 cursor-default" type="number" value={computeStage3Tax(form.stage1_amount, toy.source).toFixed(2)} readOnly />
+                      <input className="input text-xs bg-black/20 cursor-default" type="number" value={computeStage3Tax(form.stage1_amount, toy.source, form.stage3_tax_mode || toy.stage3_tax_mode).toFixed(2)} readOnly />
                     </div>
+                    {toy.source !== 'proxy' && (
+                      <div className="flex gap-1 pt-1">
+                        <button
+                          type="button"
+                          className={`flex-1 text-[10px] py-1 rounded border ${(form.stage3_tax_mode || toy.stage3_tax_mode) === 'normal' ? 'bg-orange-500/20 border-orange-500 text-orange-300' : 'bg-black/20 border-white/10 text-[#6b7085]'}`}
+                          onClick={() => setForm({ ...form, stage3_tax_mode: 'normal' })}
+                        >
+                          正常运输
+                        </button>
+                        <button
+                          type="button"
+                          className={`flex-1 text-[10px] py-1 rounded border ${(form.stage3_tax_mode || toy.stage3_tax_mode) === 'tax_included' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300' : 'bg-black/20 border-white/10 text-[#6b7085]'}`}
+                          onClick={() => setForm({ ...form, stage3_tax_mode: 'tax_included' })}
+                        >
+                          包税线路
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

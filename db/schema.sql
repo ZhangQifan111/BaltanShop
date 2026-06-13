@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS toys (
   stage3_note TEXT,
   stage3_intl_ship REAL DEFAULT 0,
   stage3_tax REAL DEFAULT 0,
+  stage3_tax_mode TEXT DEFAULT 'normal',  -- normal/tax_included
 
   -- 预计到货日（采购中提示用）
   expected_arrival_date TEXT,
