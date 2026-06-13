@@ -11,7 +11,7 @@ export const SOURCES = [
 // 切换进货渠道时自动套用的默认值
 export const ESTIMATE_DEFAULTS = {
   direct:     { handling_fee: '10', japan_domestic_shipping: '90', intl_shipping: '70', logistics_fee: '10', box_fee: '5', packing_fee: '5' },
-  proxy:      { handling_fee: '0',  japan_domestic_shipping: '0',  intl_shipping: '70', logistics_fee: '10', box_fee: '5', packing_fee: '5' },
+  proxy:      { handling_fee: '5',  japan_domestic_shipping: '0',  intl_shipping: '70', logistics_fee: '10', box_fee: '5', packing_fee: '5' },
 };
 
 export const num = (v) => (v === '' || v === null || v === undefined) ? 0 : Number(v);
