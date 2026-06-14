@@ -1,18 +1,16 @@
 /*
  * ============================================================================
- * 任你购历史订单抓取脚本 v9
+ * 任你购历史订单抓取脚本 v10
  * ============================================================================
  *
- * 用途：从 rennigou.jp 抓取全部已完成订单，逐条获取每件商品的费用（代购手续费、
- *       日本国内运费、付款手续费、优惠券），并获取每单包裹信息（国际运费、
- *       包装手续费、快递方式、运单号、重量）。
+ * 用途：从 rennigou.jp 抓取全部已完成订单，逐条获取费用（日元+人民币）和包裹信息。
  *
  * ── 使用步骤 ──────────────────────────────────────────────────────────────
  * 1. 用手机/电脑浏览器打开 rennigou.jp 并登录
  * 2. 打开开发者工具（F12 或 菜单 → 开发者工具）
  * 3. 切换到 Console（控制台）标签页
  * 4. 复制本脚本的全部内容，粘贴到 Console 里，按回车运行
- * 5. 弹出对话框，粘贴你当前页面的 JWT Token（见下方获取方式）
+ * 5. 弹出对话框，JWT 已默认填入，过期再手动换新
  * 6. 等待脚本运行（标题栏会显示进度，约 2~3 分钟）
  * 7. 运行完成后弹出文本框，全选复制 JSON 数据
  * 8. 回到巴坦杂货铺设置页 → 任你购订单分析 → 粘贴 → 点「分析」
@@ -23,24 +21,22 @@
  *   - 左侧 Storage → Local Storage → https://rl.rngmoe.com
  *   - 找到 key 为 "token" 的条目，复制其 value
  * 或者直接在 Console 输入：copy(localStorage.token)
- * 然后粘贴到脚本弹出的对话框里。
- *
- * ── 抓取范围 ──────────────────────────────────────────────────────────────
- * 仅抓取"已完成"状态的订单（service=finish_ownerPackage），共 7 页约 138 单。
- * 每件商品和每单包裹各发一次详情请求，20 条并发。
  *
  * ── 输出字段 ──────────────────────────────────────────────────────────────
  * 商品级（body[] 内）：
- *   _paymentFee         — 付款手续费（日元）
- *   _serviceFee         — 代购手续费（日元）
- *   _domesticShipping   — 日本国内运费（日元）
- *   _coupon             — 优惠券抵扣（元，负数为抵扣金额）
+ *   _paymentFee           — 付款手续费（日元）
+ *   _paymentFeeRmb        — 付款手续费（人民币）
+ *   _serviceFee           — 代购手续费（日元）
+ *   _serviceFeeRmb        — 代购手续费（人民币）
+ *   _domesticShipping     — 日本国内运费（日元）
+ *   _domesticShippingRmb  — 日本国内运费（人民币）
+ *   _coupon               — 优惠券抵扣（人民币）
  * 订单级（_package）：
- *   internationalShipping — 国际运费（日元）
- *   packagingFee          — 包装手续费（日元）
- *   expressName           — 快递方式
- *   expressNo             — 运单号
- *   weight                — 实际重量（克，可能为0表示未记录）
+ *   internationalShipping    — 国际运费（日元）
+ *   internationalShippingRmb — 国际运费（人民币）
+ *   packagingFee             — 包装手续费（日元）
+ *   packagingFeeRmb          — 包装手续费（人民币）
+ *   expressName / expressNo / weight
  * ============================================================================
  */
 (async () => {
@@ -48,6 +44,15 @@
   if (!jwt) return;
   const H = { "accept": "application/json", "authorization": "Bearer " + jwt, "token": "0fe0f7d6f0fc2c1f79fe53992a189c2d032a0cfd6c3560a4402f4ac715e376a1", "uid": "2016001" };
   const BASE = "https://rl.rngmoe.com/order/order/";
+
+  // Helper: parse JPY and RMB from titleValue like "750日元（约 34 元）"
+  function parseFee(s) {
+    var parts = (s || "").split("日元");
+    var jpy = parseInt(parts[0].replace(/[^0-9]/g, ""), 10) || 0;
+    var rmb = 0;
+    if (parts.length > 1) rmb = parseInt(parts[1].replace(/[^0-9]/g, ""), 10) || 0;
+    return [jpy, rmb];
+  }
 
   // Step 1: fetch list
   var orders = [];
@@ -91,14 +96,12 @@
             var feeBlock = null;
             for (var dii = 0; dii < di.length; dii++) { if (di[dii].sign === "feeInfo") { feeBlock = di[dii]; break; } }
             if (feeBlock && feeBlock.data) {
-              var fees = { pf:0, sf:0, ds:0, coupon:0 };
+              var fees = { pf:0, pfRmb:0, sf:0, sfRmb:0, ds:0, dsRmb:0, coupon:0 };
               for (var fi = 0; fi < feeBlock.data.length; fi++) {
                 var f = feeBlock.data[fi];
-                var parts = (f.titleValue || "").split("日元");
-                var num = parseInt(parts[0].replace(/[^0-9]/g, ""), 10) || 0;
-                if (f.title === "付款手续费") fees.pf = num;
-                else if (f.title === "代购手续费") fees.sf = num;
-                else if (f.title === "日本国内运费") fees.ds = num;
+                if (f.title === "付款手续费") { var pr = parseFee(f.titleValue); fees.pf = pr[0]; fees.pfRmb = pr[1]; }
+                else if (f.title === "代购手续费") { var pr = parseFee(f.titleValue); fees.sf = pr[0]; fees.sfRmb = pr[1]; }
+                else if (f.title === "日本国内运费") { var pr = parseFee(f.titleValue); fees.ds = pr[0]; fees.dsRmb = pr[1]; }
                 else if (f.title === "优惠券抵扣") {
                   var cparts = (f.titleValue || "").split("元");
                   fees.coupon = parseInt(cparts[0].replace(/[^0-9\-]/g, ""), 10) || 0;
@@ -134,23 +137,19 @@
           var r = await fetch(BASE + "getDetails?service=package&itemId=" + oid, { headers: H });
           var d = JSON.parse(await r.text());
           if (d.code === 0 && d.data) {
-            var pkg = { is:0, pf:0, en:"", eno:"", wt:0 };
+            var pkg = { is:0, isRmb:0, pf:0, pfRmb:0, en:"", eno:"", wt:0 };
 
-            // extract feeInfo: 国际运费 / 包装手续费
             var di = d.data.detailedInfo || [];
             var feeBlock = null;
             for (var dii = 0; dii < di.length; dii++) { if (di[dii].sign === "feeInfo") { feeBlock = di[dii]; break; } }
             if (feeBlock && feeBlock.data) {
               for (var fi = 0; fi < feeBlock.data.length; fi++) {
                 var f = feeBlock.data[fi];
-                var parts = (f.titleValue || "").split("日元");
-                var num = parseInt(parts[0].replace(/[^0-9]/g, ""), 10) || 0;
-                if (f.title === "国际运费") pkg.is = num;
-                else if (f.title === "包装手续费") pkg.pf = num;
+                if (f.title === "国际运费") { var pr = parseFee(f.titleValue); pkg.is = pr[0]; pkg.isRmb = pr[1]; }
+                else if (f.title === "包装手续费") { var pr = parseFee(f.titleValue); pkg.pf = pr[0]; pkg.pfRmb = pr[1]; }
               }
             }
 
-            // extract expressInfo
             var ei = d.data.expressInfo;
             if (ei) {
               pkg.en = ei.express_name || "";
@@ -178,8 +177,11 @@
       var f = itemResults[bd[n].item_id];
       if (f) {
         bd[n]._paymentFee = f.pf;
+        bd[n]._paymentFeeRmb = f.pfRmb;
         bd[n]._serviceFee = f.sf;
+        bd[n]._serviceFeeRmb = f.sfRmb;
         bd[n]._domesticShipping = f.ds;
+        bd[n]._domesticShippingRmb = f.dsRmb;
         bd[n]._coupon = f.coupon;
         merged++;
       }
@@ -193,7 +195,9 @@
     if (p) {
       orders[oi]._package = {
         internationalShipping: p.is,
+        internationalShippingRmb: p.isRmb,
         packagingFee: p.pf,
+        packagingFeeRmb: p.pfRmb,
         expressName: p.en,
         expressNo: p.eno,
         weight: p.wt
@@ -202,7 +206,7 @@
     }
   }
 
-  var status = "v8: orders=" + orders.length + " itemFees=" + itemOk + "/" + itemIds.length + " packages=" + pkgOk + "/" + orderIds.length + " merged=" + merged + " pkgMerged=" + pkgMerged;
+  var status = "v10: orders=" + orders.length + " itemFees=" + itemOk + "/" + itemIds.length + " packages=" + pkgOk + "/" + orderIds.length + " merged=" + merged + " pkgMerged=" + pkgMerged;
   document.title = status;
 
   var out = "=== " + status + " ===\n\n" + JSON.stringify(orders);

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 
 function fmt(n, d) { return Number(n).toFixed(d||0); }
 function yne(n) { return '¥' + Number(n).toLocaleString('zh-CN'); }
+function rmb(n) { return '¥' + Number(n).toLocaleString('zh-CN') + ' (CNY)'; }
 function ts2date(ts) { const d = new Date(ts*1000); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function ts2month(ts) { const d = new Date(ts*1000); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
 
@@ -85,8 +86,11 @@ export default function OrderAnalyzer() {
           amount: it.amount||1,
           createTs: it.create_time,
           paymentFee: it._paymentFee||0,
+          paymentFeeRmb: it._paymentFeeRmb||0,
           serviceFee: it._serviceFee||0,
+          serviceFeeRmb: it._serviceFeeRmb||0,
           domesticShipping: it._domesticShipping||0,
+          domesticShippingRmb: it._domesticShippingRmb||0,
           coupon: it._coupon||0
         });
       });
@@ -94,13 +98,19 @@ export default function OrderAnalyzer() {
 
     const totalSpent = items.reduce((s,i) => s + i.price * i.amount, 0);
     const totalServiceFee = items.reduce((s,i) => s + i.serviceFee, 0);
+    const totalServiceFeeRmb = items.reduce((s,i) => s + i.serviceFeeRmb, 0);
     const totalShipping = items.reduce((s,i) => s + i.domesticShipping, 0);
+    const totalShippingRmb = items.reduce((s,i) => s + i.domesticShippingRmb, 0);
     const totalPaymentFee = items.reduce((s,i) => s + i.paymentFee, 0);
+    const totalPaymentFeeRmb = items.reduce((s,i) => s + i.paymentFeeRmb, 0);
     const totalCoupon = items.reduce((s,i) => s + i.coupon, 0);
     const totalIntlShipping = data.reduce((s,ord) => s + ((ord._package||{}).internationalShipping||0), 0);
+    const totalIntlShippingRmb = data.reduce((s,ord) => s + ((ord._package||{}).internationalShippingRmb||0), 0);
     const totalPackagingFee = data.reduce((s,ord) => s + ((ord._package||{}).packagingFee||0), 0);
+    const totalPackagingFeeRmb = data.reduce((s,ord) => s + ((ord._package||{}).packagingFeeRmb||0), 0);
     const intlCount = data.filter(ord => ((ord._package||{}).internationalShipping||0) > 0).length;
     const totalAllIn = totalSpent + totalServiceFee + totalShipping + totalPaymentFee + totalIntlShipping + totalPackagingFee;
+    const totalAllInRmb = totalServiceFeeRmb + totalShippingRmb + totalPaymentFeeRmb + totalCoupon + totalIntlShippingRmb + totalPackagingFeeRmb;
     const avgPrice = totalSpent / items.length;
     const prices = items.map(i => i.price).sort((a,b) => a-b);
     const p50 = prices[Math.floor(prices.length*0.5)];
@@ -110,11 +120,13 @@ export default function OrderAnalyzer() {
     // 来源
     const srcMap = {};
     items.forEach(i => {
-      if (!srcMap[i.source]) srcMap[i.source] = { count:0, spent:0, serviceFee:0, shipping:0, coupon:0 };
+      if (!srcMap[i.source]) srcMap[i.source] = { count:0, spent:0, serviceFee:0, serviceFeeRmb:0, shipping:0, shippingRmb:0, coupon:0 };
       srcMap[i.source].count++;
       srcMap[i.source].spent += i.price * i.amount;
       srcMap[i.source].serviceFee += i.serviceFee;
+      srcMap[i.source].serviceFeeRmb += i.serviceFeeRmb;
       srcMap[i.source].shipping += i.domesticShipping;
+      srcMap[i.source].shippingRmb += i.domesticShippingRmb;
       srcMap[i.source].coupon += i.coupon;
     });
     const srcs = Object.entries(srcMap).sort((a,b) => b[1].spent - a[1].spent);
@@ -122,11 +134,13 @@ export default function OrderAnalyzer() {
     // 月度
     const monthMap = {};
     items.forEach(i => {
-      if (!monthMap[i.orderMonth]) monthMap[i.orderMonth] = { count:0, spent:0, serviceFee:0, shipping:0, coupon:0 };
+      if (!monthMap[i.orderMonth]) monthMap[i.orderMonth] = { count:0, spent:0, serviceFee:0, serviceFeeRmb:0, shipping:0, shippingRmb:0, coupon:0 };
       monthMap[i.orderMonth].count++;
       monthMap[i.orderMonth].spent += i.price * i.amount;
       monthMap[i.orderMonth].serviceFee += i.serviceFee;
+      monthMap[i.orderMonth].serviceFeeRmb += i.serviceFeeRmb;
       monthMap[i.orderMonth].shipping += i.domesticShipping;
+      monthMap[i.orderMonth].shippingRmb += i.domesticShippingRmb;
       monthMap[i.orderMonth].coupon += i.coupon;
     });
     const months = Object.entries(monthMap).sort();
@@ -138,11 +152,13 @@ export default function OrderAnalyzer() {
     const yearMonths = {};
     items.forEach(i => {
       const y = i.orderMonth.slice(0,4);
-      if (!yearMap[y]) yearMap[y] = { count:0, spent:0, serviceFee:0, shipping:0, coupon:0 };
+      if (!yearMap[y]) yearMap[y] = { count:0, spent:0, serviceFee:0, serviceFeeRmb:0, shipping:0, shippingRmb:0, coupon:0 };
       yearMap[y].count++;
       yearMap[y].spent += i.price * i.amount;
       yearMap[y].serviceFee += i.serviceFee;
+      yearMap[y].serviceFeeRmb += i.serviceFeeRmb;
       yearMap[y].shipping += i.domesticShipping;
+      yearMap[y].shippingRmb += i.domesticShippingRmb;
       yearMap[y].coupon += i.coupon;
       if (!yearMonths[y]) yearMonths[y] = new Set();
       yearMonths[y].add(i.orderMonth);
@@ -185,7 +201,9 @@ export default function OrderAnalyzer() {
         source: (it.source_site_name||'未知').trim(),
         amount: it.amount||1,
         serviceFee: it._serviceFee||0,
+        serviceFeeRmb: it._serviceFeeRmb||0,
         shipping: it._domesticShipping||0,
+        shippingRmb: it._domesticShippingRmb||0,
         coupon: it._coupon||0
       }));
       const pkg = ord._package || {};
@@ -197,6 +215,7 @@ export default function OrderAnalyzer() {
         items: batchItems,
         itemCount: batchItems.length,
         totalSpent: batchItems.reduce((s,i) => s + i.price*i.amount + i.serviceFee + i.shipping, 0),
+        totalSpentRmb: batchItems.reduce((s,i) => s + i.serviceFeeRmb + i.shippingRmb, 0),
         sources: [...new Set(batchItems.map(i => i.source))]
       };
     });
@@ -213,7 +232,7 @@ export default function OrderAnalyzer() {
     setResult({
       orderCount: data.length,
       itemCount: items.length,
-      totalSpent, totalServiceFee, totalShipping, totalPaymentFee, totalCoupon, totalIntlShipping, totalPackagingFee, intlCount, totalAllIn,
+      totalSpent, totalServiceFee, totalServiceFeeRmb, totalShipping, totalShippingRmb, totalPaymentFee, totalPaymentFeeRmb, totalCoupon, totalIntlShipping, totalIntlShippingRmb, totalPackagingFee, totalPackagingFeeRmb, intlCount, totalAllIn, totalAllInRmb,
       avgPrice, p50, p90, p95,
       minPrice: prices[0],
       maxPrice: prices[prices.length-1],
@@ -302,6 +321,29 @@ export default function OrderAnalyzer() {
                 </div>
               ))}
             </div>
+
+            {result.totalServiceFeeRmb + result.totalShippingRmb + result.totalIntlShippingRmb > 0 && (
+              <div className="mt-3">
+                <div className="text-xs text-accent font-bold mb-2">费用人民币估算 (CNY)</div>
+                <div className="grid grid-cols-2 xs:grid-cols-4 gap-2">
+                  {[
+                    ['代购手续费', result.totalServiceFeeRmb],
+                    ['日本国内运费', result.totalShippingRmb],
+                    ['付款手续费', result.totalPaymentFeeRmb],
+                    ['优惠券抵扣', result.totalCoupon],
+                    ['国际运费', result.totalIntlShippingRmb],
+                    ['包装手续费', result.totalPackagingFeeRmb],
+                    ['合计 (不含商品)', result.totalAllInRmb],
+                  ].map(([label, val]) => (
+                    <div key={label} className="bg-bg rounded-lg p-2 text-center">
+                      <div className="text-sm font-bold text-[#f0883e]">{val ? rmb(val) : '-'}</div>
+                      <div className="text-[10px] text-[#6b7085]">{label}</div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-[#6b7085] mt-1">注意：商品价未记录人民币，以上仅为各费用的 RMB 估值</p>
+              </div>
+            )}
           </div>
 
           {/* 年度 */}
@@ -510,12 +552,16 @@ export default function OrderAnalyzer() {
                       {mixedSources && <span className="bg-[#f0883e]/20 text-[#f0883e] px-1.5 py-0.5 rounded text-[10px]">跨站合批</span>}
                     </div>
                     <div className="text-[#6b7085] mt-0.5">
-                      合计 {yne(b.totalSpent)}
+                      JPY {yne(b.totalSpent)}
                       {b.pkg && b.pkg.internationalShipping ? <span className="ml-2 text-[#58a6ff]">+国际 {yne(b.pkg.internationalShipping)}</span> : ''}
                       {b.pkg && b.pkg.packagingFee ? <span className="ml-2">+包装 {yne(b.pkg.packagingFee)}</span> : ''}
                     </div>
+                    {(() => {
+                      var pRmb = b.totalSpentRmb + (b.pkg ? (b.pkg.internationalShippingRmb||0) + (b.pkg.packagingFeeRmb||0) : 0);
+                      return pRmb > 0 ? <div className="text-[10px] text-[#6b7085]">费用约 {rmb(pRmb)}</div> : null;
+                    })()}
                     {b.pkg && (b.pkg.expressName || b.pkg.expressNo) ? (
-                      <div className="text-[10px] text-[#6b7085] mt-1">
+                      <div className="text-[10px] text-[#6b7085] mt-0.5">
                         快递: {b.pkg.expressName}{b.pkg.expressNo ? ' ' + b.pkg.expressNo : ''}{b.pkg.weight ? ' 重量 ' + b.pkg.weight + 'g' : ''}
                       </div>
                     ) : null}
