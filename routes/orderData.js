@@ -43,7 +43,9 @@ router.post('/', (req, res) => {
 router.delete('/:name', (req, res) => {
   const p = path.join(DATA_DIR, req.params.name);
   if (!fs.existsSync(p)) return res.status(404).json({ error: 'not found' });
-  fs.unlinkSync(p);
+  try { fs.unlinkSync(p); } catch(e) {
+    return res.status(500).json({ error: e.message });
+  }
   res.json({ ok: true });
 });
 
