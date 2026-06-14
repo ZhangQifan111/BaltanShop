@@ -1,51 +1,40 @@
+// debug: 查看 detailedInfo 全部区块（找优惠券等隐藏字段）
 (async () => {
   const jwt = prompt("Paste JWT:");
   if (!jwt) return;
   const H = { "accept": "application/json", "authorization": "Bearer " + jwt, "token": "0fe0f7d6f0fc2c1f79fe53992a189c2d032a0cfd6c3560a4402f4ac715e376a1", "uid": "2016001" };
-  const itemId = 39280200;
+  const itemId = prompt("Item ID (留空用默认 39280200):") || "39280200";
 
-  var log = "";
-
-  // Step 1: fetch detail
-  log += "=== Step 1: fetch getDetails ===\n";
+  var log = "=== itemId=" + itemId + " ===\n\n";
   var r = await fetch("https://rl.rngmoe.com/order/order/getDetails?service=item&itemId=" + itemId, { headers: H });
-  log += "status: " + r.status + "\n";
   var d = JSON.parse(await r.text());
-  log += "code: " + d.code + ", msg: " + d.msg + "\n";
-  log += "has data: " + !!d.data + "\n\n";
+  log += "API code: " + d.code + "\n\n";
 
-  // Step 2: find feeInfo
-  log += "=== Step 2: detailedInfo ===\n";
   var di = d.data.detailedInfo || [];
-  log += "detailedInfo length: " + di.length + "\n";
-  di.forEach(function(x, i) { log += "  [" + i + "] sign=" + x.sign + "\n"; });
-  log += "\n";
+  log += "detailedInfo 共 " + di.length + " 个区块:\n";
+  log += "────────────────────────────────────────────\n";
 
-  // Step 3: get fee block
-  log += "=== Step 3: find feeInfo ===\n";
-  var feeBlock = di.find(function(x) { return x.sign === "feeInfo"; });
-  log += "found: " + !!feeBlock + "\n";
-  if (feeBlock) {
-    log += "feeBlock.data length: " + feeBlock.data.length + "\n";
-    feeBlock.data.forEach(function(f) {
-      log += "  title=" + f.title + " value=" + f.titleValue + "\n";
-    });
-  }
-  log += "\n";
-
-  // Step 4: parse
-  log += "=== Step 4: parse fees ===\n";
-  var feeInfo = (feeBlock || {}).data || [];
-  var fees = { paymentFee:0, serviceFee:0, domesticShipping:0 };
-  feeInfo.forEach(function(f) {
-    var parts = (f.titleValue || "").split("日元");
-    var num = parseInt(parts[0].replace(/[^0-9]/g, ""), 10) || 0;
-    log += f.title + " -> raw=[" + f.titleValue + "] -> parts0=[" + parts[0] + "] -> num=" + num + "\n";
-    if (f.title === "付款手续费") fees.paymentFee = num;
-    if (f.title === "代购手续费") fees.serviceFee = num;
-    if (f.title === "日本国内运费") fees.domesticShipping = num;
+  di.forEach(function(block, i) {
+    log += "\n[" + i + "] sign=" + block.sign + "  data条数=" + (block.data ? block.data.length : 0) + "\n";
+    if (block.sign !== "itemState") {
+      // 打印该区块的完整 data 内容
+      if (block.data && block.data.length) {
+        block.data.forEach(function(row, j) {
+          if (typeof row === "object") {
+            log += "  [" + j + "] " + JSON.stringify(row) + "\n";
+          } else {
+            log += "  [" + j + "] " + row + "\n";
+          }
+        });
+      }
+    } else {
+      // itemState 只打印条数
+      log += "  (状态时间线，共" + (block.data ? block.data.length : 0) + "条)\n";
+    }
   });
-  log += "FINAL: paymentFee=" + fees.paymentFee + " serviceFee=" + fees.serviceFee + " domesticShipping=" + fees.domesticShipping + "\n";
+
+  log += "\n────────────────────────────────────────────\n";
+  log += "如果有优惠券相关字段，会出现在上面的非 itemState 区块中。\n";
 
   var ta = document.createElement("textarea");
   ta.value = log;
