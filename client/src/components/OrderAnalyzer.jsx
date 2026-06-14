@@ -217,9 +217,12 @@ export default function OrderAnalyzer() {
   return (
     <div className="card">
       <div className="text-xs text-[#6b7085] uppercase tracking-widest mb-4">任你购订单分析</div>
-      <p className="text-xs text-[#6b7085] mb-3">
-        在任你购页面 Console 运行抓取脚本，将输出的 JSON 数组粘贴到下方进行分析。数据仅在浏览器本地处理。
-      </p>
+      <div className="flex items-center gap-3 mb-3">
+        <p className="text-xs text-[#6b7085] flex-1">
+          在任你购页面 Console 运行<a href="/fetch_all_details.js" target="_blank" className="text-accent underline mx-0.5">抓取脚本</a>，将输出的 JSON 数组粘贴到下方进行分析。
+        </p>
+        <a href="/fetch_all_details.js" target="_blank" className="btn-primary text-xs whitespace-nowrap">打开抓取脚本</a>
+      </div>
       <textarea
         className="input text-xs w-full h-32 resize-y mb-3 font-mono"
         placeholder="粘贴 JSON 数组..."
