@@ -9,6 +9,7 @@ dist.before-estimate/
 # Database & runtime data
 data.db
 backups/
+data/
 
 # User-uploaded / scraped media
 uploads/

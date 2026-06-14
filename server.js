@@ -35,6 +35,7 @@ app.use('/api/settings', require('./routes/settings'));
 app.use('/api/stats', require('./routes/stats'));
 const { router: backupRouter } = require('./routes/backup');
 app.use('/api/backup', backupRouter);
+app.use('/api/order-data', require('./routes/orderData'));
 
 // Misc sales
 const db = require('./db/database');

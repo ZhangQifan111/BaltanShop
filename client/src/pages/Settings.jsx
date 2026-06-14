@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import useStore from '../stores/useStore';
 import { api } from '../lib/api';
 import ConfirmModal from '../components/ConfirmModal';
+import OrderAnalyzer from '../components/OrderAnalyzer';
 
 export default function Settings() {
   const { suppliers, feeRules, addSupplier, addFeeRule, deleteFeeRule, setToast } = useStore();
@@ -131,6 +132,9 @@ export default function Settings() {
         {categories.length === 0 && <div className="text-xs text-[#6b7085] mt-2">暂无分类</div>}
         <p className="text-[10px] text-[#6b7085] mt-3">点击分类可删除</p>
       </div>
+
+      {/* 任你购订单分析 */}
+      <OrderAnalyzer />
 
       {pendingDelete && (
         <ConfirmModal
