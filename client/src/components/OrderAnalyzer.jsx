@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 
 function fmt(n, d) { return Number(n).toFixed(d||0); }
 function yne(n) { return '¥' + Number(n).toLocaleString('zh-CN'); }
-function rmb(n) { return '¥' + Number(n).toLocaleString('zh-CN') + ' (CNY)'; }
+function rmb(n) { return '≈¥' + Number(n).toLocaleString('zh-CN'); }
 function ts2date(ts) { const d = new Date(ts*1000); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function ts2month(ts) { const d = new Date(ts*1000); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
 
@@ -536,11 +536,6 @@ export default function OrderAnalyzer() {
               ))}
             </div>
             <div className="text-xs text-[#6b7085] mb-2">全部批次（由近到远）</div>
-            <div className="flex text-[10px] text-[#6b7085] px-3 mb-1">
-              <span className="flex-1">商品 / 费用</span>
-              <span className="shrink-0 w-14 text-right">JPY</span>
-              <span className="shrink-0 w-14 text-right">CNY</span>
-            </div>
             {result.allBatches.map(b => {
               const mixedSources = b.sources.length >= 2;
               return (
@@ -553,13 +548,13 @@ export default function OrderAnalyzer() {
                       {mixedSources && <span className="bg-[#f0883e]/20 text-[#f0883e] px-1.5 py-0.5 rounded text-[10px]">跨站合批</span>}
                     </div>
                     <div className="text-[#6b7085] mt-0.5">
-                      JPY {yne(b.totalSpent)}
+                      {yne(b.totalSpent)}
                       {b.pkg && b.pkg.internationalShipping ? <span className="ml-2 text-[#58a6ff]">+国际 {yne(b.pkg.internationalShipping)}</span> : ''}
                       {b.pkg && b.pkg.packagingFee ? <span className="ml-2">+包装 {yne(b.pkg.packagingFee)}</span> : ''}
                     </div>
                     {(() => {
                       var pRmb = b.totalSpentRmb + (b.pkg ? (b.pkg.internationalShippingRmb||0) + (b.pkg.packagingFeeRmb||0) : 0);
-                      return pRmb > 0 ? <div className="text-[10px] text-[#6b7085]">费用 CNY {rmb(pRmb)}</div> : null;
+                      return pRmb > 0 ? <div className="text-[10px] text-[#6b7085]">{rmb(pRmb)}</div> : null;
                     })()}
                     {b.pkg && (b.pkg.expressName || b.pkg.expressNo) ? (
                       <div className="text-[10px] text-[#6b7085] mt-0.5">
@@ -575,11 +570,12 @@ export default function OrderAnalyzer() {
                       return (
                       <div key={idx} className="pl-2 border-l-2 border-white/[0.06] text-[11px]">
                         <div className="truncate mb-0.5">{it.title}</div>
-                        <div className="flex items-center gap-x-2 text-[10px] text-[#6b7085] flex-wrap">
-                          <span className="text-accent whitespace-nowrap">商品 {yne(it.price)}{it.priceRmb ? <span className="text-[#f0883e]"> / {rmb(it.priceRmb)}</span> : ''}</span>
-                          {it.serviceFee ? <span>代购 +{yne(it.serviceFee)}<span className="text-[#f0883e]"> / {rmb(it.serviceFeeRmb)}</span></span> : null}
-                          {it.shipping ? <span>运费 +{yne(it.shipping)}<span className="text-[#f0883e]"> / {rmb(it.shippingRmb)}</span></span> : null}
-                          {it.coupon ? <span className="text-[#f0883e]">券 {it.coupon}元</span> : null}
+                        <div className="text-[10px] text-[#6b7085] leading-relaxed">
+                          <span className="text-accent">{yne(it.price)}</span>
+                          {it.priceRmb ? <span className="text-[#f0883e] ml-1">{rmb(it.priceRmb)}</span> : null}
+                          {it.serviceFee ? <span className="ml-2">代购 <span className="text-accent">+{yne(it.serviceFee)}</span><span className="text-[#f0883e]"> {rmb(it.serviceFeeRmb)}</span></span> : null}
+                          {it.shipping ? <span className="ml-2">运费 <span className="text-accent">+{yne(it.shipping)}</span><span className="text-[#f0883e]"> {rmb(it.shippingRmb)}</span></span> : null}
+                          {it.coupon ? <span className="ml-2 text-[#f0883e]">券 {it.coupon}元</span> : null}
                         </div>
                       </div>
                     )})}
