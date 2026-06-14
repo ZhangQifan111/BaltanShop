@@ -49,10 +49,12 @@ export default function OrderAnalyzer() {
 
   const deleteFile = async (name) => {
     try {
-      await fetch('/api/order-data/' + name, { method: 'DELETE' });
+      const r = await fetch('/api/order-data/' + name, { method: 'DELETE' });
+      const j = await r.json();
+      if (!j.ok) { setSaveMsg('删除失败: ' + (j.error || 'unknown')); return; }
+      setSavedFiles(prev => prev.filter(f => f.name !== name));
       setSaveMsg('已删除: ' + name);
-      refreshFiles();
-    } catch(e) { setSaveMsg('删除失败'); }
+    } catch(e) { setSaveMsg('删除失败: ' + e.message); }
   };
 
   const analyze = () => {
