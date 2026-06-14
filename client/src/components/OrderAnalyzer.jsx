@@ -86,7 +86,8 @@ export default function OrderAnalyzer() {
           createTs: it.create_time,
           paymentFee: it._paymentFee||0,
           serviceFee: it._serviceFee||0,
-          domesticShipping: it._domesticShipping||0
+          domesticShipping: it._domesticShipping||0,
+          coupon: it._coupon||0
         });
       });
     });
@@ -95,6 +96,7 @@ export default function OrderAnalyzer() {
     const totalServiceFee = items.reduce((s,i) => s + i.serviceFee, 0);
     const totalShipping = items.reduce((s,i) => s + i.domesticShipping, 0);
     const totalPaymentFee = items.reduce((s,i) => s + i.paymentFee, 0);
+    const totalCoupon = items.reduce((s,i) => s + i.coupon, 0);
     const totalAllIn = totalSpent + totalServiceFee + totalShipping + totalPaymentFee;
     const avgPrice = totalSpent / items.length;
     const prices = items.map(i => i.price).sort((a,b) => a-b);
@@ -105,22 +107,24 @@ export default function OrderAnalyzer() {
     // 来源
     const srcMap = {};
     items.forEach(i => {
-      if (!srcMap[i.source]) srcMap[i.source] = { count:0, spent:0, serviceFee:0, shipping:0 };
+      if (!srcMap[i.source]) srcMap[i.source] = { count:0, spent:0, serviceFee:0, shipping:0, coupon:0 };
       srcMap[i.source].count++;
       srcMap[i.source].spent += i.price * i.amount;
       srcMap[i.source].serviceFee += i.serviceFee;
       srcMap[i.source].shipping += i.domesticShipping;
+      srcMap[i.source].coupon += i.coupon;
     });
     const srcs = Object.entries(srcMap).sort((a,b) => b[1].spent - a[1].spent);
 
     // 月度
     const monthMap = {};
     items.forEach(i => {
-      if (!monthMap[i.orderMonth]) monthMap[i.orderMonth] = { count:0, spent:0, serviceFee:0, shipping:0 };
+      if (!monthMap[i.orderMonth]) monthMap[i.orderMonth] = { count:0, spent:0, serviceFee:0, shipping:0, coupon:0 };
       monthMap[i.orderMonth].count++;
       monthMap[i.orderMonth].spent += i.price * i.amount;
       monthMap[i.orderMonth].serviceFee += i.serviceFee;
       monthMap[i.orderMonth].shipping += i.domesticShipping;
+      monthMap[i.orderMonth].coupon += i.coupon;
     });
     const months = Object.entries(monthMap).sort();
     const maxMonthSpent = Math.max(...months.map(e => e[1].spent));
@@ -131,11 +135,12 @@ export default function OrderAnalyzer() {
     const yearMonths = {};
     items.forEach(i => {
       const y = i.orderMonth.slice(0,4);
-      if (!yearMap[y]) yearMap[y] = { count:0, spent:0, serviceFee:0, shipping:0 };
+      if (!yearMap[y]) yearMap[y] = { count:0, spent:0, serviceFee:0, shipping:0, coupon:0 };
       yearMap[y].count++;
       yearMap[y].spent += i.price * i.amount;
       yearMap[y].serviceFee += i.serviceFee;
       yearMap[y].shipping += i.domesticShipping;
+      yearMap[y].coupon += i.coupon;
       if (!yearMonths[y]) yearMonths[y] = new Set();
       yearMonths[y].add(i.orderMonth);
     });
@@ -177,7 +182,8 @@ export default function OrderAnalyzer() {
         source: (it.source_site_name||'未知').trim(),
         amount: it.amount||1,
         serviceFee: it._serviceFee||0,
-        shipping: it._domesticShipping||0
+        shipping: it._domesticShipping||0,
+        coupon: it._coupon||0
       }));
       batchMap[ord.id] = {
         orderId: ord.id,
@@ -202,7 +208,7 @@ export default function OrderAnalyzer() {
     setResult({
       orderCount: data.length,
       itemCount: items.length,
-      totalSpent, totalServiceFee, totalShipping, totalPaymentFee, totalAllIn,
+      totalSpent, totalServiceFee, totalShipping, totalPaymentFee, totalCoupon, totalAllIn,
       avgPrice, p50, p90, p95,
       minPrice: prices[0],
       maxPrice: prices[prices.length-1],
@@ -274,6 +280,7 @@ export default function OrderAnalyzer() {
                 ['代购手续费', yne(result.totalServiceFee)],
                 ['日本国内运费', yne(result.totalShipping)],
                 ['付款手续费', yne(result.totalPaymentFee)],
+                ['优惠券抵扣', (result.totalCoupon||0) + ' 元'],
                 ['合计 (含费)', yne(result.totalAllIn)],
                 ['均价', yne(result.avgPrice)],
                 ['中位数', yne(result.p50)],
@@ -299,6 +306,7 @@ export default function OrderAnalyzer() {
                   <th className="py-1 pr-2 text-right">件数</th>
                   <th className="py-1 pr-2 text-right">商品价</th>
                   <th className="py-1 pr-2 text-right">费用</th>
+                  <th className="py-1 pr-2 text-right">优惠券</th>
                   <th className="py-1 text-right">合计</th>
                 </tr>
               </thead>
@@ -309,6 +317,7 @@ export default function OrderAnalyzer() {
                     <td className="py-1.5 pr-2 text-right">{v.count}</td>
                     <td className="py-1.5 pr-2 text-right">{yne(v.spent)}</td>
                     <td className="py-1.5 pr-2 text-right">{yne(v.serviceFee+v.shipping)}</td>
+                    <td className="py-1.5 pr-2 text-right text-[#f0883e]">{v.coupon ? v.coupon + ' 元' : ''}</td>
                     <td className="py-1.5 text-right">{yne(v.spent+v.serviceFee+v.shipping)}</td>
                   </tr>
                 ))}
@@ -327,6 +336,7 @@ export default function OrderAnalyzer() {
                   <th className="py-1 pr-2 text-right">商品价</th>
                   <th className="py-1 pr-2 text-right">手续费</th>
                   <th className="py-1 pr-2 text-right">运费</th>
+                  <th className="py-1 pr-2 text-right">优惠券</th>
                   <th className="py-1 text-right">合计</th>
                 </tr>
               </thead>
@@ -338,6 +348,7 @@ export default function OrderAnalyzer() {
                     <td className="py-1.5 pr-2 text-right">{yne(v.spent)}</td>
                     <td className="py-1.5 pr-2 text-right">{yne(v.serviceFee)}</td>
                     <td className="py-1.5 pr-2 text-right">{yne(v.shipping)}</td>
+                    <td className="py-1.5 pr-2 text-right text-[#f0883e]">{v.coupon ? v.coupon + ' 元' : ''}</td>
                     <td className="py-1.5 text-right">{yne(v.spent+v.serviceFee+v.shipping)}</td>
                   </tr>
                 ))}
@@ -387,6 +398,7 @@ export default function OrderAnalyzer() {
                   <th className="py-1 pr-2 text-right">件数</th>
                   <th className="py-1 pr-2 text-right">商品价</th>
                   <th className="py-1 pr-2 text-right">费用</th>
+                  <th className="py-1 pr-2 text-right">优惠券</th>
                   <th className="py-1 text-right">合计</th>
                 </tr>
               </thead>
@@ -397,6 +409,7 @@ export default function OrderAnalyzer() {
                     <td className="py-1 pr-2 text-right">{v.count}</td>
                     <td className="py-1 pr-2 text-right">{yne(v.spent)}</td>
                     <td className="py-1 pr-2 text-right">{yne(v.serviceFee+v.shipping)}</td>
+                    <td className="py-1 pr-2 text-right text-[#f0883e]">{v.coupon ? v.coupon + ' 元' : ''}</td>
                     <td className="py-1 text-right">{yne(v.spent+v.serviceFee+v.shipping)}</td>
                   </tr>
                 ))}
@@ -472,9 +485,10 @@ export default function OrderAnalyzer() {
             <div className="text-xs text-[#6b7085] mb-2">全部批次（由近到远）</div>
             <div className="flex text-[10px] text-[#6b7085] px-3 mb-1">
               <span className="flex-1">商品</span>
-              <span className="shrink-0 w-16 text-right">价格</span>
-              <span className="shrink-0 w-14 text-right">代购</span>
-              <span className="shrink-0 w-14 text-right">运费</span>
+              <span className="shrink-0 w-14 text-right">价格</span>
+              <span className="shrink-0 w-12 text-right">代购</span>
+              <span className="shrink-0 w-12 text-right">运费</span>
+              <span className="shrink-0 w-12 text-right">券</span>
             </div>
             {result.allBatches.map(b => {
               const mixedSources = b.sources.length >= 2;
@@ -493,9 +507,10 @@ export default function OrderAnalyzer() {
                     {b.items.map((it, idx) => (
                       <div key={idx} className="flex items-center justify-between pl-2 border-l-2 border-white/[0.06] text-[11px]">
                         <span className="truncate flex-1 mr-2">{it.title}</span>
-                        <span className="text-accent shrink-0 w-16 text-right">{yne(it.price)}</span>
-                        <span className="text-[#f0883e] shrink-0 w-14 text-right">{it.serviceFee ? '+' + yne(it.serviceFee) : ''}</span>
-                        <span className="text-[#58a6ff] shrink-0 w-14 text-right">{it.shipping ? '+' + yne(it.shipping) : ''}</span>
+                        <span className="text-accent shrink-0 w-14 text-right">{yne(it.price)}</span>
+                        <span className="text-[#f0883e] shrink-0 w-12 text-right">{it.serviceFee ? '+' + yne(it.serviceFee) : ''}</span>
+                        <span className="text-[#58a6ff] shrink-0 w-12 text-right">{it.shipping ? '+' + yne(it.shipping) : ''}</span>
+                        <span className="text-[#f0883e] shrink-0 w-12 text-right">{it.coupon ? it.coupon + '元' : ''}</span>
                       </div>
                     ))}
                   </div>

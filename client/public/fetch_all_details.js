@@ -1,6 +1,6 @@
 /*
  * ============================================================================
- * 任你购历史订单抓取脚本 v6
+ * 任你购历史订单抓取脚本 v7
  * ============================================================================
  *
  * 用途：从 rennigou.jp 抓取全部已完成订单，并逐条获取每件商品的代购手续费、
@@ -32,6 +32,7 @@
  * _paymentFee       — 付款手续费（日元）
  * _serviceFee       — 代购手续费（日元）
  * _domesticShipping — 日本国内运费（日元）
+ * _coupon           — 优惠券抵扣（元，负数为抵扣金额）
  * 费用可能为 0，表示该订单未产生此项费用。
  * ============================================================================
  */
@@ -83,7 +84,7 @@
             var feeBlock = null;
             for (var dii = 0; dii < di.length; dii++) { if (di[dii].sign === "feeInfo") { feeBlock = di[dii]; break; } }
             if (feeBlock && feeBlock.data) {
-              var fees = { pf:0, sf:0, ds:0 };
+              var fees = { pf:0, sf:0, ds:0, coupon:0 };
               for (var fi = 0; fi < feeBlock.data.length; fi++) {
                 var f = feeBlock.data[fi];
                 var parts = (f.titleValue || "").split("日元");
@@ -91,6 +92,10 @@
                 if (f.title === "付款手续费") fees.pf = num;
                 else if (f.title === "代购手续费") fees.sf = num;
                 else if (f.title === "日本国内运费") fees.ds = num;
+                else if (f.title === "优惠券抵扣") {
+                  var cparts = (f.titleValue || "").split("元");
+                  fees.coupon = parseInt(cparts[0].replace(/[^0-9\-]/g, ""), 10) || 0;
+                }
               }
               results[id] = fees;
               ok++;
@@ -115,6 +120,7 @@
         bd[n]._paymentFee = f.pf;
         bd[n]._serviceFee = f.sf;
         bd[n]._domesticShipping = f.ds;
+        bd[n]._coupon = f.coupon;
         merged++;
       }
     }
