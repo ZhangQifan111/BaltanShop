@@ -14,12 +14,16 @@ export default function OrderAnalyzer() {
   const [saveMsg, setSaveMsg] = useState('');
   const [parsedData, setParsedData] = useState(null);
 
+  const _fetchFiles = () => {
+    return fetch('/api/order-data?t=' + Date.now()).then(r => r.json());
+  };
+
   useEffect(() => {
-    fetch('/api/order-data').then(r => r.json()).then(setSavedFiles).catch(() => {});
+    _fetchFiles().then(setSavedFiles).catch(() => {});
   }, []);
 
   const refreshFiles = () => {
-    fetch('/api/order-data').then(r => r.json()).then(setSavedFiles).catch(() => {});
+    _fetchFiles().then(setSavedFiles).catch(() => {});
   };
 
   const saveData = async () => {

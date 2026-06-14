@@ -11,6 +11,7 @@ function ensureDir() {
 
 // List saved files
 router.get('/', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   ensureDir();
   const files = fs.readdirSync(DATA_DIR)
     .filter(f => f.endsWith('.json'))
