@@ -97,7 +97,10 @@ export default function OrderAnalyzer() {
     const totalShipping = items.reduce((s,i) => s + i.domesticShipping, 0);
     const totalPaymentFee = items.reduce((s,i) => s + i.paymentFee, 0);
     const totalCoupon = items.reduce((s,i) => s + i.coupon, 0);
-    const totalAllIn = totalSpent + totalServiceFee + totalShipping + totalPaymentFee;
+    const totalIntlShipping = data.reduce((s,ord) => s + ((ord._package||{}).internationalShipping||0), 0);
+    const totalPackagingFee = data.reduce((s,ord) => s + ((ord._package||{}).packagingFee||0), 0);
+    const intlCount = data.filter(ord => ((ord._package||{}).internationalShipping||0) > 0).length;
+    const totalAllIn = totalSpent + totalServiceFee + totalShipping + totalPaymentFee + totalIntlShipping + totalPackagingFee;
     const avgPrice = totalSpent / items.length;
     const prices = items.map(i => i.price).sort((a,b) => a-b);
     const p50 = prices[Math.floor(prices.length*0.5)];
@@ -185,9 +188,11 @@ export default function OrderAnalyzer() {
         shipping: it._domesticShipping||0,
         coupon: it._coupon||0
       }));
+      const pkg = ord._package || {};
       batchMap[ord.id] = {
         orderId: ord.id,
         orderTs: ord.header.show_time,
+        pkg,
         orderDate: ts2date(ord.header.show_time),
         items: batchItems,
         itemCount: batchItems.length,
@@ -208,7 +213,7 @@ export default function OrderAnalyzer() {
     setResult({
       orderCount: data.length,
       itemCount: items.length,
-      totalSpent, totalServiceFee, totalShipping, totalPaymentFee, totalCoupon, totalAllIn,
+      totalSpent, totalServiceFee, totalShipping, totalPaymentFee, totalCoupon, totalIntlShipping, totalPackagingFee, intlCount, totalAllIn,
       avgPrice, p50, p90, p95,
       minPrice: prices[0],
       maxPrice: prices[prices.length-1],
@@ -279,8 +284,11 @@ export default function OrderAnalyzer() {
                 ['商品总价', yne(result.totalSpent)],
                 ['代购手续费', yne(result.totalServiceFee)],
                 ['日本国内运费', yne(result.totalShipping)],
+                ['国际运费', yne(result.totalIntlShipping)],
+                ['包装手续费', yne(result.totalPackagingFee)],
                 ['付款手续费', yne(result.totalPaymentFee)],
                 ['优惠券抵扣', (result.totalCoupon||0) + ' 元'],
+                ['有国际运费批次', result.intlCount + '/' + result.batches.length],
                 ['合计 (含费)', yne(result.totalAllIn)],
                 ['均价', yne(result.avgPrice)],
                 ['中位数', yne(result.p50)],
@@ -501,7 +509,16 @@ export default function OrderAnalyzer() {
                       <span className="text-accent">{b.itemCount}件</span>
                       {mixedSources && <span className="bg-[#f0883e]/20 text-[#f0883e] px-1.5 py-0.5 rounded text-[10px]">跨站合批</span>}
                     </div>
-                    <div className="text-[#6b7085] mt-0.5">合计 {yne(b.totalSpent)}</div>
+                    <div className="text-[#6b7085] mt-0.5">
+                      合计 {yne(b.totalSpent)}
+                      {b.pkg && b.pkg.internationalShipping ? <span className="ml-2 text-[#58a6ff]">+国际 {yne(b.pkg.internationalShipping)}</span> : ''}
+                      {b.pkg && b.pkg.packagingFee ? <span className="ml-2">+包装 {yne(b.pkg.packagingFee)}</span> : ''}
+                    </div>
+                    {b.pkg && (b.pkg.expressName || b.pkg.expressNo) ? (
+                      <div className="text-[10px] text-[#6b7085] mt-1">
+                        快递: {b.pkg.expressName}{b.pkg.expressNo ? ' ' + b.pkg.expressNo : ''}{b.pkg.weight ? ' 重量 ' + b.pkg.weight + 'g' : ''}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="space-y-1.5">
                     {b.items.map((it, idx) => (
