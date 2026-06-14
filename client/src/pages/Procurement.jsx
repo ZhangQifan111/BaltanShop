@@ -537,7 +537,7 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="text-[10px] text-[#6b7085] block mb-1">商品名称</label>
-                <input className="input text-xs" value={form.name || ''} onChange={e => setForm({ ...form, name: e.target.value })} />
+                <input className="input text-xs" lang="zh-CN" spellCheck={false} autoComplete="off" value={form.name || ''} onChange={e => setForm({ ...form, name: e.target.value })} />
               </div>
               <div>
                 <label className="text-[10px] text-[#6b7085] block mb-1">品类</label>
@@ -643,7 +643,7 @@ export default function Procurement() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">商品名称 *</label>
-              <input className="input text-xs" placeholder="商品名" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+              <input className="input text-xs" lang="zh-CN" spellCheck={false} autoComplete="off" placeholder="商品名" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             </div>
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">类型</label>
