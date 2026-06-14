@@ -534,11 +534,9 @@ export default function OrderAnalyzer() {
             </div>
             <div className="text-xs text-[#6b7085] mb-2">全部批次（由近到远）</div>
             <div className="flex text-[10px] text-[#6b7085] px-3 mb-1">
-              <span className="flex-1">商品</span>
-              <span className="shrink-0 w-14 text-right">价格</span>
-              <span className="shrink-0 w-12 text-right">代购</span>
-              <span className="shrink-0 w-12 text-right">运费</span>
-              <span className="shrink-0 w-12 text-right">券</span>
+              <span className="flex-1">商品 / 费用</span>
+              <span className="shrink-0 w-14 text-right">JPY</span>
+              <span className="shrink-0 w-14 text-right">CNY</span>
             </div>
             {result.allBatches.map(b => {
               const mixedSources = b.sources.length >= 2;
@@ -558,7 +556,7 @@ export default function OrderAnalyzer() {
                     </div>
                     {(() => {
                       var pRmb = b.totalSpentRmb + (b.pkg ? (b.pkg.internationalShippingRmb||0) + (b.pkg.packagingFeeRmb||0) : 0);
-                      return pRmb > 0 ? <div className="text-[10px] text-[#6b7085]">费用约 {rmb(pRmb)}</div> : null;
+                      return pRmb > 0 ? <div className="text-[10px] text-[#6b7085]">费用 CNY {rmb(pRmb)}</div> : null;
                     })()}
                     {b.pkg && (b.pkg.expressName || b.pkg.expressNo) ? (
                       <div className="text-[10px] text-[#6b7085] mt-0.5">
@@ -567,15 +565,21 @@ export default function OrderAnalyzer() {
                     ) : null}
                   </div>
                   <div className="space-y-1.5">
-                    {b.items.map((it, idx) => (
-                      <div key={idx} className="flex items-center justify-between pl-2 border-l-2 border-white/[0.06] text-[11px]">
-                        <span className="truncate flex-1 mr-2">{it.title}</span>
-                        <span className="text-accent shrink-0 w-14 text-right">{yne(it.price)}</span>
-                        <span className="text-[#f0883e] shrink-0 w-12 text-right">{it.serviceFee ? '+' + yne(it.serviceFee) : ''}</span>
-                        <span className="text-[#58a6ff] shrink-0 w-12 text-right">{it.shipping ? '+' + yne(it.shipping) : ''}</span>
-                        <span className="text-[#f0883e] shrink-0 w-12 text-right">{it.coupon ? it.coupon + '元' : ''}</span>
+                    {b.items.map((it, idx) => {
+                      var feeJpy = it.serviceFee + it.shipping;
+                      var feeRmb = it.serviceFeeRmb + it.shippingRmb;
+                      var hasFee = feeJpy > 0 || feeRmb > 0 || it.coupon !== 0;
+                      return (
+                      <div key={idx} className="pl-2 border-l-2 border-white/[0.06] text-[11px]">
+                        <div className="truncate mb-0.5">{it.title}</div>
+                        <div className="flex items-center gap-x-2 text-[10px] text-[#6b7085]">
+                          <span className="text-accent">商品 {yne(it.price)}</span>
+                          {it.serviceFee ? <span>代购 +{yne(it.serviceFee)}<span className="text-[#f0883e]"> / {rmb(it.serviceFeeRmb)}</span></span> : null}
+                          {it.shipping ? <span>运费 +{yne(it.shipping)}<span className="text-[#f0883e]"> / {rmb(it.shippingRmb)}</span></span> : null}
+                          {it.coupon ? <span className="text-[#f0883e]">券 {it.coupon}元</span> : null}
+                        </div>
                       </div>
-                    ))}
+                    )})}
                   </div>
                 </div>
               );
