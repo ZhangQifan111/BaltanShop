@@ -1,6 +1,6 @@
 /*
  * ============================================================================
- * 任你购历史订单抓取脚本 v8
+ * 任你购历史订单抓取脚本 v9
  * ============================================================================
  *
  * 用途：从 rennigou.jp 抓取全部已完成订单，逐条获取每件商品的费用（代购手续费、
@@ -131,9 +131,9 @@
       var orderId = batch[b];
       promises.push((async function(oid) {
         try {
-          var r = await fetch(BASE + "getDetails?service=item&itemId=" + oid, { headers: H });
+          var r = await fetch(BASE + "getDetails?service=package&itemId=" + oid, { headers: H });
           var d = JSON.parse(await r.text());
-          if (d.code === 0 && d.data && d.data.page_type === "package") {
+          if (d.code === 0 && d.data) {
             var pkg = { is:0, pf:0, en:"", eno:"", wt:0 };
 
             // extract feeInfo: 国际运费 / 包装手续费
