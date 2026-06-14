@@ -29,11 +29,13 @@ export default function OrderAnalyzer() {
   const saveData = async () => {
     if (!parsedData) { setSaveMsg('请先分析数据再保存'); return; }
     try {
-      const r = await fetch('/api/order-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(parsedData) });
+      const body = JSON.stringify(parsedData);
+      const r = await fetch('/api/order-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+      if (!r.ok) { setSaveMsg('保存失败: HTTP ' + r.status); return; }
       const info = await r.json();
       setSaveMsg('已保存: ' + info.name);
       refreshFiles();
-    } catch(e) { setSaveMsg('保存失败'); }
+    } catch(e) { setSaveMsg('保存失败: ' + (e.message || e)); }
   };
 
   const loadFile = async (name) => {
