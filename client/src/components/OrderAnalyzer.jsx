@@ -82,6 +82,7 @@ export default function OrderAnalyzer() {
           orderDate: ts2date(ord.header.show_time),
           title: (it.product_title||'').trim(),
           price: parseFloat(it.unit_price)||0,
+          priceRmb: it._priceRmb||0,
           source: (it.source_site_name||'未知').trim(),
           amount: it.amount||1,
           createTs: it.create_time,
@@ -110,7 +111,8 @@ export default function OrderAnalyzer() {
     const totalPackagingFeeRmb = data.reduce((s,ord) => s + ((ord._package||{}).packagingFeeRmb||0), 0);
     const intlCount = data.filter(ord => ((ord._package||{}).internationalShipping||0) > 0).length;
     const totalAllIn = totalSpent + totalServiceFee + totalShipping + totalPaymentFee + totalIntlShipping + totalPackagingFee;
-    const totalAllInRmb = totalServiceFeeRmb + totalShippingRmb + totalPaymentFeeRmb + totalCoupon + totalIntlShippingRmb + totalPackagingFeeRmb;
+    const totalSpentRmb = items.reduce((s,i) => s + i.priceRmb * i.amount, 0);
+    const totalAllInRmb = totalSpentRmb + totalServiceFeeRmb + totalShippingRmb + totalPaymentFeeRmb + totalCoupon + totalIntlShippingRmb + totalPackagingFeeRmb;
     const avgPrice = totalSpent / items.length;
     const prices = items.map(i => i.price).sort((a,b) => a-b);
     const p50 = prices[Math.floor(prices.length*0.5)];
@@ -198,6 +200,7 @@ export default function OrderAnalyzer() {
       const batchItems = (ord.body||[]).map(it => ({
         title: (it.product_title||'').trim(),
         price: parseFloat(it.unit_price)||0,
+        priceRmb: it._priceRmb||0,
         source: (it.source_site_name||'未知').trim(),
         amount: it.amount||1,
         serviceFee: it._serviceFee||0,
@@ -232,7 +235,7 @@ export default function OrderAnalyzer() {
     setResult({
       orderCount: data.length,
       itemCount: items.length,
-      totalSpent, totalServiceFee, totalServiceFeeRmb, totalShipping, totalShippingRmb, totalPaymentFee, totalPaymentFeeRmb, totalCoupon, totalIntlShipping, totalIntlShippingRmb, totalPackagingFee, totalPackagingFeeRmb, intlCount, totalAllIn, totalAllInRmb,
+      totalSpent, totalSpentRmb, totalServiceFee, totalServiceFeeRmb, totalShipping, totalShippingRmb, totalPaymentFee, totalPaymentFeeRmb, totalCoupon, totalIntlShipping, totalIntlShippingRmb, totalPackagingFee, totalPackagingFeeRmb, intlCount, totalAllIn, totalAllInRmb,
       avgPrice, p50, p90, p95,
       minPrice: prices[0],
       maxPrice: prices[prices.length-1],
@@ -322,18 +325,19 @@ export default function OrderAnalyzer() {
               ))}
             </div>
 
-            {result.totalServiceFeeRmb + result.totalShippingRmb + result.totalIntlShippingRmb > 0 && (
+            {result.totalAllInRmb > 0 && (
               <div className="mt-3">
-                <div className="text-xs text-accent font-bold mb-2">费用人民币估算 (CNY)</div>
+                <div className="text-xs text-accent font-bold mb-2">人民币汇总 (CNY)</div>
                 <div className="grid grid-cols-2 xs:grid-cols-4 gap-2">
                   {[
+                    ['商品总价', result.totalSpentRmb],
                     ['代购手续费', result.totalServiceFeeRmb],
                     ['日本国内运费', result.totalShippingRmb],
                     ['付款手续费', result.totalPaymentFeeRmb],
                     ['优惠券抵扣', result.totalCoupon],
                     ['国际运费', result.totalIntlShippingRmb],
                     ['包装手续费', result.totalPackagingFeeRmb],
-                    ['合计 (不含商品)', result.totalAllInRmb],
+                    ['合计 (含所有)', result.totalAllInRmb],
                   ].map(([label, val]) => (
                     <div key={label} className="bg-bg rounded-lg p-2 text-center">
                       <div className="text-sm font-bold text-[#f0883e]">{val ? rmb(val) : '-'}</div>
@@ -341,7 +345,6 @@ export default function OrderAnalyzer() {
                     </div>
                   ))}
                 </div>
-                <p className="text-[10px] text-[#6b7085] mt-1">注意：商品价未记录人民币，以上仅为各费用的 RMB 估值</p>
               </div>
             )}
           </div>
@@ -572,8 +575,8 @@ export default function OrderAnalyzer() {
                       return (
                       <div key={idx} className="pl-2 border-l-2 border-white/[0.06] text-[11px]">
                         <div className="truncate mb-0.5">{it.title}</div>
-                        <div className="flex items-center gap-x-2 text-[10px] text-[#6b7085]">
-                          <span className="text-accent">商品 {yne(it.price)}</span>
+                        <div className="flex items-center gap-x-2 text-[10px] text-[#6b7085] flex-wrap">
+                          <span className="text-accent whitespace-nowrap">商品 {yne(it.price)}{it.priceRmb ? <span className="text-[#f0883e]"> / {rmb(it.priceRmb)}</span> : ''}</span>
                           {it.serviceFee ? <span>代购 +{yne(it.serviceFee)}<span className="text-[#f0883e]"> / {rmb(it.serviceFeeRmb)}</span></span> : null}
                           {it.shipping ? <span>运费 +{yne(it.shipping)}<span className="text-[#f0883e]"> / {rmb(it.shippingRmb)}</span></span> : null}
                           {it.coupon ? <span className="text-[#f0883e]">券 {it.coupon}元</span> : null}

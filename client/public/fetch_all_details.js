@@ -1,6 +1,6 @@
 /*
  * ============================================================================
- * 任你购历史订单抓取脚本 v10
+ * 任你购历史订单抓取脚本 v11
  * ============================================================================
  *
  * 用途：从 rennigou.jp 抓取全部已完成订单，逐条获取费用（日元+人民币）和包裹信息。
@@ -30,6 +30,7 @@
  *   _serviceFeeRmb        — 代购手续费（人民币）
  *   _domesticShipping     — 日本国内运费（日元）
  *   _domesticShippingRmb  — 日本国内运费（人民币）
+ *   _priceRmb             — 商品价格（人民币，来自包裹数据）
  *   _coupon               — 优惠券抵扣（人民币）
  * 订单级（_package）：
  *   internationalShipping    — 国际运费（日元）
@@ -137,7 +138,15 @@
           var r = await fetch(BASE + "getDetails?service=package&itemId=" + oid, { headers: H });
           var d = JSON.parse(await r.text());
           if (d.code === 0 && d.data) {
-            var pkg = { is:0, isRmb:0, pf:0, pfRmb:0, en:"", eno:"", wt:0 };
+            var pkg = { is:0, isRmb:0, pf:0, pfRmb:0, en:"", eno:"", wt:0, itemPrices:{} };
+
+            // extract product RMB prices
+            var prods = d.data.product || [];
+            for (var pi = 0; pi < prods.length; pi++) {
+              if (prods[pi].itemId && prods[pi].unitPriceRmb) {
+                pkg.itemPrices[prods[pi].itemId] = prods[pi].unitPriceRmb;
+              }
+            }
 
             var di = d.data.detailedInfo || [];
             var feeBlock = null;
@@ -169,10 +178,12 @@
     document.title = "packages " + idx2 + "/" + orderIds.length + " ok=" + pkgOk + " fail=" + pkgFail;
   }
 
-  // Step 5: merge item fees
+  // Step 5: merge item fees + product prices
   var merged = 0;
+  var priceMerged = 0;
   for (var m = 0; m < orders.length; m++) {
     var bd = orders[m].body || [];
+    var pkgItemPrices = (packageResults[orders[m].id] || {}).itemPrices || {};
     for (var n = 0; n < bd.length; n++) {
       var f = itemResults[bd[n].item_id];
       if (f) {
@@ -184,6 +195,13 @@
         bd[n]._domesticShippingRmb = f.dsRmb;
         bd[n]._coupon = f.coupon;
         merged++;
+      }
+      // merge product RMB price from package data
+      if (pkgItemPrices[bd[n].item_id]) {
+        bd[n]._priceRmb = pkgItemPrices[bd[n].item_id];
+        priceMerged++;
+      } else if (!bd[n]._priceRmb) {
+        bd[n]._priceRmb = 0;
       }
     }
   }
@@ -206,7 +224,7 @@
     }
   }
 
-  var status = "v10: orders=" + orders.length + " itemFees=" + itemOk + "/" + itemIds.length + " packages=" + pkgOk + "/" + orderIds.length + " merged=" + merged + " pkgMerged=" + pkgMerged;
+  var status = "v11: orders=" + orders.length + " itemFees=" + itemOk + "/" + itemIds.length + " packages=" + pkgOk + "/" + orderIds.length + " merged=" + merged + " pkgMerged=" + pkgMerged + " priceRmb=" + priceMerged;
   document.title = status;
 
   var out = "=== " + status + " ===\n\n" + JSON.stringify(orders);
