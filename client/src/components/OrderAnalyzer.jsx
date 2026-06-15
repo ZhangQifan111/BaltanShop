@@ -6,6 +6,70 @@ function rmb(n) { return '≈¥' + Number(n).toLocaleString('zh-CN'); }
 function ts2date(ts) { const d = new Date(ts*1000); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function ts2month(ts) { const d = new Date(ts*1000); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
 
+function guessCategory(title) {
+  const t = (title || '').toLowerCase();
+  if (/ソフビ|ソフビ人形|ビニール|軟質|sofvi|sofubi|soft.?vinyl|ビニパラ/.test(t)) return 'vinyl';
+  if (/フィギュア|figure|フィグ/.test(t)) return 'figure';
+  if (/ガチャ|ガシャポン|カプセル|ガチャポン|gacha|gashapon|capsule/.test(t)) return 'gacha';
+  if (/ぬいぐるみ|ぬい|ぬい/.test(t)) return 'plush';
+  if (/プラモデル|キット|未組立|組立|プラモ|kit|model kit/.test(t)) return 'kit';
+  if (/カード|TCG|トレカ|カードゲーム/.test(t)) return 'card';
+  return 'other';
+}
+
+function mapItemToToy(it, ord) {
+  const jpy = parseFloat(it.unit_price) || 0;
+  const sf = it._serviceFee || 0;
+  const sfRmb = it._serviceFeeRmb || 0;
+  const ds = it._domesticShipping || 0;
+  const dsRmb = it._domesticShippingRmb || 0;
+  const pf = it._paymentFee || 0;
+  const pfRmb = it._paymentFeeRmb || 0;
+  const pkg = ord._package || {};
+
+  const t = {
+    name: (it.product_title || '').trim(),
+    source: 'proxy',
+    status: 'procurement',
+    procurement_stage: 'stage1',
+    category: guessCategory(it.product_title || ''),
+    purchase_date: ts2date(ord.header.show_time),
+    stage1_date: ts2date(ord.header.show_time),
+    japan_price_jpy: jpy,
+    japan_price_cny: it._priceRmb || 0,
+    handling_fee: sf,
+    japan_domestic_shipping: ds,
+    stage1_jpy: jpy + sf + ds + pf,
+    stage1_amount: (it._priceRmb || 0) + sfRmb + dsRmb + pfRmb,
+    stage1_handling: sf,
+    stage1_domestic_ship: ds,
+    notes: 'renrigou_item_id:' + it.item_id
+  };
+
+  if (pkg.internationalShipping) {
+    t.intl_shipping = pkg.internationalShipping;
+    t.stage3_intl_ship = pkg.internationalShipping;
+  }
+  if (pkg.packagingFee) {
+    t.packing_fee = pkg.packagingFee;
+  }
+  if (pkg.expressName) t.logistics_type = pkg.expressName;
+  if (pkg.expressNo) t.logistics_tracking = pkg.expressNo;
+  if (pkg.weight) t.logistics_weight = pkg.weight;
+
+  return t;
+}
+
+const CATEGORIES = [
+  { value: 'vinyl', label: '软胶 (vinyl)' },
+  { value: 'figure', label: '手办 (figure)' },
+  { value: 'gacha', label: '扭蛋 (gacha)' },
+  { value: 'plush', label: '毛绒 (plush)' },
+  { value: 'kit', label: '套件 (kit)' },
+  { value: 'card', label: '卡片 (card)' },
+  { value: 'other', label: '其他' },
+];
+
 export default function OrderAnalyzer() {
   const [raw, setRaw] = useState('');
   const [result, setResult] = useState(null);
@@ -16,6 +80,9 @@ export default function OrderAnalyzer() {
   const [jwt, setJwt] = useState('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJGUXdjd3RySHRtZHhRMGFDS2xRb3hOTXk5Z2xFcjRaZCIsImlhdCI6MTc4MTQzMTc1OC41NDcsImV4cCI6MTc4MTQzMTc4OC41NDd9.RghiWRqVq1I5tKNpPy7GlQpRQi2EXOgiHQ9fQEBFsNU');
   const [fetching, setFetching] = useState(false);
   const [fetchProgress, setFetchProgress] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState('');
+  const [preview, setPreview] = useState(null); // { items, pkg, orderDate, orderId }
 
   const _fetchFiles = () => {
     return fetch('/api/order-data?t=' + Date.now()).then(r => r.json());
@@ -324,6 +391,37 @@ export default function OrderAnalyzer() {
     }
   };
 
+  const handleImport = async (batch) => {
+    const pkg = batch.pkg || {};
+    const items = batch.items.map(it => ({
+      toy: mapItemToToy(it, { header: { show_time: batch.orderTs }, _package: pkg }),
+      item: it
+    }));
+    setPreview({ items, pkg, orderDate: batch.orderDate, orderId: batch.orderId });
+  };
+
+  const confirmImport = async () => {
+    if (!preview) return;
+    setImporting(true);
+    setImportMsg('');
+    try {
+      const body = preview.items
+        .filter(p => !p.removed)
+        .map(p => p.toy);
+      const r = await fetch('/api/import-renrigou', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: body })
+      });
+      const j = await r.json();
+      setImportMsg('创建 ' + j.createdCount + ' 件' + (j.skippedCount > 0 ? '，跳过 ' + j.skippedCount + ' 件（已存在）' : ''));
+      setPreview(null);
+    } catch(e) {
+      setImportMsg('导入失败: ' + (e.message || e));
+    }
+    setImporting(false);
+  };
+
   return (
     <div className="card">
       <div className="text-xs text-[#6b7085] uppercase tracking-widest mb-4">任你购订单分析</div>
@@ -403,6 +501,7 @@ export default function OrderAnalyzer() {
         <button className="btn-primary text-xs" onClick={analyze}>分析</button>
         {result && <button className="btn-ghost text-xs text-accent" onClick={saveData}>保存</button>}
         {saveMsg && <span className="text-xs text-[#6b7085] self-center">{saveMsg}</span>}
+        {importMsg && <span className="text-xs text-[#f0883e] self-center">{importMsg}</span>}
       </div>
 
       {error && <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-xs text-red-400 mb-4">{error}</div>}
@@ -714,9 +813,87 @@ export default function OrderAnalyzer() {
                       </div>
                     )})}
                   </div>
+                  <div className="mt-2 text-right">
+                    <button className="btn-ghost text-[11px] text-accent" onClick={() => handleImport(b)}>导入入库</button>
+                  </div>
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* 导入预览弹窗 */}
+      {preview && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center" onClick={() => setPreview(null)}>
+          <div className="bg-[#1a1d27] rounded-t-xl sm:rounded-xl w-full sm:max-w-lg max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-white/[0.06] shrink-0">
+              <div className="text-sm text-accent font-bold">确认导入 {preview.items.filter(p => !p.removed).length} 件商品</div>
+              <div className="text-[10px] text-[#6b7085] mt-1">
+                批次 #{preview.orderId} · {preview.orderDate}
+                {preview.pkg.expressName ? ' · ' + preview.pkg.expressName + ' ' + (preview.pkg.expressNo || '') : ''}
+              </div>
+            </div>
+            <div className="overflow-y-auto p-4 space-y-2 flex-1">
+              {preview.items.map((p, i) => (
+                <div key={i} className={'bg-bg rounded-lg p-3 text-xs' + (p.removed ? ' opacity-40' : '')}>
+                  <div className="flex items-start gap-2">
+                    <input type="checkbox" className="mt-1 shrink-0" checked={!p.removed} onChange={() => {
+                      setPreview(prev => ({
+                        ...prev,
+                        items: prev.items.map((x, xi) => xi === i ? { ...x, removed: !x.removed } : x)
+                      }));
+                    }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate mb-1">{p.item.title}</div>
+                      <div className="flex items-center gap-2 flex-wrap text-[10px] text-[#6b7085]">
+                        <span className="text-accent">{yne(parseFloat(p.item.unit_price) || 0)}</span>
+                        {p.item._priceRmb ? <span className="text-[#f0883e]">{rmb(p.item._priceRmb)}</span> : null}
+                        <select
+                          className="bg-white/[0.06] rounded px-1.5 py-0.5 text-[10px] text-[#6b7085] ml-auto"
+                          value={p.toy.category}
+                          onChange={e => {
+                            setPreview(prev => ({
+                              ...prev,
+                              items: prev.items.map((x, xi) => xi === i ? { ...x, toy: { ...x.toy, category: e.target.value } } : x)
+                            }));
+                          }}
+                        >
+                          {CATEGORIES.map(c => (
+                            <option key={c.value} value={c.value}>{c.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {(() => {
+                        const t = p.toy;
+                        const parts = [];
+                        if (t.stage1_jpy) parts.push('小计 ' + yne(t.stage1_jpy));
+                        if (t.stage1_amount) parts.push(rmb(t.stage1_amount));
+                        if (t.intl_shipping) parts.push('国际 ' + yne(t.intl_shipping));
+                        return parts.length > 0 ? <div className="text-[10px] text-[#6b7085] mt-1">{parts.join(' · ')}</div> : null;
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {preview.pkg && (preview.pkg.expressName || preview.pkg.internationalShipping) && (
+              <div className="px-4 py-2 border-t border-white/[0.06] shrink-0">
+                <div className="text-[10px] text-[#6b7085]">
+                  物流：
+                  {preview.pkg.expressName ? ' ' + preview.pkg.expressName : ''}
+                  {preview.pkg.expressNo ? ' ' + preview.pkg.expressNo : ''}
+                  {preview.pkg.internationalShipping ? ' 国际运费 ' + yne(preview.pkg.internationalShipping) + ' ' + rmb(preview.pkg.internationalShippingRmb||0) : ''}
+                  {preview.pkg.packagingFee ? ' 包装费 ' + yne(preview.pkg.packagingFee) : ''}
+                </div>
+              </div>
+            )}
+            <div className="p-4 border-t border-white/[0.06] flex gap-2 shrink-0">
+              <button className="btn-ghost text-xs flex-1" onClick={() => setPreview(null)}>取消</button>
+              <button className="btn-primary text-xs flex-1" onClick={confirmImport} disabled={importing || preview.items.every(p => p.removed)}>
+                {importing ? '导入中...' : '确认导入 ' + preview.items.filter(p => !p.removed).length + ' 件'}
+              </button>
+            </div>
           </div>
         </div>
       )}
