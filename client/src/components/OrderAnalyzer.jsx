@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
+import useStore from '../stores/useStore';
 
 function fmt(n, d) { return Number(n).toFixed(d||0); }
 function yne(n) { return '¥' + Number(n).toLocaleString('zh-CN'); }
@@ -71,6 +74,7 @@ const CATEGORIES = [
 ];
 
 export default function OrderAnalyzer() {
+  const navigate = useNavigate();
   const [raw, setRaw] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
@@ -394,13 +398,18 @@ export default function OrderAnalyzer() {
     }
   };
 
-  const handleImport = async (batch) => {
-    const pkg = batch.pkg || {};
-    const items = batch.items.map(it => ({
-      toy: mapItemToToy(it, { header: { show_time: batch.orderTs }, _package: pkg }),
-      item: it
-    }));
-    setPreview({ items, pkg, orderDate: batch.orderDate, orderId: batch.orderId });
+  const handleImport = (batch) => {
+    try {
+      const pkg = batch.pkg || {};
+      const items = batch.items.map(it => ({
+        toy: mapItemToToy(it, { header: { show_time: batch.orderTs }, _package: pkg }),
+        item: it
+      }));
+      setPreview({ items, pkg, orderDate: batch.orderDate, orderId: batch.orderId });
+    } catch(e) {
+      setError('导入预览失败: ' + (e.message || e));
+      console.error('handleImport error:', e);
+    }
   };
 
   const confirmImport = async () => {
@@ -417,10 +426,14 @@ export default function OrderAnalyzer() {
         body: JSON.stringify({ items: body })
       });
       const j = await r.json();
-      setImportMsg('创建 ' + j.createdCount + ' 件' + (j.skippedCount > 0 ? '，跳过 ' + j.skippedCount + ' 件（已存在）' : ''));
+      // 把新创建的 toy 直接写入 store，采购页立即可见
+      if (j.created && j.created.length > 0) {
+        useStore.setState(s => ({ toys: [...j.created, ...s.toys] }));
+      }
+      setImportMsg({ text: '创建 ' + j.createdCount + ' 件' + (j.skippedCount > 0 ? '，跳过 ' + j.skippedCount + ' 件（已存在）' : ''), ok: true });
       setPreview(null);
     } catch(e) {
-      setImportMsg('导入失败: ' + (e.message || e));
+      setImportMsg({ text: '导入失败: ' + (e.message || e), ok: false });
     }
     setImporting(false);
   };
@@ -504,7 +517,14 @@ export default function OrderAnalyzer() {
         <button className="btn-primary text-xs" onClick={analyze}>分析</button>
         {result && <button className="btn-ghost text-xs text-accent" onClick={saveData}>保存</button>}
         {saveMsg && <span className="text-xs text-[#6b7085] self-center">{saveMsg}</span>}
-        {importMsg && <span className="text-xs text-[#f0883e] self-center">{importMsg}</span>}
+        {importMsg && (
+            <span className={'text-xs self-center flex items-center gap-2' + (importMsg.ok ? ' text-green-400' : ' text-red-400')}>
+              {importMsg.text}
+              {importMsg.ok && (
+                <button className="btn-primary text-[11px] py-1 px-2" onClick={() => navigate('/procurement')}>去采购页查看</button>
+              )}
+            </span>
+          )}
       </div>
 
       {error && <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-xs text-red-400 mb-4">{error}</div>}
@@ -827,34 +847,39 @@ export default function OrderAnalyzer() {
       )}
 
       {/* 导入预览弹窗 */}
-      {preview && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center" onClick={() => setPreview(null)}>
-          <div className="bg-[#1a1d27] rounded-t-xl sm:rounded-xl w-full sm:max-w-lg max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-white/[0.06] shrink-0">
-              <div className="text-sm text-accent font-bold">确认导入 {preview.items.filter(p => !p.removed).length} 件商品</div>
-              <div className="text-[10px] text-[#6b7085] mt-1">
+      {preview && createPortal(
+        <div className="fixed inset-0 z-50 bg-black/80 flex flex-col justify-end">
+          <div className="flex-1 min-h-0" onClick={() => setPreview(null)} />
+          <div className="bg-[#1a1d27] rounded-t-xl w-full max-h-[80vh] overflow-y-auto flex flex-col">
+            <div className="sticky top-0 bg-[#1a1d27] p-4 border-b border-white/[0.06] z-10">
+              <div className="text-sm text-accent font-bold">
+                确认导入 {preview.items.reduce((c, p) => c + (p.removed ? 0 : 1), 0)} 件商品
+              </div>
+              <div className="text-[10px] text-[#6b7085] mt-0.5">
                 批次 #{preview.orderId} · {preview.orderDate}
-                {preview.pkg.expressName ? ' · ' + preview.pkg.expressName + ' ' + (preview.pkg.expressNo || '') : ''}
               </div>
             </div>
-            <div className="overflow-y-auto p-4 space-y-2 flex-1">
-              {preview.items.map((p, i) => (
+            <div className="p-3 space-y-1.5">
+              {preview.items.map((p, i) => {
+                const t = p.toy;
+                const showIntl = t.intl_shipping ? true : false;
+                return (
                 <div key={i} className={'bg-bg rounded-lg p-3 text-xs' + (p.removed ? ' opacity-40' : '')}>
-                  <div className="flex items-start gap-2">
-                    <input type="checkbox" className="mt-1 shrink-0" checked={!p.removed} onChange={() => {
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" className="shrink-0" checked={!p.removed} onChange={() => {
                       setPreview(prev => ({
                         ...prev,
                         items: prev.items.map((x, xi) => xi === i ? { ...x, removed: !x.removed } : x)
                       }));
                     }} />
                     <div className="flex-1 min-w-0">
-                      <div className="truncate mb-1">{p.item.title}</div>
-                      <div className="flex items-center gap-2 flex-wrap text-[10px] text-[#6b7085]">
-                        <span className="text-accent">{yne(p.item.price)}</span>
-                        {p.item.priceRmb ? <span className="text-[#f0883e]">{rmb(p.item.priceRmb)}</span> : null}
+                      <div className="text-xs mb-1" style={{ wordBreak: 'break-all' }}>{p.item.title}</div>
+                      <div className="flex items-center gap-x-2 flex-wrap text-[11px]">
+                        <span className="text-accent font-bold">{yne(p.item.price)}</span>
+                        {p.item.priceRmb > 0 && <span className="text-[#f0883e]">{rmb(p.item.priceRmb)}</span>}
                         <select
-                          className="bg-white/[0.06] rounded px-1.5 py-0.5 text-[10px] text-[#6b7085] ml-auto"
-                          value={p.toy.category}
+                          className="bg-white/[0.08] rounded px-1 py-0.5 text-[11px] text-[#6b7085]"
+                          value={t.category}
                           onChange={e => {
                             setPreview(prev => ({
                               ...prev,
@@ -866,40 +891,27 @@ export default function OrderAnalyzer() {
                             <option key={c.value} value={c.value}>{c.label}</option>
                           ))}
                         </select>
+                        {showIntl && <span className="text-[#58a6ff] text-[10px]">国际 {yne(t.intl_shipping)}</span>}
                       </div>
-                      {(() => {
-                        const t = p.toy;
-                        const parts = [];
-                        if (t.stage1_jpy) parts.push('小计 ' + yne(t.stage1_jpy));
-                        if (t.stage1_amount) parts.push(rmb(t.stage1_amount));
-                        if (t.intl_shipping) parts.push('国际 ' + yne(t.intl_shipping));
-                        return parts.length > 0 ? <div className="text-[10px] text-[#6b7085] mt-1">{parts.join(' · ')}</div> : null;
-                      })()}
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
-            {preview.pkg && (preview.pkg.expressName || preview.pkg.internationalShipping) && (
-              <div className="px-4 py-2 border-t border-white/[0.06] shrink-0">
-                <div className="text-[10px] text-[#6b7085]">
-                  物流：
-                  {preview.pkg.expressName ? ' ' + preview.pkg.expressName : ''}
-                  {preview.pkg.expressNo ? ' ' + preview.pkg.expressNo : ''}
-                  {preview.pkg.internationalShipping ? ' 国际运费 ' + yne(preview.pkg.internationalShipping) + ' ' + rmb(preview.pkg.internationalShippingRmb||0) : ''}
-                  {preview.pkg.packagingFee ? ' 包装费 ' + yne(preview.pkg.packagingFee) : ''}
-                </div>
-              </div>
-            )}
-            <div className="p-4 border-t border-white/[0.06] flex gap-2 shrink-0">
-              <button className="btn-ghost text-xs flex-1" onClick={() => setPreview(null)}>取消</button>
-              <button className="btn-primary text-xs flex-1" onClick={confirmImport} disabled={importing || preview.items.every(p => p.removed)}>
-                {importing ? '导入中...' : '确认导入 ' + preview.items.filter(p => !p.removed).length + ' 件'}
+            <div className="sticky bottom-0 bg-[#1a1d27] p-3 border-t border-white/[0.06] flex gap-2">
+              <button className="btn-ghost text-sm flex-1 py-2" onClick={() => setPreview(null)}>取消</button>
+              <button
+                className="btn-primary text-sm flex-1 py-2"
+                onClick={confirmImport}
+                disabled={importing || preview.items.every(p => p.removed)}
+              >
+                {importing ? '导入中...' : '确认导入'}
               </button>
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 }
