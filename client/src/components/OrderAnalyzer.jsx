@@ -29,7 +29,7 @@ function mapItemToToy(it, ord) {
 
   const t = {
     name: (it.product_title || '').trim(),
-    source: 'proxy',
+    source: 'renrigou',
     status: 'procurement',
     procurement_stage: 'stage1',
     category: guessCategory(it.product_title || ''),
