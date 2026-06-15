@@ -18,32 +18,32 @@ function guessCategory(title) {
 }
 
 function mapItemToToy(it, ord) {
-  const jpy = parseFloat(it.unit_price) || 0;
-  const sf = it._serviceFee || 0;
-  const sfRmb = it._serviceFeeRmb || 0;
-  const ds = it._domesticShipping || 0;
-  const dsRmb = it._domesticShippingRmb || 0;
-  const pf = it._paymentFee || 0;
-  const pfRmb = it._paymentFeeRmb || 0;
+  const jpy = it.price || 0;
+  const sf = it.serviceFee || 0;
+  const sfRmb = it.serviceFeeRmb || 0;
+  const ds = it.shipping || 0;
+  const dsRmb = it.shippingRmb || 0;
+  const pf = it.paymentFee || 0;
+  const pfRmb = it.paymentFeeRmb || 0;
   const pkg = ord._package || {};
 
   const t = {
-    name: (it.product_title || '').trim(),
+    name: (it.title || '').trim(),
     source: 'renrigou',
     status: 'procurement',
     procurement_stage: 'stage1',
-    category: guessCategory(it.product_title || ''),
+    category: guessCategory(it.title || ''),
     purchase_date: ts2date(ord.header.show_time),
     stage1_date: ts2date(ord.header.show_time),
     japan_price_jpy: jpy,
-    japan_price_cny: it._priceRmb || 0,
+    japan_price_cny: it.priceRmb || 0,
     handling_fee: sf,
     japan_domestic_shipping: ds,
     stage1_jpy: jpy + sf + ds + pf,
-    stage1_amount: (it._priceRmb || 0) + sfRmb + dsRmb + pfRmb,
+    stage1_amount: (it.priceRmb || 0) + sfRmb + dsRmb + pfRmb,
     stage1_handling: sf,
     stage1_domestic_ship: ds,
-    notes: 'renrigou_item_id:' + it.item_id
+    notes: 'renrigou_item_id:' + it.itemId
   };
 
   if (pkg.internationalShipping) {
@@ -266,7 +266,10 @@ export default function OrderAnalyzer() {
         serviceFeeRmb: it._serviceFeeRmb||0,
         shipping: it._domesticShipping||0,
         shippingRmb: it._domesticShippingRmb||0,
-        coupon: it._coupon||0
+        coupon: it._coupon||0,
+        itemId: it.item_id,
+        paymentFee: it._paymentFee||0,
+        paymentFeeRmb: it._paymentFeeRmb||0
       }));
       const pkg = ord._package || {};
       batchMap[ord.id] = {
@@ -847,8 +850,8 @@ export default function OrderAnalyzer() {
                     <div className="flex-1 min-w-0">
                       <div className="truncate mb-1">{p.item.title}</div>
                       <div className="flex items-center gap-2 flex-wrap text-[10px] text-[#6b7085]">
-                        <span className="text-accent">{yne(parseFloat(p.item.unit_price) || 0)}</span>
-                        {p.item._priceRmb ? <span className="text-[#f0883e]">{rmb(p.item._priceRmb)}</span> : null}
+                        <span className="text-accent">{yne(p.item.price)}</span>
+                        {p.item.priceRmb ? <span className="text-[#f0883e]">{rmb(p.item.priceRmb)}</span> : null}
                         <select
                           className="bg-white/[0.06] rounded px-1.5 py-0.5 text-[10px] text-[#6b7085] ml-auto"
                           value={p.toy.category}
