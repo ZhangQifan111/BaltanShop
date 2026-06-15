@@ -36,6 +36,7 @@ app.use('/api/stats', require('./routes/stats'));
 const { router: backupRouter } = require('./routes/backup');
 app.use('/api/backup', backupRouter);
 app.use('/api/order-data', require('./routes/orderData'));
+app.use('/api/fetch-renrigou', require('./routes/renrigou'));
 
 // Misc sales
 const db = require('./db/database');

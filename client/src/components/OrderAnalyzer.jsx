@@ -13,6 +13,9 @@ export default function OrderAnalyzer() {
   const [savedFiles, setSavedFiles] = useState([]);
   const [saveMsg, setSaveMsg] = useState('');
   const [parsedData, setParsedData] = useState(null);
+  const [jwt, setJwt] = useState('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJGUXdjd3RySHRtZHhRMGFDS2xRb3hOTXk5Z2xFcjRaZCIsImlhdCI6MTc4MTQzMTc1OC41NDcsImV4cCI6MTc4MTQzMTc4OC41NDd9.RghiWRqVq1I5tKNpPy7GlQpRQi2EXOgiHQ9fQEBFsNU');
+  const [fetching, setFetching] = useState(false);
+  const [fetchProgress, setFetchProgress] = useState(null);
 
   const _fetchFiles = () => {
     return fetch('/api/order-data?t=' + Date.now()).then(r => r.json());
@@ -59,26 +62,7 @@ export default function OrderAnalyzer() {
     } catch(e) { setSaveMsg('删除失败: ' + e.message); }
   };
 
-  const analyze = () => {
-    setError('');
-    setResult(null);
-    if (!raw.trim()) { setError('请先粘贴 JSON 数据'); return; }
-
-    // 跳过 JSON 之前的日志文本
-    let txt = raw;
-    let s = txt.indexOf('[');
-    if (s > 0) txt = txt.slice(s);
-    if (txt.startsWith('"') && txt.endsWith('"')) txt = txt.slice(1, -1).replace(/\\"/g, '"');
-    let cleaned = txt.replace(/^\s*\/\/[^\n\r]*/gm, '');
-    cleaned = cleaned.replace(/,(\s*[}\]])/g, '$1');
-
-    let data;
-    try { data = JSON.parse(cleaned); } catch(e) {
-      setError('JSON 解析失败: ' + e.message);
-      return;
-    }
-    if (!Array.isArray(data)) { setError('需要 JSON 数组'); return; }
-
+  const runAnalysis = (data) => {
     setParsedData(data);
 
     const items = [];
@@ -255,14 +239,156 @@ export default function OrderAnalyzer() {
     });
   };
 
+  const analyze = () => {
+    setError('');
+    setResult(null);
+    if (!raw.trim()) { setError('请先粘贴 JSON 数据'); return; }
+
+    // 跳过 JSON 之前的日志文本
+    let txt = raw;
+    let s = txt.indexOf('[');
+    if (s > 0) txt = txt.slice(s);
+    if (txt.startsWith('"') && txt.endsWith('"')) txt = txt.slice(1, -1).replace(/\\"/g, '"');
+    let cleaned = txt.replace(/^\s*\/\/[^\n\r]*/gm, '');
+    cleaned = cleaned.replace(/,(\s*[}\]])/g, '$1');
+
+    let data;
+    try { data = JSON.parse(cleaned); } catch(e) {
+      setError('JSON 解析失败: ' + e.message);
+      return;
+    }
+    if (!Array.isArray(data)) { setError('需要 JSON 数组'); return; }
+
+    runAnalysis(data);
+  };
+
+  const handleFetch = async () => {
+    if (!jwt.trim()) { setError('请先输入 JWT'); return; }
+    setFetching(true);
+    setFetchProgress(null);
+    setError('');
+
+    try {
+      const res = await fetch('/api/fetch-renrigou', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jwt: jwt.trim() })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'HTTP ' + res.status }));
+        setError('抓取失败: ' + (err.error || res.statusText));
+        setFetching(false);
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+
+        const parts = buf.split('\n\n');
+        buf = parts.pop();
+
+        for (const part of parts) {
+          const lines = part.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const event = JSON.parse(line.slice(6));
+                setFetchProgress(event);
+
+                if (event.phase === 'done') {
+                  setRaw(JSON.stringify(event.data));
+                  runAnalysis(event.data);
+                  refreshFiles();
+                  setFetching(false);
+                  return;
+                } else if (event.phase === 'error') {
+                  setError(event.message);
+                  setFetching(false);
+                  return;
+                }
+              } catch(e) {}
+            }
+          }
+        }
+      }
+    } catch(e) {
+      setError('抓取失败: ' + (e.message || e));
+      setFetching(false);
+    }
+  };
+
   return (
     <div className="card">
       <div className="text-xs text-[#6b7085] uppercase tracking-widest mb-4">任你购订单分析</div>
+
+      {/* 一键抓取 */}
+      <div className="mb-3 p-3 bg-bg rounded-lg">
+        <div className="text-xs text-[#6b7085] mb-2">
+          输入任你购 JWT，一键抓取全部历史订单（约 30-60 秒）
+          <a href="/fetch_all_details.js" target="_blank" className="text-accent underline ml-1">JWT 获取方法</a>
+        </div>
+        <div className="flex gap-2">
+          <input
+            className="input text-xs flex-1 font-mono"
+            type="password"
+            placeholder="粘贴 JWT token..."
+            value={jwt}
+            onChange={e => setJwt(e.target.value)}
+            disabled={fetching}
+            autoComplete="off"
+            lang="zh-CN"
+            spellCheck={false}
+          />
+          <button
+            className="btn-primary text-xs whitespace-nowrap"
+            onClick={handleFetch}
+            disabled={fetching}
+          >
+            {fetching ? '抓取中...' : '一键抓取'}
+          </button>
+        </div>
+      </div>
+
+      {/* 进度条 */}
+      {fetching && fetchProgress && fetchProgress.phase !== 'done' && (
+        <div className="mb-3 p-3 bg-bg rounded-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs text-accent">
+              {fetchProgress.phase === 'list' && `正在获取订单列表 ${fetchProgress.current}/${fetchProgress.total} 页...`}
+              {fetchProgress.phase === 'items' && `正在获取商品费用（成功 ${fetchProgress.ok}，共 ${fetchProgress.done}/${fetchProgress.total}）`}
+              {fetchProgress.phase === 'packages' && `正在获取包裹信息（成功 ${fetchProgress.ok}，共 ${fetchProgress.done}/${fetchProgress.total}）`}
+            </span>
+          </div>
+          <div className="w-full h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-accent rounded-full transition-all duration-300"
+              style={{
+                width: fetchProgress.phase === 'list'
+                  ? (fetchProgress.current / fetchProgress.total * 25) + '%'
+                  : fetchProgress.phase === 'items'
+                  ? (25 + (fetchProgress.done / fetchProgress.total) * 40) + '%'
+                  : fetchProgress.phase === 'packages'
+                  ? (65 + (fetchProgress.done / fetchProgress.total) * 35) + '%'
+                  : '0%'
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-3 mb-3">
         <p className="text-xs text-[#6b7085] flex-1">
-          在任你购页面 Console 运行<a href="/fetch_all_details.js" target="_blank" className="text-accent underline mx-0.5">抓取脚本</a>，将输出的 JSON 数组粘贴到下方进行分析。
+          也可以手动在 Console 运行抓取脚本，将 JSON 粘贴到下方分析。
         </p>
-        <a href="/fetch_all_details.js" target="_blank" className="btn-primary text-xs whitespace-nowrap">打开抓取脚本</a>
+        <a href="/fetch_all_details.js" target="_blank" className="btn-ghost text-xs whitespace-nowrap">打开脚本</a>
       </div>
       <textarea
         className="input text-xs w-full h-32 resize-y mb-3 font-mono"
