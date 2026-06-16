@@ -160,7 +160,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
           <span className="text-sm font-bold" style={{ color: STAGE_COLORS[next] }}>
             推进到{STAGE_LABELS[next]}阶段
           </span>
-          <span className="text-xs text-[#6b7085]">— {toy.name}</span>
+          <span className="text-xs text-[#6b7085]">— {toy.name_zh || toy.name}</span>
         </div>
 
         {isS2 && toy.source !== 'domestic' && (
@@ -212,7 +212,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
                         checked={selectedIds.has(t.id)}
                         onChange={() => toggleItem(t.id)}
                         className="accent-orange-500" />
-                      <span className="flex-1 truncate text-[#d0d4e8]">{t.name}</span>
+                      <span className="flex-1 truncate text-[#d0d4e8]">{t.name_zh || t.name}</span>
                       {t.logistics_weight > 0
                         ? <span className="text-[#6b7085]">{t.logistics_weight}kg</span>
                         : <span className="text-red-400 text-[9px]">未填重量</span>}
@@ -272,7 +272,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
                   const tTax = computeStage3Tax(t.stage1_amount, t.source, stage3_tax_mode);
                   return (
                     <div key={id} className="flex justify-between text-[10px]">
-                      <span className="text-[#6b7085] truncate flex-1">{t.name}</span>
+                      <span className="text-[#6b7085] truncate flex-1">{t.name_zh || t.name}</span>
                       <span className="text-[#d0d4e8] ml-2">¥{share.toFixed(2)}{tTax > 0 ? ` + ¥${tTax.toFixed(2)}税` : ''}</span>
                     </div>
                   );
@@ -355,9 +355,11 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys }) {
 
       <div className={`card mb-3 border-l-4 ${arrivalTone ? arrivalTone.bar : 'border-l-transparent'}`}>
         <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            {toy.image && <img src={toy.image} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 bg-white/5" loading="lazy" onError={e => e.target.style.display='none'} />}
+            <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="text-sm font-bold truncate">{toy.name}</span>
+              <span className="text-sm font-bold truncate">{toy.name_zh || toy.name}</span>
               {isPreorder ? <PreorderChip /> : <StageChip stage={toy.procurement_stage} />}
               <ArrivalBadge info={arrival} />
             </div>
@@ -372,6 +374,7 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys }) {
               ) : (
                 <span>购入 {toy.purchase_date || toy.created_at?.slice(0, 10)}</span>
               )}
+            </div>
             </div>
           </div>
           <div className="text-right">
@@ -422,10 +425,10 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys }) {
               <div className="text-sm font-bold text-[#d0d4e8]">¥{toy.stage2_amount || 0}</div>
               {stage2SubLabel && <div className="text-[8px] text-[#6b7085] mt-0.5 truncate">{stage2SubLabel}</div>}
             </div>
-            <div className={`rounded-lg p-2 text-center ${toy.stage3_intl_ship > 0 ? 'bg-black/20' : 'bg-black/10 border border-dashed border-white/10'}`}>
+            <div className={`rounded-lg p-2 text-center ${toy.stage3_amount > 0 ? 'bg-black/20' : 'bg-black/10 border border-dashed border-white/10'}`}>
               <div className="text-[9px] text-[#6b7085] mb-1">③ 国际运输</div>
-              <div className="text-sm font-bold text-[#d0d4e8]">¥{toy.stage3_intl_ship || 0}</div>
-              {toy.stage3_tax > 0 && <div className="text-[8px] text-[#6b7085] mt-0.5">+税 ¥{toy.stage3_tax}</div>}
+              <div className="text-sm font-bold text-[#d0d4e8]">¥{toy.stage3_amount || 0}</div>
+              {toy.stage3_tax > 0 && <div className="text-[8px] text-[#6b7085] mt-0.5">含税 ¥{toy.stage3_tax}</div>}
             </div>
           </div>
         )}

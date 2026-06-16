@@ -38,6 +38,7 @@ app.use('/api/backup', backupRouter);
 app.use('/api/order-data', require('./routes/orderData'));
 app.use('/api/fetch-renrigou', require('./routes/renrigou'));
 app.use('/api/import-renrigou', require('./routes/importRenrigou'));
+app.use('/api/translate', require('./routes/translate'));
 
 // Misc sales
 const db = require('./db/database');

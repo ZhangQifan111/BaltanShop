@@ -23,9 +23,10 @@ function ToyCard({ toy, onSell, onEdit, onDelete, onReturn, onDone }) {
 
   return (
     <div className="card cursor-pointer" onClick={() => setExpanded(!expanded)}>
-      <div className="flex items-start justify-between gap-2 mb-3">
+      <div className="flex items-start gap-3 mb-3">
+        {toy.image && <img src={toy.image} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 bg-white/5" loading="lazy" onError={e => e.target.style.display='none'} />}
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-bold truncate mb-1">{toy.name}</div>
+          <div className="text-sm font-bold truncate mb-1">{toy.name_zh || toy.name}</div>
           <span className="inline-block text-[10px] px-2 py-0.5 rounded-full" style={{ background: statusBadge.bg, color: statusBadge.color }}>
             {statusBadge.label}
           </span>
@@ -217,7 +218,7 @@ function SellModal({ toy, onConfirm, onCancel }) {
   return (
     <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4" onClick={onCancel}>
       <div className="bg-[#1a1d27] rounded-xl border border-white/10 p-6 w-full max-w-sm space-y-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <h3 className="text-base font-bold">出售 {toy.name}</h3>
+        <h3 className="text-base font-bold">出售 {toy.name_zh || toy.name}</h3>
 
         <form className="space-y-3" onSubmit={handleSubmit}>
           {/* 售出价格 */}
@@ -625,7 +626,7 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
   return (
     <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4" onClick={onCancel}>
       <div className="bg-[#1a1d27] rounded-xl border border-white/10 p-6 w-full max-w-sm space-y-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <h3 className="text-base font-bold">编辑 {toy.name}</h3>
+        <h3 className="text-base font-bold">编辑 {toy.name_zh || toy.name}</h3>
 
         <form className="space-y-3" onSubmit={handleSubmit}>
           <div>
@@ -829,7 +830,7 @@ function ReturnModal({ toy, onConfirm, onCancel }) {
   return (
     <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4" onClick={onCancel}>
       <div className="bg-[#1a1d27] rounded-xl border border-white/10 p-6 w-full max-w-xs space-y-4" onClick={e => e.stopPropagation()}>
-        <h3 className="text-base font-bold">退换货 {toy.name}</h3>
+        <h3 className="text-base font-bold">退换货 {toy.name_zh || toy.name}</h3>
         <form className="space-y-3" onSubmit={handleSubmit}>
           <div>
             <label className="text-[10px] text-[#6b7085] block mb-1">回收成本 (¥)</label>
@@ -880,7 +881,7 @@ export default function Warehouse() {
     if (t.status !== filter) return false;
     if (search) {
       const q = search.toLowerCase();
-      if (!t.name?.toLowerCase().includes(q) && !t.category?.toLowerCase().includes(q)) return false;
+      if (!t.name?.toLowerCase().includes(q) && !t.name_zh?.toLowerCase().includes(q) && !t.category?.toLowerCase().includes(q)) return false;
     }
     return t.status !== 'procurement' && t.status !== 'transit' && t.status !== 'preorder';
   });

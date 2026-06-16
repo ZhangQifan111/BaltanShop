@@ -1,7 +1,41 @@
 const express = require('express');
+const https = require('https');
+const fs = require('fs');
+const path = require('path');
 const router = express.Router();
 const db = require('../db/database');
 const { calcTotalCost } = require('../utils/calcCost');
+
+function decodeRngImg(url) {
+  try {
+    const m = (url || '').match(/rl\.rng\.vip\/([A-Za-z0-9+/=]+)/);
+    if (!m) return null;
+    return Buffer.from(m[1], 'base64').toString('utf8');
+  } catch { return null; }
+}
+
+function downloadImage(imgUrl, destPath) {
+  return new Promise((resolve) => {
+    const file = fs.createWriteStream(destPath);
+    https.get(imgUrl, (res) => {
+      if (res.statusCode !== 200) { file.close(); fs.unlink(destPath, () => {}); return resolve(false); }
+      res.pipe(file);
+      file.on('finish', () => resolve(true));
+      file.on('error', () => { fs.unlink(destPath, () => {}); resolve(false); });
+    }).on('error', () => { fs.unlink(destPath, () => {}); resolve(false); });
+  });
+}
+
+async function fetchAndSaveImage(imageUrl, itemId) {
+  const yahooUrl = decodeRngImg(imageUrl);
+  if (!yahooUrl) return null;
+  const ext = yahooUrl.match(/\.(jpg|jpeg|png|webp)/i)?.[0] || '.jpg';
+  const fname = 'renrigou_' + itemId + ext;
+  const dest = path.join(__dirname, '..', 'uploads', fname);
+  if (fs.existsSync(dest)) return '/uploads/' + fname;
+  const ok = await downloadImage(yahooUrl, dest);
+  return ok ? '/uploads/' + fname : null;
+}
 
 router.post('/', async (req, res) => {
   const { items } = req.body || {};
@@ -29,7 +63,7 @@ router.post('/', async (req, res) => {
     const totalCost = calcTotalCost(it);
 
     const cols = [
-      'name','category','source','status','supplier_id','supplier_name','purchase_date',
+      'name','name_zh','category','source','status','supplier_id','supplier_name','purchase_date',
       'japan_price_jpy','japan_price_cny','japan_price_includes_tax','japan_consumption_tax',
       'handling_fee','japan_domestic_shipping',
       'proxy_price','proxy_intl_shipping','proxy_domestic_shipping',
@@ -43,7 +77,7 @@ router.post('/', async (req, res) => {
       'stage2_date','stage2_amount','stage2_note','stage2_handling','stage2_domestic_ship',
       'stage3_date','stage3_amount','stage3_note','stage3_intl_ship','stage3_tax','stage3_tax_mode',
       'expected_arrival_date',
-      'shipment_id','total_cost','profit','baltan_ref_id','notes'
+      'shipment_id','total_cost','profit','baltan_ref_id','notes','image'
     ];
 
     const vals = cols.map(c => {
@@ -51,11 +85,23 @@ router.post('/', async (req, res) => {
       if (c === 'profit') return null;
       if (c === 'supplier_id') return null;
       if (c === 'stage3_tax_mode') return it.stage3_tax_mode || 'normal';
+      if (c === 'image') return null;
       return it[c] ?? null;
     });
 
     const sql = 'INSERT INTO toys (' + cols.join(',') + ') VALUES (' + cols.map(() => '?').join(',') + ')';
     const id = await db.insert(sql, vals);
+
+    // 下载商品图片
+    if (it.image_url) {
+      const match = (it.notes || '').match(/renrigou_item_id:(\d+)/);
+      const itemId = match ? match[1] : id;
+      const imgPath = await fetchAndSaveImage(it.image_url, itemId);
+      if (imgPath) {
+        db.update('UPDATE toys SET image = ? WHERE id = ?', [imgPath, id]);
+      }
+    }
+
     const toy = await db.get('SELECT * FROM toys WHERE id = ?', [id]);
     created.push(toy);
   }

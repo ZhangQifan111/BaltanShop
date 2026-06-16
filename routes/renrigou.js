@@ -124,12 +124,13 @@ router.post('/', async (req, res) => {
         if (r.code !== 0 || !r.data) throw new Error('bad response');
         const di = r.data.detailedInfo || [];
         const feeBlock = di.find(b => b.sign === 'feeInfo');
-        const fees = { pf: 0, pfRmb: 0, sf: 0, sfRmb: 0, ds: 0, dsRmb: 0, coupon: 0 };
+        const fees = { pf: 0, pfRmb: 0, sf: 0, sfRmb: 0, ds: 0, dsRmb: 0, coupon: 0, itemPriceRmb: 0 };
         if (feeBlock && feeBlock.data) {
           for (const f of feeBlock.data) {
             if (f.title === '付款手续费') { var pr = parseFee(f.titleValue); fees.pf = pr[0]; fees.pfRmb = pr[1]; }
             else if (f.title === '代购手续费') { var pr = parseFee(f.titleValue); fees.sf = pr[0]; fees.sfRmb = pr[1]; }
             else if (f.title === '日本国内运费') { var pr = parseFee(f.titleValue); fees.ds = pr[0]; fees.dsRmb = pr[1]; }
+            else if (f.title === '商品费用') { var pr = parseFee(f.titleValue); fees.itemPriceRmb = pr[1]; }
             else if (f.title === '优惠券抵扣') {
               var cparts = (f.titleValue || '').split('元');
               fees.coupon = parseInt(cparts[0].replace(/[^0-9\-]/g, ''), 10) || 0;
@@ -190,6 +191,10 @@ router.post('/', async (req, res) => {
           it._domesticShippingRmb = f.dsRmb;
           it._coupon = f.coupon;
           merged++;
+          // 用 item 详情里的商品费用（购买时真实付款 RMB），比 package 的 unitPriceRmb（当前汇率）更准
+          if (f.itemPriceRmb > 0) {
+            it._priceRmb = f.itemPriceRmb;
+          }
         }
         if (pkgItemPrices[it.item_id]) {
           it._priceRmb = pkgItemPrices[it.item_id];

@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import useStore from '../stores/useStore';
+import { batchTranslateJpToCn } from '../lib/translator';
 
 function fmt(n, d) { return Number(n).toFixed(d||0); }
 function yne(n) { return '¥' + Number(n).toLocaleString('zh-CN'); }
@@ -32,9 +33,11 @@ function mapItemToToy(it, ord) {
 
   const t = {
     name: (it.title || '').trim(),
+    name_zh: '',
+    image_url: it.product_main_img || '',
     source: 'renrigou',
     status: 'procurement',
-    procurement_stage: 'stage1',
+    procurement_stage: 'stage3',
     category: guessCategory(it.title || ''),
     purchase_date: ts2date(ord.header.show_time),
     stage1_date: ts2date(ord.header.show_time),
@@ -42,23 +45,39 @@ function mapItemToToy(it, ord) {
     japan_price_cny: it.priceRmb || 0,
     handling_fee: sf,
     japan_domestic_shipping: ds,
-    stage1_jpy: jpy + sf + ds + pf,
-    stage1_amount: (it.priceRmb || 0) + sfRmb + dsRmb + pfRmb,
-    stage1_handling: sf,
-    stage1_domestic_ship: ds,
+    // Stage 1: 仅商品价格
+    stage1_jpy: jpy,
+    stage1_amount: it.priceRmb || 0,
+    // Stage 2: 国内转运 = 代购手续费 + 日本国内运费（人民币）
+    stage2_date: ts2date(ord.header.show_time),
+    stage2_handling: sfRmb,
+    stage2_domestic_ship: dsRmb,
+    stage2_amount: sfRmb + dsRmb,
     notes: 'renrigou_item_id:' + it.itemId
   };
 
-  if (pkg.internationalShipping) {
+  // Stage 3: 国际运输 + 进口税（买价 × 13%）
+  const stage3Tax = Math.round(((it.priceRmb || 0) * 0.13) * 100) / 100;
+  t.stage3_tax_mode = 'normal';
+  t.stage3_tax = stage3Tax;
+  t.stage3_date = ts2date(ord.header.show_time);
+
+  if (pkg.internationalShipping && ord.itemCount) {
     t.intl_shipping = pkg.internationalShipping;
-    t.stage3_intl_ship = pkg.internationalShipping;
+    const shipRmb = Math.round((pkg.internationalShippingRmb || 0) / ord.itemCount);
+    t.stage3_intl_ship = shipRmb;
+    t.stage3_amount = shipRmb + stage3Tax;
+  } else {
+    t.stage3_amount = stage3Tax;
   }
-  if (pkg.packagingFee) {
-    t.packing_fee = pkg.packagingFee;
+  if (pkg.packagingFee && ord.itemCount) {
+    t.packing_fee = Math.round((pkg.packagingFeeRmb || 0) / ord.itemCount);
   }
   if (pkg.expressName) t.logistics_type = pkg.expressName;
   if (pkg.expressNo) t.logistics_tracking = pkg.expressNo;
-  if (pkg.weight) t.logistics_weight = pkg.weight;
+  if (pkg.weight && ord.itemCount) {
+    t.logistics_weight = Math.round(pkg.weight / ord.itemCount);
+  }
 
   return t;
 }
@@ -93,7 +112,22 @@ export default function OrderAnalyzer() {
   };
 
   useEffect(() => {
-    _fetchFiles().then(setSavedFiles).catch(() => {});
+    _fetchFiles().then(async (files) => {
+      setSavedFiles(files);
+      // Auto-load the latest saved analysis
+      if (files.length > 0) {
+        const latest = files[files.length - 1];
+        try {
+          autoLoading.current = true;
+          const r = await fetch('/api/order-data/' + latest.name);
+          const data = await r.json();
+          setRaw(JSON.stringify(data));
+          runAnalysis(data);
+        } catch(e) {} finally {
+          autoLoading.current = false;
+        }
+      }
+    }).catch(() => {});
   }, []);
 
   const refreshFiles = () => {
@@ -111,6 +145,16 @@ export default function OrderAnalyzer() {
       refreshFiles();
     } catch(e) { setSaveMsg('保存失败: ' + (e.message || e)); }
   };
+
+  const autoSave = async (data) => {
+    try {
+      const body = JSON.stringify(data);
+      await fetch('/api/order-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+      refreshFiles();
+    } catch(e) {}
+  };
+
+  const autoLoading = useRef(false);
 
   const loadFile = async (name) => {
     try {
@@ -273,7 +317,8 @@ export default function OrderAnalyzer() {
         coupon: it._coupon||0,
         itemId: it.item_id,
         paymentFee: it._paymentFee||0,
-        paymentFeeRmb: it._paymentFeeRmb||0
+        paymentFeeRmb: it._paymentFeeRmb||0,
+        product_main_img: it.product_main_img || ''
       }));
       const pkg = ord._package || {};
       batchMap[ord.id] = {
@@ -334,6 +379,7 @@ export default function OrderAnalyzer() {
     if (!Array.isArray(data)) { setError('需要 JSON 数组'); return; }
 
     runAnalysis(data);
+    autoSave(data);
   };
 
   const handleFetch = async () => {
@@ -379,7 +425,7 @@ export default function OrderAnalyzer() {
                 if (event.phase === 'done') {
                   setRaw(JSON.stringify(event.data));
                   runAnalysis(event.data);
-                  refreshFiles();
+                  autoSave(event.data);
                   setFetching(false);
                   return;
                 } else if (event.phase === 'error') {
@@ -398,17 +444,24 @@ export default function OrderAnalyzer() {
     }
   };
 
-  const handleImport = (batch) => {
+  const handleImport = async (batch) => {
     try {
+      setImporting(true);
       const pkg = batch.pkg || {};
       const items = batch.items.map(it => ({
-        toy: mapItemToToy(it, { header: { show_time: batch.orderTs }, _package: pkg }),
+        toy: mapItemToToy(it, { header: { show_time: batch.orderTs }, _package: pkg, itemCount: batch.items.length }),
         item: it
       }));
+      // Batch translate Japanese titles to Chinese
+      const names = items.map(p => p.toy.name);
+      const translations = await batchTranslateJpToCn(names);
+      items.forEach((p, i) => { p.toy.name_zh = translations[i] || ''; });
       setPreview({ items, pkg, orderDate: batch.orderDate, orderId: batch.orderId });
+      setImporting(false);
     } catch(e) {
       setError('导入预览失败: ' + (e.message || e));
       console.error('handleImport error:', e);
+      setImporting(false);
     }
   };
 
@@ -837,7 +890,7 @@ export default function OrderAnalyzer() {
                     )})}
                   </div>
                   <div className="mt-2 text-right">
-                    <button className="btn-ghost text-[11px] text-accent" onClick={() => handleImport(b)}>导入入库</button>
+                    <button className="btn-ghost text-[11px] text-accent" disabled={importing} onClick={() => handleImport(b)}>{importing ? '翻译中...' : '导入入库'}</button>
                   </div>
                 </div>
               );
@@ -873,7 +926,19 @@ export default function OrderAnalyzer() {
                       }));
                     }} />
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs mb-1" style={{ wordBreak: 'break-all' }}>{p.item.title}</div>
+                      <input
+                        className="bg-white/[0.06] rounded px-2 py-1 text-sm text-[#d0d4e8] w-full mb-0.5"
+                        style={{ wordBreak: 'break-all' }}
+                        value={p.toy.name_zh}
+                        placeholder="中文名（可编辑）"
+                        onChange={e => {
+                          setPreview(prev => ({
+                            ...prev,
+                            items: prev.items.map((x, xi) => xi === i ? { ...x, toy: { ...x.toy, name_zh: e.target.value } } : x)
+                          }));
+                        }}
+                      />
+                      <div className="text-[10px] text-[#6b7085]" style={{ wordBreak: 'break-all' }}>{p.item.title}</div>
                       <div className="flex items-center gap-x-2 flex-wrap text-[11px]">
                         <span className="text-accent font-bold">{yne(p.item.price)}</span>
                         {p.item.priceRmb > 0 && <span className="text-[#f0883e]">{rmb(p.item.priceRmb)}</span>}

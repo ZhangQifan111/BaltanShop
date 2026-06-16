@@ -13,8 +13,8 @@ router.get('/', async (req, res) => {
     if (category) { where.push('category = ?'); params.push(category); }
     if (search) {
       const q = `%${search.toLowerCase()}%`;
-      where.push('(LOWER(name) LIKE ? OR LOWER(category) LIKE ?)');
-      params.push(q, q);
+      where.push('(LOWER(name) LIKE ? OR LOWER(name_zh) LIKE ? OR LOWER(category) LIKE ?)');
+      params.push(q, q, q);
     }
     const sql = `SELECT * FROM toys${where.length ? ' WHERE ' + where.join(' AND ') : ''} ORDER BY created_at DESC`;
     const toys = (await db.all(sql, params)).map(enrichToy);
@@ -101,7 +101,7 @@ router.post('/', async (req, res) => {
     const totalCost = calcTotalCost(t);
 
     const cols = [
-      'name','category','source','status','supplier_id','supplier_name','purchase_date',
+      'name','name_zh','category','source','status','supplier_id','supplier_name','purchase_date',
       'japan_price_jpy','japan_price_cny','japan_price_includes_tax','japan_consumption_tax',
       'handling_fee','japan_domestic_shipping',
       'proxy_price','proxy_intl_shipping','proxy_domestic_shipping',

@@ -62,6 +62,9 @@ function migrate() {
   if (!colNames.has('stage3_tax_mode')) {
     changes.push("ALTER TABLE toys ADD COLUMN stage3_tax_mode TEXT DEFAULT 'normal'");
   }
+  if (!colNames.has('name_zh')) {
+    changes.push("ALTER TABLE toys ADD COLUMN name_zh TEXT DEFAULT ''");
+  }
   if (!tableNames.has('shipping_rules')) {
     changes.push(`CREATE TABLE shipping_rules (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
