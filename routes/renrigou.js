@@ -37,6 +37,8 @@ function parseFee(s) {
   var rmb = 0;
   if (parts.length > 1) {
     rmb = parseInt(parts[1].replace(/[^0-9]/g, ''), 10) || 0;
+    // "246日元" 后面没有数字 → 前面的数字就是 RMB
+    if (!rmb && jpy > 0) rmb = jpy;
   } else if (jpy > 0) {
     // 没有"日元"分隔符 → 直接是 RMB
     rmb = jpy;

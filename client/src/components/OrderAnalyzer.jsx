@@ -57,15 +57,15 @@ function mapItemToToy(it, ord) {
   };
 
   // Stage 3: 国际运输 + 进口税（买价 × 13%，包税路线为 0）
-  const isTaxFree = /代理清关|包线/.test(pkg.expressName || '');
+  const isTaxFree = /代理清关|包线|萌特快/.test(pkg.expressName || '');
   const stage3Tax = isTaxFree ? 0 : Math.round(((it.priceRmb || 0) * 0.13) * 100) / 100;
   t.stage3_tax_mode = isTaxFree ? 'tax_free' : 'normal';
   t.stage3_tax = stage3Tax;
   t.stage3_date = ts2date(ord.header.show_time);
 
   if (pkg.internationalShipping && ord.itemCount) {
-    t.intl_shipping = pkg.internationalShipping;
-    const shipRmbTotal = pkg.internationalShippingRmb || pkg.internationalShipping || 0;
+    t.intl_shipping = Math.round(pkg.internationalShipping / ord.itemCount);
+    const shipRmbTotal = pkg.internationalShippingRmb || 0;
     const shipRmb = Math.round(shipRmbTotal / ord.itemCount);
     t.stage3_intl_ship = shipRmb;
     t.stage3_amount = shipRmb + stage3Tax;

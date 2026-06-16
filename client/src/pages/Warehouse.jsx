@@ -84,7 +84,14 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
           {toy.stage2_amount > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">②转运</span><span>¥{toy.stage2_amount}</span></div>}
           {toy.stage3_intl_ship > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">③国际运费</span><span>¥{toy.stage3_intl_ship}</span></div>}
           {toy.stage3_tax > 0 && <div className="flex justify-between pl-2"><span className="text-[#6b7085]">③税费</span><span>¥{toy.stage3_tax}</span></div>}
-          {toy.sell_price > 0 && <div className="flex justify-between text-green-400"><span className="text-[#6b7085]">售价</span><span>¥{toy.sell_price}</span></div>}
+          {toy.logistics_type && (
+            <div className="flex justify-between">
+              <span className="text-[#6b7085]">路线</span>
+              <span className={toy.stage3_tax_mode === 'tax_free' ? 'text-green-400' : ''}>
+                {toy.logistics_type}{toy.stage3_tax_mode === 'tax_free' ? ' · 包税' : ''}
+              </span>
+            </div>
+          )}
           {toy.profit != null && <div className="flex justify-between font-bold" style={{ color: toy.profit >= 0 ? '#34d399' : '#f87171' }}><span className="text-[#6b7085]">利润</span><span>{toy.profit >= 0 ? '+' : ''}¥{toy.profit.toFixed(0)}</span></div>}
           {toy.notes && <div className="flex justify-between text-[#6b7085]"><span>备注</span><span className="text-right max-w-[60%] truncate">{toy.notes}</span></div>}
         </div>
