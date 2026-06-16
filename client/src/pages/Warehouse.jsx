@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo, useCallback } from 'react';
 import ConfirmModal from '../components/ConfirmModal';
 import useStore from '../stores/useStore';
 import { api } from '../lib/api';
@@ -11,7 +11,7 @@ const FILTERS = [
 
 const SOURCE_LABELS = { direct: '直购', proxy: '代购', domestic: '国内', secondhand: '二手' };
 
-function ToyCard({ toy, onSell, onEdit, onDelete, onReturn, onDone }) {
+const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn, onDone, onUnsell }) {
   const [expanded, setExpanded] = useState(false);
 
   const statusBadge = {
@@ -110,15 +110,19 @@ function ToyCard({ toy, onSell, onEdit, onDelete, onReturn, onDone }) {
           <button className="btn-danger" onClick={e => { e.stopPropagation(); onDelete(toy.id); }}>删除</button>
           {toy.status === 'sold' && (
             <>
+              <button className="btn-ghost flex-1 text-xs text-yellow-400" onClick={e => { e.stopPropagation(); onUnsell(toy.id); }}>退回仓库</button>
               <button className="btn-warn flex-1" onClick={e => { e.stopPropagation(); onReturn(toy); }}>退换</button>
               <button className="btn-success flex-1" onClick={e => { e.stopPropagation(); onDone(toy.id); }}>确认完成</button>
             </>
+          )}
+          {toy.status === 'done' && (
+            <button className="btn-ghost flex-1 text-xs text-yellow-400" onClick={e => { e.stopPropagation(); onUnsell(toy.id); }}>退回仓库</button>
           )}
         </div>
       </div>
     </div>
   );
-}
+});
 
 /* ─── 售出弹窗 ─── */
 function SellModal({ toy, onConfirm, onCancel }) {
@@ -148,6 +152,16 @@ function SellModal({ toy, onConfirm, onCancel }) {
   const [calcLogisticsFee, setCalcLogisticsFee] = useState(toy.logistics_fee || 0);
   const [calcBoxFee, setCalcBoxFee] = useState(toy.box_fee || 0);
   const [packingFee, setPackingFee] = useState(toy.packing_fee || 0);
+
+  // 售价变化 → 自动重算平台费
+  useEffect(() => {
+    const price = +form.sell_price || 0;
+    setForm(f => ({
+      ...f,
+      software_service_fee: Math.round(price * 0.01 * 100) / 100,
+      basic_software_service_fee: Math.round(price * 0.006 * 100) / 100,
+    }));
+  }, [form.sell_price]);
 
   // 重量或地区变化 → 中通自动查运费
   useEffect(() => {
@@ -618,9 +632,7 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
       - (toy.basic_software_service_fee || 0)
       - (toy.worry_free_service_fee || 0)
       - (toy.huabei || 0)
-      - (toy.logistics_fee || 0)
-      - (toy.box_fee || 0)
-      - (toy.packing_fee || 0)
+      - (toy.refund_amount || 0)
     : null;
 
   return (
@@ -870,12 +882,17 @@ export default function Warehouse() {
   const [editing, setEditing] = useState(null);
   const [returning, setReturning] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [pendingUnsell, setPendingUnsell] = useState(null);
   const [showHistorical, setShowHistorical] = useState(false);
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
     api.get('/settings/categories').then(cats => setCategories(cats)).catch(() => {});
   }, []);
+
+  const [page, setPage] = useState(1);
+  const [sortNewest, setSortNewest] = useState(true);
+  const PAGE_SIZE = 20;
 
   const filtered = toys.filter(t => {
     if (t.status !== filter) return false;
@@ -885,6 +902,18 @@ export default function Warehouse() {
     }
     return t.status !== 'procurement' && t.status !== 'transit' && t.status !== 'preorder';
   });
+
+  const sorted = [...filtered].sort((a, b) => {
+    const da = a.created_at || '';
+    const db = b.created_at || '';
+    return sortNewest ? db.localeCompare(da) : da.localeCompare(db);
+  });
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const paged = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // 搜素/切 tab 重置页码
+  useEffect(() => { setPage(1); }, [filter, search]);
 
   const handleSell = async (updates) => {
     try {
@@ -914,7 +943,7 @@ export default function Warehouse() {
       <div className="flex items-center justify-between gap-2">
         <div className="order-2 md:order-1">
           <h2 className="text-lg font-bold">仓库</h2>
-          <p className="text-xs text-[#6b7085]">{filtered.length} 件商品</p>
+          <p className="text-xs text-[#6b7085]">{sorted.length} 件商品{totalPages > 1 ? ` · 第${page}/${totalPages}页` : ''}</p>
         </div>
         <button
           className="btn-primary text-sm order-1 md:order-2 shrink-0"
@@ -931,7 +960,7 @@ export default function Warehouse() {
         onChange={e => setSearch(e.target.value)}
       />
 
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap items-center">
         {FILTERS.map(f => (
           <button
             key={f.key}
@@ -941,10 +970,16 @@ export default function Warehouse() {
             {f.label}
           </button>
         ))}
+        <button
+          className="btn-ghost text-xs px-2 py-1.5 ml-auto"
+          onClick={() => { setSortNewest(!sortNewest); setPage(1); }}
+        >
+          {sortNewest ? '↓ 最新' : '↑ 最早'}
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {filtered.map(toy => (
+        {paged.map(toy => (
           <ToyCard
             key={toy.id}
             toy={toy}
@@ -952,10 +987,32 @@ export default function Warehouse() {
             onEdit={toy => setEditing(toy)}
             onReturn={toy => setReturning(toy)}
             onDone={id => updateToy(id, { ...toys.find(t => t.id === id), status: 'done' })}
+            onUnsell={id => setPendingUnsell(id)}
             onDelete={id => setPendingDelete(id)}
           />
         ))}
       </div>
+
+      {/* 分页控件 */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 py-2">
+          <button
+            className="btn-ghost text-xs px-3 py-1.5"
+            disabled={page <= 1}
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+          >
+            ◀ 上一页
+          </button>
+          <span className="text-xs text-[#6b7085]">{page} / {totalPages}</span>
+          <button
+            className="btn-ghost text-xs px-3 py-1.5"
+            disabled={page >= totalPages}
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+          >
+            下一页 ▶
+          </button>
+        </div>
+      )}
 
       {filtered.length === 0 && (
         <div className="text-center py-16 text-[#6b7085] text-sm">没有匹配的商品</div>
@@ -991,6 +1048,36 @@ export default function Warehouse() {
           message={`确认删除「${pendingDelete}」吗？此操作不可恢复。`}
           onConfirm={async () => { await deleteToy(pendingDelete); setPendingDelete(null); setEditing(null); }}
           onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
+      {pendingUnsell && (
+        <ConfirmModal
+          title="退回仓库"
+          message="确定将此商品退回仓库？售价和平台费将被清空。"
+          onConfirm={async () => {
+            const t = toys.find(t => t.id === pendingUnsell);
+            if (t) {
+              await updateToy(pendingUnsell, {
+                ...t,
+                status: 'stock',
+                procurement_stage: 'stocked',
+                sell_price: null,
+                sell_date: null,
+                software_service_fee: null,
+                basic_software_service_fee: null,
+                worry_free_service_fee: null,
+                huabei: null,
+                logistics_fee: null,
+                logistics_region: null,
+                logistics_weight: null,
+                box_fee: null,
+                packing_fee: null,
+              });
+            }
+            setPendingUnsell(null);
+          }}
+          onCancel={() => setPendingUnsell(null)}
         />
       )}
 

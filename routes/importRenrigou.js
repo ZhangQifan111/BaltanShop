@@ -17,7 +17,18 @@ function decodeRngImg(url) {
 function downloadImage(imgUrl, destPath) {
   return new Promise((resolve) => {
     const file = fs.createWriteStream(destPath);
-    https.get(imgUrl, (res) => {
+    const url = new URL(imgUrl);
+    const opts = {
+      hostname: url.hostname,
+      path: url.pathname,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://rl.rngmoe.com/',
+        'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
+      },
+      timeout: 15000
+    };
+    https.get(opts, (res) => {
       if (res.statusCode !== 200) { file.close(); fs.unlink(destPath, () => {}); return resolve(false); }
       res.pipe(file);
       file.on('finish', () => resolve(true));
@@ -27,13 +38,12 @@ function downloadImage(imgUrl, destPath) {
 }
 
 async function fetchAndSaveImage(imageUrl, itemId) {
-  const yahooUrl = decodeRngImg(imageUrl);
-  if (!yahooUrl) return null;
-  const ext = yahooUrl.match(/\.(jpg|jpeg|png|webp)/i)?.[0] || '.jpg';
+  // 直接用 renrigou 代理 URL 下载，不解码到 Yahoo（浏览器也是这么加载的）
+  const ext = imageUrl.match(/\.(jpg|jpeg|png|webp)/i)?.[0] || '.jpg';
   const fname = 'renrigou_' + itemId + ext;
   const dest = path.join(__dirname, '..', 'uploads', fname);
   if (fs.existsSync(dest)) return '/uploads/' + fname;
-  const ok = await downloadImage(yahooUrl, dest);
+  const ok = await downloadImage(imageUrl, dest);
   return ok ? '/uploads/' + fname : null;
 }
 
@@ -92,14 +102,9 @@ router.post('/', async (req, res) => {
     const sql = 'INSERT INTO toys (' + cols.join(',') + ') VALUES (' + cols.map(() => '?').join(',') + ')';
     const id = await db.insert(sql, vals);
 
-    // 下载商品图片
+    // 直接用 renrigou 代理 URL，浏览器从用户 IP 加载（服务器下载会被 CDN 封）
     if (it.image_url) {
-      const match = (it.notes || '').match(/renrigou_item_id:(\d+)/);
-      const itemId = match ? match[1] : id;
-      const imgPath = await fetchAndSaveImage(it.image_url, itemId);
-      if (imgPath) {
-        db.update('UPDATE toys SET image = ? WHERE id = ?', [imgPath, id]);
-      }
+      db.update('UPDATE toys SET image = ? WHERE id = ?', [it.image_url, id]);
     }
 
     const toy = await db.get('SELECT * FROM toys WHERE id = ?', [id]);

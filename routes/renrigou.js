@@ -35,7 +35,12 @@ function parseFee(s) {
   var parts = (s || '').split('日元');
   var jpy = parseInt(parts[0].replace(/[^0-9]/g, ''), 10) || 0;
   var rmb = 0;
-  if (parts.length > 1) rmb = parseInt(parts[1].replace(/[^0-9]/g, ''), 10) || 0;
+  if (parts.length > 1) {
+    rmb = parseInt(parts[1].replace(/[^0-9]/g, ''), 10) || 0;
+  } else if (jpy > 0) {
+    // 没有"日元"分隔符 → 直接是 RMB
+    rmb = jpy;
+  }
   return [jpy, rmb];
 }
 

@@ -65,7 +65,8 @@ function mapItemToToy(it, ord) {
 
   if (pkg.internationalShipping && ord.itemCount) {
     t.intl_shipping = pkg.internationalShipping;
-    const shipRmb = Math.round((pkg.internationalShippingRmb || 0) / ord.itemCount);
+    const shipRmbTotal = pkg.internationalShippingRmb || pkg.internationalShipping || 0;
+    const shipRmb = Math.round(shipRmbTotal / ord.itemCount);
     t.stage3_intl_ship = shipRmb;
     t.stage3_amount = shipRmb + stage3Tax;
   } else {

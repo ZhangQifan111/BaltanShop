@@ -33,6 +33,10 @@ function calcProfit(toy, xFee = 0) {
   return toy.sell_price
     - (toy.refund_amount || 0)
     - (toy.huabei || 0)
+    - (toy.software_service_fee || 0)
+    - (toy.basic_software_service_fee || 0)
+    - (toy.worry_free_service_fee || 0)
+    - (toy.return_cost || 0)
     - cost
     - xFee;
 }

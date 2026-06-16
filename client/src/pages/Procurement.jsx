@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo, useCallback } from 'react';
 import useStore from '../stores/useStore';
 import { api } from '../lib/api';
 import { useIsTouchDevice } from '../lib/useIsTouchDevice';
@@ -288,13 +288,6 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
         </div>
       </div>
 
-      {batchDeleteConfirm && (
-        <ConfirmModal
-          message={"确定删除已选的 " + selectedIds.size + " 件商品？此操作不可撤销。"}
-          onConfirm={handleBatchDelete}
-          onCancel={() => setBatchDeleteConfirm(false)}
-        />
-      )}
     </div>
   );
 }
@@ -416,7 +409,7 @@ function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
   );
 }
 
-function ToyRow({ toy, onUpdate, onDelete, categories, allToys, batchMode, selected, onToggleSelect }) {
+const ToyRow = memo(function ToyRow({ toy, onUpdate, onDelete, categories, allToys, batchMode, selected, onToggleSelect }) {
   const isTouch = useIsTouchDevice();
   const [editing, setEditing] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null);
@@ -473,7 +466,7 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys, batchMode, selec
       <div className={`card mb-3 border-l-4 ${arrivalTone ? arrivalTone.bar : 'border-l-transparent'}`}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
-            {batchMode && <input type="checkbox" className="shrink-0 mt-1 accent-orange-500" checked={selected} onChange={onToggleSelect} />}
+            {batchMode && <input type="checkbox" className="shrink-0 mt-1 accent-orange-500" checked={selected} onChange={() => onToggleSelect(toy.id)} />}
             {toy.image && <img src={toy.image} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 bg-white/5" loading="lazy" onError={e => e.target.style.display='none'} />}
             <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -615,7 +608,7 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys, batchMode, selec
       )}
     </>
   );
-}
+});
 
 export default function Procurement() {
   const isTouch = useIsTouchDevice();
@@ -624,6 +617,7 @@ export default function Procurement() {
   const [batchMode, setBatchMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
+  const [batchStockinConfirm, setBatchStockinConfirm] = useState(false);
   const [categories, setCategories] = useState([]);
   const [tab, setTab] = useState('all');
   const [form, setForm] = useState({
@@ -668,14 +662,14 @@ export default function Procurement() {
 
   const isPreorderForm = form.status === 'preorder';
 
-  const toggleSelect = (id) => {
+  const toggleSelect = useCallback((id) => {
     setSelectedIds(s => {
       const ns = new Set(s);
       if (ns.has(id)) ns.delete(id);
       else ns.add(id);
       return ns;
     });
-  };
+  }, []);
 
   const selectAll = () => {
     setSelectedIds(new Set(filteredList.map(t => t.id)));
@@ -690,6 +684,20 @@ export default function Procurement() {
     await deleteToys(ids);
     setSelectedIds(new Set());
     setBatchDeleteConfirm(false);
+  };
+
+  const stockinCandidates = [...selectedIds].filter(id => {
+    const t = inProcurement.find(t => t.id === id);
+    if (!t) return false;
+    return t.procurement_stage === 'stage3' || (t.procurement_stage === 'stage2' && t.source === 'domestic');
+  });
+
+  const handleBatchStockin = async () => {
+    await api.post('/toys/batch-stockin', { ids: stockinCandidates });
+    useStore.getState().loadAll();
+    setSelectedIds(new Set());
+    setBatchStockinConfirm(false);
+    setToast(`已入库 ${stockinCandidates.length} 件`);
   };
 
   const handleExitBulk = () => {
@@ -811,14 +819,41 @@ export default function Procurement() {
             <span className="text-xs text-[#6b7085]">已选{selectedIds.size}项</span>
             <button className="btn-ghost text-xs py-1 px-2" onClick={selectAll}>全选</button>
           </div>
-          <button
-            className="btn-primary text-xs bg-red-600 py-1.5 px-4"
-            disabled={selectedIds.size === 0}
-            onClick={() => setBatchDeleteConfirm(true)}
-          >
-            删除 {selectedIds.size} 项
-          </button>
+          <div className="flex items-center gap-2">
+            {stockinCandidates.length > 0 && (
+              <button
+                className="btn-primary text-xs bg-green-600 py-1.5 px-3"
+                onClick={() => setBatchStockinConfirm(true)}
+              >
+                入库 {stockinCandidates.length} 项
+              </button>
+            )}
+            <button
+              className="btn-primary text-xs bg-red-600 py-1.5 px-3"
+              disabled={selectedIds.size === 0}
+              onClick={() => setBatchDeleteConfirm(true)}
+            >
+              删除 {selectedIds.size} 项
+            </button>
+          </div>
         </div>
+      )}
+
+      {batchDeleteConfirm && (
+        <ConfirmModal
+          message={"确定删除已选的 " + selectedIds.size + " 件商品？此操作不可撤销。"}
+          onConfirm={handleBatchDelete}
+          onCancel={() => setBatchDeleteConfirm(false)}
+        />
+      )}
+
+      {batchStockinConfirm && (
+        <ConfirmModal
+          title="批量入库"
+          message={"确定将 " + stockinCandidates.length + " 件商品入库？"}
+          onConfirm={handleBatchStockin}
+          onCancel={() => setBatchStockinConfirm(false)}
+        />
       )}
 
       {filteredList.length === 0 && (
@@ -838,7 +873,7 @@ export default function Procurement() {
             allToys={inProcurement}
             batchMode={batchMode}
             selected={selectedIds.has(toy.id)}
-            onToggleSelect={() => toggleSelect(toy.id)}
+            onToggleSelect={toggleSelect}
           />
         ))}
       </div>
