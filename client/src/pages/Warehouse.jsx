@@ -293,9 +293,11 @@ function SellModal({ toy, onConfirm, onCancel }) {
                           <select className="input text-xs" value={form.logistics_region}
                             onChange={e => setForm(f => ({ ...f, logistics_region: e.target.value }))}>
                             <option value="">— 选择省份 —</option>
-                            {shippingRules.map(r => (
-                              <option key={r.id} value={r.provinces}>{r.provinces}（{r.region_name}）</option>
-                            ))}
+                            {shippingRules.flatMap(r =>
+                              (r.provinces || '').split(',').map(p => p.trim()).filter(Boolean).map(p => (
+                                <option key={`${r.id}-${p}`} value={p}>{p}（{r.name}）</option>
+                              ))
+                            )}
                           </select>
                         </div>
                         <div>
