@@ -56,9 +56,10 @@ function mapItemToToy(it, ord) {
     notes: 'renrigou_item_id:' + it.itemId
   };
 
-  // Stage 3: 国际运输 + 进口税（买价 × 13%）
-  const stage3Tax = Math.round(((it.priceRmb || 0) * 0.13) * 100) / 100;
-  t.stage3_tax_mode = 'normal';
+  // Stage 3: 国际运输 + 进口税（买价 × 13%，包税路线为 0）
+  const isTaxFree = /代理清关|包线/.test(pkg.expressName || '');
+  const stage3Tax = isTaxFree ? 0 : Math.round(((it.priceRmb || 0) * 0.13) * 100) / 100;
+  t.stage3_tax_mode = isTaxFree ? 'tax_free' : 'normal';
   t.stage3_tax = stage3Tax;
   t.stage3_date = ts2date(ord.header.show_time);
 
@@ -100,11 +101,16 @@ export default function OrderAnalyzer() {
   const [savedFiles, setSavedFiles] = useState([]);
   const [saveMsg, setSaveMsg] = useState('');
   const [parsedData, setParsedData] = useState(null);
-  const [jwt, setJwt] = useState('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJGUXdjd3RySHRtZHhRMGFDS2xRb3hOTXk5Z2xFcjRaZCIsImlhdCI6MTc4MTQzMTc1OC41NDcsImV4cCI6MTc4MTQzMTc4OC41NDd9.RghiWRqVq1I5tKNpPy7GlQpRQi2EXOgiHQ9fQEBFsNU');
+  const [jwt, setJwt] = useState(() => {
+    try { return localStorage.getItem('rng_jwt') || 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJGUXdjd3RySHRtZHhRMGFDS2xRb3hOTXk5Z2xFcjRaZCIsImlhdCI6MTc4MTQzMTc1OC41NDcsImV4cCI6MTc4MTQzMTc4OC41NDd9.RghiWRqVq1I5tKNpPy7GlQpRQi2EXOgiHQ9fQEBFsNU'; } catch { return ''; }
+  });
   const [fetching, setFetching] = useState(false);
   const [fetchProgress, setFetchProgress] = useState(null);
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState('');
+  const [lastImportedIds, setLastImportedIds] = useState(null);
+  const [undoing, setUndoing] = useState(false);
+  const [translating, setTranslating] = useState({ done: 0, total: 0 });
   const [preview, setPreview] = useState(null); // { items, pkg, orderDate, orderId }
 
   const _fetchFiles = () => {
@@ -423,9 +429,13 @@ export default function OrderAnalyzer() {
                 setFetchProgress(event);
 
                 if (event.phase === 'done') {
+                  try { localStorage.setItem('rng_jwt', jwt.trim()); } catch {}
                   setRaw(JSON.stringify(event.data));
                   runAnalysis(event.data);
                   autoSave(event.data);
+                  if (event.itemFail > event.itemCount * 0.3) {
+                    setError('⚠ 商品详情获取失败 ' + event.itemFail + '/' + event.itemCount + ' 件，JWT 可能已过期，请重新获取');
+                  }
                   setFetching(false);
                   return;
                 } else if (event.phase === 'error') {
@@ -454,7 +464,11 @@ export default function OrderAnalyzer() {
       }));
       // Batch translate Japanese titles to Chinese
       const names = items.map(p => p.toy.name);
-      const translations = await batchTranslateJpToCn(names);
+      setTranslating({ done: 0, total: names.length });
+      const translations = await batchTranslateJpToCn(names, (done, total) => {
+        setTranslating({ done, total });
+      });
+      setTranslating({ done: 0, total: 0 });
       items.forEach((p, i) => { p.toy.name_zh = translations[i] || ''; });
       setPreview({ items, pkg, orderDate: batch.orderDate, orderId: batch.orderId });
       setImporting(false);
@@ -465,30 +479,59 @@ export default function OrderAnalyzer() {
     }
   };
 
+  const [importProgress, setImportProgress] = useState({ done: 0, total: 0 });
+
   const confirmImport = async () => {
     if (!preview) return;
     setImporting(true);
     setImportMsg('');
+    setImportProgress({ done: 0, total: 0 });
+    const IMP_BATCH = 5;
     try {
-      const body = preview.items
-        .filter(p => !p.removed)
-        .map(p => p.toy);
-      const r = await fetch('/api/import-renrigou', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: body })
-      });
-      const j = await r.json();
-      // 把新创建的 toy 直接写入 store，采购页立即可见
-      if (j.created && j.created.length > 0) {
-        useStore.setState(s => ({ toys: [...j.created, ...s.toys] }));
+      const selected = preview.items.filter(p => !p.removed).map(p => p.toy);
+      const allCreated = [];
+      let totalSkipped = 0;
+
+      for (let i = 0; i < selected.length; i += IMP_BATCH) {
+        const batch = selected.slice(i, i + IMP_BATCH);
+        const r = await fetch('/api/import-renrigou', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: batch })
+        });
+        const j = await r.json();
+        if (j.created) allCreated.push(...j.created);
+        totalSkipped += j.skippedCount || 0;
+        setImportProgress({ done: Math.min(i + IMP_BATCH, selected.length), total: selected.length });
       }
-      setImportMsg({ text: '创建 ' + j.createdCount + ' 件' + (j.skippedCount > 0 ? '，跳过 ' + j.skippedCount + ' 件（已存在）' : ''), ok: true });
+
+      if (allCreated.length > 0) {
+        useStore.setState(s => ({ toys: [...allCreated, ...s.toys] }));
+        setLastImportedIds(allCreated.map(t => t.id));
+      }
+      setImportMsg({ text: '创建 ' + allCreated.length + ' 件' + (totalSkipped > 0 ? '，跳过 ' + totalSkipped + ' 件（已存在）' : ''), ok: true });
+      setImportProgress({ done: 0, total: 0 });
       setPreview(null);
     } catch(e) {
       setImportMsg({ text: '导入失败: ' + (e.message || e), ok: false });
     }
     setImporting(false);
+  };
+
+  const undoLastImport = async () => {
+    if (!lastImportedIds || lastImportedIds.length === 0) return;
+    setUndoing(true);
+    try {
+      for (const id of lastImportedIds) {
+        await fetch('/api/toys/' + id, { method: 'DELETE' });
+      }
+      useStore.setState(s => ({ toys: s.toys.filter(t => !lastImportedIds.includes(t.id)) }));
+      setImportMsg({ text: '已撤销 ' + lastImportedIds.length + ' 件', ok: false });
+      setLastImportedIds(null);
+    } catch(e) {
+      setImportMsg({ text: '撤销失败: ' + (e.message || e), ok: false });
+    }
+    setUndoing(false);
   };
 
   return (
@@ -573,6 +616,13 @@ export default function OrderAnalyzer() {
         {importMsg && (
             <span className={'text-xs self-center flex items-center gap-2' + (importMsg.ok ? ' text-green-400' : ' text-red-400')}>
               {importMsg.text}
+              {importMsg.ok && lastImportedIds && lastImportedIds.length > 0 && (
+                <button
+                  className="btn-ghost text-[11px] py-1 px-2 text-red-400"
+                  disabled={undoing}
+                  onClick={undoLastImport}
+                >{undoing ? '撤销中...' : '撤销导入'}</button>
+              )}
               {importMsg.ok && (
                 <button className="btn-primary text-[11px] py-1 px-2" onClick={() => navigate('/procurement')}>去采购页查看</button>
               )}
@@ -816,6 +866,46 @@ export default function OrderAnalyzer() {
             </table>
           </div>
 
+          {/* 一键全部导入 */}
+          {result && result.allBatches && result.allBatches.length > 0 && (
+            <div className="mb-4">
+              <button
+                className="btn-primary text-sm w-full py-2.5"
+                onClick={async () => {
+                  setImporting(true);
+                  setError('');
+                  try {
+                    const allItems = [];
+                    result.allBatches.forEach(batch => {
+                      const pkg = batch.pkg || {};
+                      batch.items.forEach(it => {
+                        allItems.push({
+                          toy: mapItemToToy(it, { header: { show_time: batch.orderTs }, _package: pkg, itemCount: batch.items.length }),
+                          item: it,
+                          batchId: batch.orderId
+                        });
+                      });
+                    });
+                    const names = allItems.map(p => p.toy.name);
+                    setTranslating({ done: 0, total: names.length });
+                    const translations = await batchTranslateJpToCn(names, (done, total) => {
+                      setTranslating({ done, total });
+                    });
+                    setTranslating({ done: 0, total: 0 });
+                    allItems.forEach((p, i) => { p.toy.name_zh = translations[i] || ''; });
+                    setPreview({ items: allItems, pkg: null, orderDate: '全部批次', orderId: '一键导入' });
+                  } catch(e) {
+                    setError('导入预览失败: ' + (e.message || e));
+                  }
+                  setImporting(false);
+                }}
+                disabled={importing}
+              >
+                {importing ? (translating.total > 0 ? '翻译中 ' + translating.done + '/' + translating.total + '...' : '翻译中...') : '⚡ 一键全部导入（共 ' + result.allBatches.length + ' 批次）'}
+              </button>
+            </div>
+          )}
+
           {/* 批次分析 */}
           <div>
             <div className="text-xs text-accent font-bold mb-3">批次分析</div>
@@ -868,6 +958,7 @@ export default function OrderAnalyzer() {
                     {b.pkg && (b.pkg.expressName || b.pkg.expressNo) ? (
                       <div className="text-[10px] text-[#6b7085] mt-0.5">
                         快递: {b.pkg.expressName}{b.pkg.expressNo ? ' ' + b.pkg.expressNo : ''}{b.pkg.weight ? ' 重量 ' + b.pkg.weight + 'g' : ''}
+                        {/代理清关|包线/.test(b.pkg.expressName||'') && <span className="ml-1 text-green-400">包税</span>}
                       </div>
                     ) : null}
                   </div>
@@ -890,7 +981,7 @@ export default function OrderAnalyzer() {
                     )})}
                   </div>
                   <div className="mt-2 text-right">
-                    <button className="btn-ghost text-[11px] text-accent" disabled={importing} onClick={() => handleImport(b)}>{importing ? '翻译中...' : '导入入库'}</button>
+                    <button className="btn-ghost text-[11px] text-accent" disabled={importing} onClick={() => handleImport(b)}>{importing ? (translating.total > 0 ? '翻译中 ' + translating.done + '/' + translating.total : '翻译中...') : '导入入库'}</button>
                   </div>
                 </div>
               );
@@ -957,6 +1048,8 @@ export default function OrderAnalyzer() {
                           ))}
                         </select>
                         {showIntl && <span className="text-[#58a6ff] text-[10px]">国际 {yne(t.intl_shipping)}</span>}
+                        {t.logistics_type && <span className="text-[10px] text-[#6b7085]">{t.logistics_type}</span>}
+                        {t.stage3_tax_mode === 'tax_free' ? <span className="text-[10px] text-green-400">包税</span> : (t.stage3_tax > 0 ? <span className="text-[10px] text-[#f0883e]">税 {rmb(t.stage3_tax)}</span> : null)}
                       </div>
                     </div>
                   </div>
@@ -971,7 +1064,7 @@ export default function OrderAnalyzer() {
                 onClick={confirmImport}
                 disabled={importing || preview.items.every(p => p.removed)}
               >
-                {importing ? '导入中...' : '确认导入'}
+                {importing ? (importProgress.total > 0 ? '导入中 ' + importProgress.done + '/' + importProgress.total : '导入中...') : '确认导入'}
               </button>
             </div>
           </div>

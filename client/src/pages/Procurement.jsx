@@ -287,11 +287,19 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
           <button className="btn-ghost text-xs" onClick={onCancel}>取消</button>
         </div>
       </div>
+
+      {batchDeleteConfirm && (
+        <ConfirmModal
+          message={"确定删除已选的 " + selectedIds.size + " 件商品？此操作不可撤销。"}
+          onConfirm={handleBatchDelete}
+          onCancel={() => setBatchDeleteConfirm(false)}
+        />
+      )}
     </div>
   );
 }
 
-function ToyRow({ toy, onUpdate, onDelete, categories, allToys }) {
+function ToyRow({ toy, onUpdate, onDelete, categories, allToys, batchMode, selected, onToggleSelect }) {
   const isTouch = useIsTouchDevice();
   const [editing, setEditing] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null);
@@ -356,6 +364,7 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys }) {
       <div className={`card mb-3 border-l-4 ${arrivalTone ? arrivalTone.bar : 'border-l-transparent'}`}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
+            {batchMode && <input type="checkbox" className="shrink-0 mt-1 accent-orange-500" checked={selected} onChange={onToggleSelect} />}
             {toy.image && <img src={toy.image} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 bg-white/5" loading="lazy" onError={e => e.target.style.display='none'} />}
             <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -584,8 +593,11 @@ function ToyRow({ toy, onUpdate, onDelete, categories, allToys }) {
 
 export default function Procurement() {
   const isTouch = useIsTouchDevice();
-  const { toys, suppliers, addToy, updateToy, deleteToy, setToast } = useStore();
+  const { toys, suppliers, addToy, updateToy, deleteToy, deleteToys, setToast } = useStore();
   const [showForm, setShowForm] = useState(false);
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
   const [categories, setCategories] = useState([]);
   const [tab, setTab] = useState('all');
   const [form, setForm] = useState({
@@ -630,6 +642,35 @@ export default function Procurement() {
 
   const isPreorderForm = form.status === 'preorder';
 
+  const toggleSelect = (id) => {
+    setSelectedIds(s => {
+      const ns = new Set(s);
+      if (ns.has(id)) ns.delete(id);
+      else ns.add(id);
+      return ns;
+    });
+  };
+
+  const selectAll = () => {
+    setSelectedIds(new Set(filteredList.map(t => t.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleBatchDelete = async () => {
+    const ids = [...selectedIds];
+    await deleteToys(ids);
+    setSelectedIds(new Set());
+    setBatchDeleteConfirm(false);
+  };
+
+  const handleExitBulk = () => {
+    setBatchMode(false);
+    setSelectedIds(new Set());
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
@@ -637,12 +678,20 @@ export default function Procurement() {
           <h2 className="text-lg font-bold">采购</h2>
           <p className="text-xs text-[#6b7085]">{inProcurement.length} 件在途/预购中</p>
         </div>
-        <button
-          className="btn-primary text-xs order-1 md:order-2 shrink-0"
-          onClick={() => setShowForm(!showForm)}
-        >
-          + 新增
-        </button>
+        <div className="flex items-center gap-2 order-1 md:order-2 shrink-0">
+          <button
+            className={'text-xs ' + (batchMode ? 'btn-primary' : 'btn-ghost')}
+            onClick={() => { setBatchMode(!batchMode); setSelectedIds(new Set()); }}
+          >
+            {batchMode ? '退出批量' : '批量模式'}
+          </button>
+          <button
+            className="btn-primary text-xs"
+            onClick={() => setShowForm(!showForm)}
+          >
+            + 新增
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -729,6 +778,23 @@ export default function Procurement() {
         })}
       </div>
 
+      {/* 批量操作栏 */}
+      {batchMode && (
+        <div className="bg-bg rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[#6b7085]">已选{selectedIds.size}项</span>
+            <button className="btn-ghost text-xs py-1 px-2" onClick={selectAll}>全选</button>
+          </div>
+          <button
+            className="btn-primary text-xs bg-red-600 py-1.5 px-4"
+            disabled={selectedIds.size === 0}
+            onClick={() => setBatchDeleteConfirm(true)}
+          >
+            删除 {selectedIds.size} 项
+          </button>
+        </div>
+      )}
+
       {filteredList.length === 0 && (
         <div className="text-center py-16 text-[#6b7085] text-sm">
           {tab === 'preorder' ? '暂无预购' : '暂无采购记录'}
@@ -744,6 +810,9 @@ export default function Procurement() {
             onDelete={deleteToy}
             categories={categories}
             allToys={inProcurement}
+            batchMode={batchMode}
+            selected={selectedIds.has(toy.id)}
+            onToggleSelect={() => toggleSelect(toy.id)}
           />
         ))}
       </div>

@@ -63,6 +63,13 @@ const useStore = create((set, get) => ({
     get().loadAll();
   },
 
+  deleteToys: async (ids) => {
+    await api.post('/toys/batch-delete', { ids });
+    set(s => ({ toys: s.toys.filter(t => !ids.includes(t.id)) }));
+    get().loadAll();
+    get().setToast(`已删除 ${ids.length} 件商品`);
+  },
+
   // Supplier CRUD
   addSupplier: async (supplier) => {
     const created = await api.post('/suppliers', supplier);

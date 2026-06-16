@@ -173,4 +173,19 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// POST /api/toys/batch-delete
+router.post('/batch-delete', async (req, res) => {
+  try {
+    const { ids } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids array required' });
+    }
+    const placeholders = ids.map(() => '?').join(',');
+    db.update('DELETE FROM toys WHERE id IN (' + placeholders + ')', ids);
+    res.json({ ok: true, deleted: ids.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

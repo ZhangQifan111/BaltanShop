@@ -53,6 +53,7 @@ async function batchFetch(items, batchSize, fn, onProgress) {
     await Promise.all(promises);
     idx += batch.length;
     if (onProgress) onProgress({ ok, fail, done: idx, total: items.length });
+    if (idx < items.length) await new Promise(r => setTimeout(r, 200));
   }
   return { results, ok, fail };
 }
@@ -116,9 +117,9 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // Step 3: fetch item fees
+    // Step 3: fetch item fees (低并发 + 延时避免限流)
     const { results: itemFees, ok: itemOk, fail: itemFail } = await batchFetch(
-      itemIds, 20,
+      itemIds, 5,
       async (id) => {
         const r = await fetchJson(BASE + 'getDetails?service=item&itemId=' + id, { headers: H, timeout: 15000 });
         if (r.code !== 0 || !r.data) throw new Error('bad response');
@@ -142,9 +143,9 @@ router.post('/', async (req, res) => {
       (p) => send({ phase: 'items', ...p })
     );
 
-    // Step 4: fetch package data
+    // Step 4: fetch package data (低并发 + 延时避免限流)
     const { results: packages, ok: pkgOk, fail: pkgFail } = await batchFetch(
-      orderIds, 20,
+      orderIds, 5,
       async (oid) => {
         const r = await fetchJson(BASE + 'getDetails?service=package&itemId=' + oid, { headers: H, timeout: 15000 });
         if (r.code !== 0 || !r.data) throw new Error('bad response');
@@ -196,7 +197,7 @@ router.post('/', async (req, res) => {
             it._priceRmb = f.itemPriceRmb;
           }
         }
-        if (pkgItemPrices[it.item_id]) {
+        if (!it._priceRmb && pkgItemPrices[it.item_id]) {
           it._priceRmb = pkgItemPrices[it.item_id];
           priceMerged++;
         } else if (!it._priceRmb) {
