@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import useStore from '../stores/useStore';
+import { sourceLabel, sourceGroup, SOURCE_CATEGORIES, toSourceValue, parseSource } from '../lib/sources';
 import ImageModal from '../components/ImageModal';
 import {
   ESTIMATE_DEFAULTS,
@@ -29,9 +30,24 @@ const SERIES_LABELS = {
 };
 
 // 录入弹窗的渠道默认费用（按 stage 阶段付款，与反算的 ESTIMATE_DEFAULTS 是不同字段集）
+const DIRECT_SOURCE_DEFAULTS = { stage2_handling: 10, stage2_domestic_ship: 90, stage3_intl_ship: 70, logistics_fee: 10, box_fee: 5, packing_fee: 5 };
+const PROXY_SOURCE_DEFAULTS = { stage2_handling: 0, stage2_domestic_ship: 0, stage3_intl_ship: 70, logistics_fee: 10, box_fee: 5, packing_fee: 5 };
+const DOMESTIC_SOURCE_DEFAULTS = { stage2_handling: 0, stage2_domestic_ship: 0, stage3_intl_ship: 0, logistics_fee: 10, box_fee: 5, packing_fee: 5 };
+
 const SOURCE_DEFAULTS = {
-  direct: { stage2_handling: 10, stage2_domestic_ship: 90, stage3_intl_ship: 70, logistics_fee: 10, box_fee: 5, packing_fee: 5 },
-  proxy:  { stage2_handling: 0,  stage2_domestic_ship: 0,  stage3_intl_ship: 70, logistics_fee: 10, box_fee: 5, packing_fee: 5 },
+  direct: DIRECT_SOURCE_DEFAULTS,
+  proxy:  PROXY_SOURCE_DEFAULTS,
+  '海淘-任你购': DIRECT_SOURCE_DEFAULTS,
+  '海淘-任意门': DIRECT_SOURCE_DEFAULTS,
+  '海淘-乐淘一番': DIRECT_SOURCE_DEFAULTS,
+  '代购-四人帮': PROXY_SOURCE_DEFAULTS,
+  '代购-W': PROXY_SOURCE_DEFAULTS,
+  '代购-Z': PROXY_SOURCE_DEFAULTS,
+  '其他代购': PROXY_SOURCE_DEFAULTS,
+  domestic: DOMESTIC_SOURCE_DEFAULTS,
+  '咸鱼': DOMESTIC_SOURCE_DEFAULTS,
+  'vx好友': DOMESTIC_SOURCE_DEFAULTS,
+  secondhand: { stage2_handling: 0, stage2_domestic_ship: 0, stage3_intl_ship: 70, logistics_fee: 10, box_fee: 5, packing_fee: 5 },
 };
 
 function SeriesTab({ s, active, onClick }) {
@@ -393,7 +409,7 @@ function LinkPickerModal({ character_slug, ref_id, currentLinkedId, onLinked, on
                 <div className="flex-1 min-w-0">
                   <div className="truncate">{toy.name}</div>
                   <div className="text-[10px] text-[#6b7085] mt-0.5">
-                    {status} · {toy.source === 'direct' ? '直购' : toy.source === 'proxy' ? '代购' : toy.source === 'domestic' ? '国内' : toy.source === 'secondhand' ? '二手' : toy.source} · ¥{(toy.total_cost || 0).toFixed(0)}
+                    {status} · {sourceLabel(toy.source)} · ¥{(toy.total_cost || 0).toFixed(0)}
                   </div>
                 </div>
                 {isCurrent ? (
@@ -433,10 +449,6 @@ function AddForm({ item, onClose, onAdded, addToy, initialAmount = '' }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
-  const onSourceChange = (s) => {
-    setForm(f => ({ ...f, source: s, ...SOURCE_DEFAULTS[s] }));
-  };
 
   const submit = async () => {
     setLoading(true);
@@ -492,14 +504,47 @@ function AddForm({ item, onClose, onAdded, addToy, initialAmount = '' }) {
       <div className="grid grid-cols-2 gap-2">
         <div>
           <span className="text-[9px] text-[#6b7085] block mb-0.5">渠道</span>
-          <select
-            value={form.source}
-            onChange={e => onSourceChange(e.target.value)}
-            className="input text-xs w-full"
-          >
-            <option value="direct">直购</option>
-            <option value="proxy">代购</option>
-          </select>
+          <div className="space-y-1.5">
+            <select
+              value={parseSource(form.source).cat}
+              onChange={e => {
+                const c = SOURCE_CATEGORIES.find(x => x.key === e.target.value);
+                if (c && c.type === 'simple') {
+                  setForm(f => ({ ...f, source: c.key, ...SOURCE_DEFAULTS[c.key] }));
+                } else if (c) {
+                  const d = c.items[0].key;
+                  const s = toSourceValue(c.key, d);
+                  setForm(f => ({ ...f, source: s, ...SOURCE_DEFAULTS[s] }));
+                }
+              }}
+              className="input text-xs w-full"
+            >
+              {SOURCE_CATEGORIES.map(c => (
+                <option key={c.key} value={c.key}>{c.label}</option>
+              ))}
+            </select>
+            {(() => {
+              const cur = SOURCE_CATEGORIES.find(c => c.key === parseSource(form.source).cat);
+              if (cur?.type === 'group') {
+                const curDetail = parseSource(form.source).detail;
+                return (
+                  <select
+                    value={curDetail || ''}
+                    onChange={e => {
+                      const s = toSourceValue(cur.key, e.target.value);
+                      setForm(f => ({ ...f, source: s, ...SOURCE_DEFAULTS[s] }));
+                    }}
+                    className="input text-xs w-full"
+                  >
+                    {cur.items.map(d => (
+                      <option key={d.key} value={d.key}>{d.label}</option>
+                    ))}
+                  </select>
+                );
+              }
+              return null;
+            })()}
+          </div>
         </div>
         <div>
           <span className="text-[9px] text-[#6b7085] block mb-0.5">状态</span>
@@ -1167,7 +1212,7 @@ function ToyCard({ it, onZoom, onOpenForm, addToy, isFav, onToggleFav, reference
 function OwnedCard({ it, onZoom, isFav, onToggleFav, onOpenLinkPicker, onUnlink }) {
   const toy = it.linked_toy;
   const status = TOY_STATUS_LABELS[toy.status] || toy.status;
-  const sourceLabel = toy.source === 'direct' ? '直购' : toy.source === 'proxy' ? '代购' : toy.source === 'domestic' ? '国内' : toy.source === 'secondhand' ? '二手' : toy.source;
+  const sourceDisp = sourceLabel(toy.source);
   const profit = toy.profit;
   const profitTone = profit == null ? 'text-[#6b7085]' : profit >= 0 ? 'text-green-400' : 'text-red-400';
   const [unlinking, setUnlinking] = useState(false);
@@ -1202,7 +1247,7 @@ function OwnedCard({ it, onZoom, isFav, onToggleFav, onOpenLinkPicker, onUnlink 
           <div className="flex flex-wrap gap-x-1.5 gap-y-0.5">
             <span className="text-[#d0d4e8]">{status}</span>
             <span>·</span>
-            <span>{sourceLabel}</span>
+            <span>{sourceDisp}</span>
           </div>
           <div className="flex flex-wrap gap-x-1.5 gap-y-0.5 tabular-nums">
             <span>成本 ¥{(toy.total_cost || 0).toFixed(0)}</span>

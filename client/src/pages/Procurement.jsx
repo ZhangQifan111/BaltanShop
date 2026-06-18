@@ -2,6 +2,7 @@ import { useState, useEffect, memo, useCallback } from 'react';
 import useStore from '../stores/useStore';
 import { api } from '../lib/api';
 import { useIsTouchDevice } from '../lib/useIsTouchDevice';
+import { sourceLabel, sourceGroup, SOURCE_CATEGORIES, toSourceValue, parseSource } from '../lib/sources';
 import ConfirmModal from '../components/ConfirmModal';
 
 const STAGES = ['stage1', 'stage2', 'stage3'];
@@ -22,7 +23,7 @@ const ARRIVAL_WARN_DAYS = 3;
 /** 代购费已含税，不再叠加 13% 消费税；直购/二手照常 */
 /** taxMode='tax_included'（包税线路）→ 0 */
 function computeStage3Tax(stage1Amount, source, taxMode = 'normal') {
-  if (source === 'proxy') return 0;
+  if (sourceGroup(source) === 'proxy') return 0;
   if (taxMode === 'tax_included') return 0;
   return Math.round((stage1Amount || 0) * 0.13 * 100) / 100;
 }
@@ -163,7 +164,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
           <span className="text-xs text-[#6b7085]">— {toy.name_zh || toy.name}</span>
         </div>
 
-        {isS2 && toy.source !== 'domestic' && (
+        {isS2 && sourceGroup(toy.source) !== 'domestic' && (
           <>
             <p className="text-xs text-[#6b7085]">填写日本境内产生的费用：</p>
             <div className="space-y-3">
@@ -186,7 +187,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
             </div>
           </>
         )}
-        {isS2 && toy.source === 'domestic' && (
+        {isS2 && sourceGroup(toy.source) === 'domestic' && (
           <>
             <p className="text-xs text-[#6b7085]">填写国内运费：</p>
             <div>
@@ -230,7 +231,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
                 onChange={e => setTotal_ship_fee(e.target.value)} />
             </div>
 
-            {toy.source !== 'proxy' && (
+            {sourceGroup(toy.source) !== 'proxy' && (
               <div>
                 <label className="text-[10px] text-[#6b7085] block mb-1">运输方式</label>
                 <div className="flex gap-2">
@@ -325,7 +326,7 @@ function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
             <div className="bg-black/20 rounded-lg p-3 border border-[#60a5fa]/20">
               <div className="text-[10px] font-bold text-[#60a5fa] mb-2">② 国内转运</div>
               <div className="space-y-2">
-                {toy.source === 'direct' && (
+                {sourceGroup(toy.source) === 'direct' && (
                   <div>
                     <label className="text-[10px] text-[#6b7085] block mb-1">重量 (kg)</label>
                     <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" min="0" step="0.1" value={form.logistics_weight ?? ''} placeholder="0" onChange={e => setForm({ ...form, logistics_weight: e.target.value === '' ? '' : +e.target.value })} />
@@ -352,7 +353,7 @@ function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
                   <label className="text-[10px] text-[#6b7085] block mb-1">税费 (¥，13%)</label>
                   <input className="input text-xs bg-black/20 cursor-default" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={computeStage3Tax(form.stage1_amount, toy.source, form.stage3_tax_mode || toy.stage3_tax_mode).toFixed(2)} readOnly />
                 </div>
-                {toy.source !== 'proxy' && (
+                {sourceGroup(toy.source) !== 'proxy' && (
                   <div className="flex gap-1 pt-1">
                     <button
                       type="button"
@@ -384,7 +385,7 @@ function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
             <label className="text-[10px] text-[#6b7085] block mb-1">品类</label>
             <select className="input text-xs" value={form.category || ''} onChange={e => setForm({ ...form, category: e.target.value })}>
               <option value="">选择分类</option>
-              {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              {categories.map(c => <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>)}
             </select>
           </div>
         </div>
@@ -529,7 +530,7 @@ const ToyRow = memo(function ToyRow({ toy, onUpdate, onDelete, categories, allTo
             <div className="bg-black/20 rounded-lg p-2 text-center">
               <div className="text-[9px] text-[#6b7085] mb-1">① 买货</div>
               <div className="text-sm font-bold text-[#d0d4e8]">¥{toy.stage1_amount || 0}</div>
-              {toy.source && <div className="text-[9px] text-[#6b7085] mt-0.5">{toy.source === 'direct' ? '直购' : toy.source === 'proxy' ? '代购' : '国内'}</div>}
+              {toy.source && <div className="text-[9px] text-[#6b7085] mt-0.5">{sourceLabel(toy.source)}</div>}
             </div>
             <div className={`rounded-lg p-2 text-center ${toy.stage2_amount > 0 ? 'bg-black/20' : 'bg-black/10 border border-dashed border-white/10'}`}>
               <div className="text-[9px] text-[#6b7085] mb-1">② 国内转运</div>
@@ -560,7 +561,7 @@ const ToyRow = memo(function ToyRow({ toy, onUpdate, onDelete, categories, allTo
               推进到②国内转运
             </button>
           )}
-          {!isPreorder && toy.procurement_stage === 'stage2' && toy.source !== 'domestic' && (
+          {!isPreorder && toy.procurement_stage === 'stage2' && sourceGroup(toy.source) !== 'domestic' && (
             <button className="btn-primary flex-1 text-xs" onClick={() => setAdvancingTo('stage3')}>
               推进到③国际运输
             </button>
@@ -573,7 +574,7 @@ const ToyRow = memo(function ToyRow({ toy, onUpdate, onDelete, categories, allTo
               ✓ 确认入库
             </button>
           )}
-          {!isPreorder && toy.procurement_stage === 'stage2' && toy.source === 'domestic' && (
+          {!isPreorder && toy.procurement_stage === 'stage2' && sourceGroup(toy.source) === 'domestic' && (
             <button
               className="btn-primary flex-1 text-xs bg-green-600"
               onClick={() => onUpdate(toy.id, { ...toy, status: 'stock', procurement_stage: 'stocked' })}
@@ -619,12 +620,15 @@ export default function Procurement() {
   const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
   const [batchStockinConfirm, setBatchStockinConfirm] = useState(false);
   const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState([]);
   const [tab, setTab] = useState('all');
+  const [poolMode, setPoolMode] = useState(false);
   const [form, setForm] = useState({
     name: '', category: '其他', source: 'direct', status: 'procurement', procurement_stage: 'stage1',
     stage1_amount: '', stage2_amount: '', stage3_amount: '',
     stage1_date: new Date().toISOString().slice(0, 10),
     expected_arrival_date: '',
+    product_id: null, quantity: '',
   });
 
   const inProcurement = toys.filter(t =>
@@ -640,7 +644,8 @@ export default function Procurement() {
       : inProcurement.filter(t => t.procurement_stage === tab);
 
   useEffect(() => {
-    api.get('/settings/categories').then(cats => setCategories(cats)).catch(() => {});
+    api.get('/settings/categories').then(data => setCategories(data.flat || data)).catch(() => {});
+    api.get('/products').then(prods => setProducts(prods)).catch(() => {});
   }, []);
 
   const handleSubmit = async (e) => {
@@ -652,9 +657,24 @@ export default function Procurement() {
         body.procurement_stage = null;
         body.stage1_amount = body.stage1_amount === '' || body.stage1_amount == null ? 0 : +body.stage1_amount;
       }
+      if (!poolMode) { body.product_id = null; body.quantity = null; }
+      // 池模式下选了"新建商品" → 自动创建 product
+      if (poolMode && !body.product_id) {
+        const created = await api.post('/products', {
+          name: body.name,
+          name_zh: body.name_zh || '',
+          category: body.category,
+          source: body.source,
+        });
+        body.product_id = created.id;
+      }
+      if (body.product_id) body.product_id = Number(body.product_id);
+      if (body.quantity !== '' && body.quantity != null) body.quantity = Number(body.quantity);
+      else if (body.product_id) body.quantity = 1;
       await addToy(body);
       setShowForm(false);
-      setForm({ name: '', category: '其他', source: 'direct', status: 'procurement', procurement_stage: 'stage1', stage1_amount: '', stage2_amount: '', stage3_amount: '', stage1_date: new Date().toISOString().slice(0, 10), expected_arrival_date: '' });
+      setPoolMode(false);
+      setForm({ name: '', category: '其他', source: 'direct', status: 'procurement', procurement_stage: 'stage1', stage1_amount: '', stage2_amount: '', stage3_amount: '', stage1_date: new Date().toISOString().slice(0, 10), expected_arrival_date: '', product_id: null, quantity: '' });
     } catch (e) {
       setToast('添加失败');
     }
@@ -689,7 +709,7 @@ export default function Procurement() {
   const stockinCandidates = [...selectedIds].filter(id => {
     const t = inProcurement.find(t => t.id === id);
     if (!t) return false;
-    return t.procurement_stage === 'stage3' || (t.procurement_stage === 'stage2' && t.source === 'domestic');
+    return t.procurement_stage === 'stage3' || (t.procurement_stage === 'stage2' && sourceGroup(t.source) === 'domestic');
   });
 
   const handleBatchStockin = async () => {
@@ -746,16 +766,47 @@ export default function Procurement() {
               <label className="text-[10px] text-[#6b7085] block mb-1">品类</label>
               <select className="input text-xs" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
                 <option value="">选择分类</option>
-                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                {categories.map(c => <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>)}
               </select>
             </div>
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">采购方式</label>
-              <select className="input text-xs" value={form.source} onChange={e => setForm({ ...form, source: e.target.value })}>
-                <option value="direct">直购</option>
-                <option value="proxy">代购</option>
-                <option value="domestic">国内</option>
-              </select>
+              <div className="space-y-1.5">
+                <select
+                  className="input text-xs"
+                  value={parseSource(form.source).cat}
+                  onChange={e => {
+                    const c = SOURCE_CATEGORIES.find(x => x.key === e.target.value);
+                    if (c && c.type === 'simple') {
+                      setForm({ ...form, source: c.key });
+                    } else if (c) {
+                      setForm({ ...form, source: toSourceValue(c.key, c.items[0].key) });
+                    }
+                  }}
+                >
+                  {SOURCE_CATEGORIES.map(c => (
+                    <option key={c.key} value={c.key}>{c.label}</option>
+                  ))}
+                </select>
+                {(() => {
+                  const cur = SOURCE_CATEGORIES.find(c => c.key === parseSource(form.source).cat);
+                  if (cur?.type === 'group') {
+                    const curDetail = parseSource(form.source).detail;
+                    return (
+                      <select
+                        className="input text-xs"
+                        value={curDetail || ''}
+                        onChange={e => setForm({ ...form, source: toSourceValue(cur.key, e.target.value) })}
+                      >
+                        {cur.items.map(d => (
+                          <option key={d.key} value={d.key}>{d.label}</option>
+                        ))}
+                      </select>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
             </div>
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">
@@ -770,6 +821,42 @@ export default function Procurement() {
               <input className="input text-xs" type="date" value={form.stage1_date} onChange={e => setForm({ ...form, stage1_date: e.target.value })} />
             </div>
           </div>
+          {/* 池模式开关 */}
+          <div className="bg-black/20 rounded-lg p-3 space-y-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" className="accent-orange-500"
+                checked={poolMode}
+                onChange={e => {
+                  setPoolMode(e.target.checked);
+                  if (!e.target.checked) setForm({ ...form, product_id: null, quantity: '' });
+                }} />
+              <span className="text-xs text-[#d0d4e8]">批量入库（池模式）— 同一商品一次进多件</span>
+            </label>
+            {poolMode && (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-[#6b7085] block mb-1">关联商品</label>
+                  <select className="input text-xs" value={form.product_id || ''}
+                    onChange={e => {
+                      const pid = e.target.value ? Number(e.target.value) : null;
+                      const prod = pid ? products.find(p => p.id === pid) : null;
+                      setForm({ ...form, product_id: pid, name: prod ? prod.name : form.name, category: prod ? prod.category : form.category });
+                    }}>
+                    <option value="">— 新建商品 —</option>
+                    {products.map(p => (
+                      <option key={p.id} value={p.id}>{p.name_zh || p.name} [{p.category}]</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#6b7085] block mb-1">数量</label>
+                  <input className="input text-xs" type="text" inputmode="decimal" lang="zh-CN" placeholder="1"
+                    value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} />
+                </div>
+              </div>
+            )}
+          </div>
+
           {isPreorderForm && (
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">

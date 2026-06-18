@@ -2,16 +2,28 @@
  * 反算（estimate）的共享 UI 组件与常量
  * Estimate.jsx（独立页）与 Monster.jsx（收藏卡弹窗）共用同一份，确保逻辑不漂移
  */
-
-export const SOURCES = [
-  { value: 'direct', label: '直购' },
-  { value: 'proxy', label: '代购' },
-];
+import { useState } from 'react';
+import { SOURCE_CATEGORIES, toSourceValue, parseSource } from '../lib/sources';
 
 // 切换进货渠道时自动套用的默认值
+const DIRECT_DEFAULTS = { handling_fee: '10', japan_domestic_shipping: '90', intl_shipping: '70', logistics_fee: '10', box_fee: '5', packing_fee: '5' };
+const PROXY_DEFAULTS  = { handling_fee: '5',  japan_domestic_shipping: '0',  intl_shipping: '70', logistics_fee: '10', box_fee: '5', packing_fee: '5' };
+const DOMESTIC_DEFAULTS = { handling_fee: '0', japan_domestic_shipping: '0', intl_shipping: '0', logistics_fee: '10', box_fee: '5', packing_fee: '5' };
+
 export const ESTIMATE_DEFAULTS = {
-  direct:     { handling_fee: '10', japan_domestic_shipping: '90', intl_shipping: '70', logistics_fee: '10', box_fee: '5', packing_fee: '5' },
-  proxy:      { handling_fee: '5',  japan_domestic_shipping: '0',  intl_shipping: '70', logistics_fee: '10', box_fee: '5', packing_fee: '5' },
+  direct:           DIRECT_DEFAULTS,
+  proxy:            PROXY_DEFAULTS,
+  '海淘-任你购':   DIRECT_DEFAULTS,
+  '海淘-任意门':   DIRECT_DEFAULTS,
+  '海淘-乐淘一番': DIRECT_DEFAULTS,
+  '代购-四人帮':   PROXY_DEFAULTS,
+  '代购-W':        PROXY_DEFAULTS,
+  '代购-Z':        PROXY_DEFAULTS,
+  '其他代购':      PROXY_DEFAULTS,
+  domestic:         DOMESTIC_DEFAULTS,
+  '咸鱼':           DOMESTIC_DEFAULTS,
+  'vx好友':         DOMESTIC_DEFAULTS,
+  secondhand:       { handling_fee: '0', japan_domestic_shipping: '0', intl_shipping: '70', logistics_fee: '10', box_fee: '5', packing_fee: '5' },
 };
 
 export const num = (v) => (v === '' || v === null || v === undefined) ? 0 : Number(v);
@@ -34,25 +46,60 @@ export function FeeRow({ label, field, value, onChange, placeholder = '0' }) {
 }
 
 export function SourcePicker({ value, onChange }) {
+  const parsed = parseSource(value);
+  const [cat, setCat] = useState(parsed.cat);
+  const [detail, setDetail] = useState(parsed.detail);
+  const currentCat = SOURCE_CATEGORIES.find(c => c.key === cat);
+
+  const handleCat = (c) => {
+    setCat(c.key);
+    if (c.type === 'simple') {
+      setDetail(null);
+      onChange(c.key);
+    } else {
+      const first = c.items[0].key;
+      setDetail(first);
+      onChange(toSourceValue(c.key, first));
+    }
+  };
+
   return (
     <div>
       <label className="text-xs text-[#6b7085] mb-1.5 block">进货渠道</label>
-      <div className="grid grid-cols-4 gap-2">
-        {SOURCES.map(s => (
+      <div className="flex flex-wrap gap-2">
+        {SOURCE_CATEGORIES.map(c => (
           <button
             type="button"
-            key={s.value}
-            onClick={() => onChange(s.value)}
-            className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-              value === s.value
+            key={c.key}
+            onClick={() => handleCat(c)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              c.key === cat
                 ? 'bg-accent text-[#0f1117]'
                 : 'bg-white/5 text-[#a0a4b8] hover:bg-white/10'
             }`}
           >
-            {s.label}
+            {c.label}
           </button>
         ))}
       </div>
+      {currentCat?.type === 'group' && (
+        <div className="flex flex-wrap gap-2 mt-2">
+          {currentCat.items.map(d => (
+            <button
+              type="button"
+              key={d.key}
+              onClick={() => { setDetail(d.key); onChange(toSourceValue(cat, d.key)); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                d.key === detail
+                  ? 'bg-accent/70 text-[#0f1117]'
+                  : 'bg-white/5 text-[#a0a4b8] hover:bg-white/10'
+              }`}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

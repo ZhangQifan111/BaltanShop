@@ -36,7 +36,20 @@ router.put('/', async (req, res) => {
 router.get('/categories', async (req, res) => {
   try {
     const rows = await db.all('SELECT * FROM categories ORDER BY id');
-    res.json(rows);
+    // 返回树形结构
+    const tree = [];
+    const map = {};
+    for (const r of rows) {
+      map[r.id] = { ...r, children: [] };
+    }
+    for (const r of rows) {
+      if (r.parent_id && map[r.parent_id]) {
+        map[r.parent_id].children.push(map[r.id]);
+      } else {
+        tree.push(map[r.id]);
+      }
+    }
+    res.json({ flat: rows, tree });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -45,11 +58,12 @@ router.get('/categories', async (req, res) => {
 // POST /api/settings/categories
 router.post('/categories', async (req, res) => {
   try {
-    const { name, color } = req.body;
+    const { name, color, parent_id } = req.body;
     if (!name) return res.status(400).json({ error: 'name required' });
+    const pid = parent_id ? Number(parent_id) : null;
     const id = await db.insert(
-      'INSERT INTO categories (name, color) VALUES (?, ?)',
-      [name.trim(), color || '#6b7085']
+      'INSERT INTO categories (name, color, parent_id) VALUES (?, ?, ?)',
+      [name.trim(), color || '#6b7085', pid]
     );
     const row = await db.get('SELECT * FROM categories WHERE id = ?', [id]);
     res.json(row);

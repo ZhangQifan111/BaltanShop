@@ -102,9 +102,19 @@ router.post('/', async (req, res) => {
     const sql = 'INSERT INTO toys (' + cols.join(',') + ') VALUES (' + cols.map(() => '?').join(',') + ')';
     const id = await db.insert(sql, vals);
 
-    // 直接用 renrigou 代理 URL，浏览器从用户 IP 加载（服务器下载会被 CDN 封）
+    // 下载图片到本地，避免远程链接过期
     if (it.image_url) {
-      db.update('UPDATE toys SET image = ? WHERE id = ?', [it.image_url, id]);
+      try {
+        const localPath = await fetchAndSaveImage(it.image_url, it.item_id || id);
+        if (localPath) {
+          db.update('UPDATE toys SET image = ? WHERE id = ?', [localPath, id]);
+        } else {
+          // 下载失败时保留远程链接作为后备
+          db.update('UPDATE toys SET image = ? WHERE id = ?', [it.image_url, id]);
+        }
+      } catch (e) {
+        db.update('UPDATE toys SET image = ? WHERE id = ?', [it.image_url, id]);
+      }
     }
 
     const toy = await db.get('SELECT * FROM toys WHERE id = ?', [id]);

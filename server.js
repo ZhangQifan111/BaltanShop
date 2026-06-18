@@ -24,6 +24,8 @@ app.use('/uploads', express.static(uploadsPath, {
 
 // API Routes
 app.use('/api/toys', require('./routes/toys'));
+app.use('/api/products', require('./routes/products'));
+app.use('/api/sales', require('./routes/sales'));
 app.use('/api/suppliers', require('./routes/suppliers'));
 app.use('/api/shipments', require('./routes/shipments'));
 app.use('/api/supplies', require('./routes/supplies'));

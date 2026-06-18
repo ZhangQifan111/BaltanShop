@@ -97,6 +97,12 @@ CREATE TABLE IF NOT EXISTS toys (
   -- 关联（精确指向某个巴尔坦 ref）
   baltan_ref_id TEXT,
 
+  -- SKU 池模式（NULL = 传统一件一条）
+  product_id INTEGER,
+  quantity INTEGER,
+  remaining INTEGER,
+  unit_cost REAL,
+
   -- 元数据
   image TEXT,
   notes TEXT,
@@ -185,6 +191,7 @@ CREATE TABLE IF NOT EXISTS categories (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL UNIQUE,
   color TEXT DEFAULT '#6b7085',
+  parent_id INTEGER,
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -215,6 +222,39 @@ CREATE TABLE IF NOT EXISTS monster_favorites (
   created_at TEXT DEFAULT (datetime('now')),
   PRIMARY KEY (character_slug, ref_id)
 );
+CREATE TABLE IF NOT EXISTS products (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  name_zh TEXT DEFAULT '',
+  category TEXT DEFAULT '其他',
+  source TEXT DEFAULT 'direct',
+  image TEXT,
+  notes TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS sales (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id INTEGER,
+  toy_id INTEGER,
+  quantity INTEGER DEFAULT 1,
+  sell_price REAL,
+  total_revenue REAL DEFAULT 0,
+  huabei REAL DEFAULT 0,
+  software_service_fee REAL DEFAULT 0,
+  basic_software_service_fee REAL DEFAULT 0,
+  worry_free_service_fee REAL DEFAULT 0,
+  refund_amount REAL DEFAULT 0,
+  logistics_fee REAL DEFAULT 0,
+  box_fee REAL DEFAULT 0,
+  packing_fee REAL DEFAULT 0,
+  logistics_region TEXT DEFAULT '',
+  logistics_weight REAL DEFAULT 0,
+  sell_date TEXT,
+  notes TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 INSERT OR IGNORE INTO categories (name, color) VALUES ('vinyl', '#60a5fa');
 INSERT OR IGNORE INTO categories (name, color) VALUES ('plush', '#a78bfa');
 INSERT OR IGNORE INTO categories (name, color) VALUES ('figure', '#34d399');

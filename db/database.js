@@ -65,6 +65,62 @@ function migrate() {
   if (!colNames.has('name_zh')) {
     changes.push("ALTER TABLE toys ADD COLUMN name_zh TEXT DEFAULT ''");
   }
+  if (!colNames.has('product_id')) {
+    changes.push("ALTER TABLE toys ADD COLUMN product_id INTEGER");
+  }
+  if (!colNames.has('quantity')) {
+    changes.push("ALTER TABLE toys ADD COLUMN quantity INTEGER");
+  }
+  if (!colNames.has('remaining')) {
+    changes.push("ALTER TABLE toys ADD COLUMN remaining INTEGER");
+  }
+  if (!colNames.has('unit_cost')) {
+    changes.push("ALTER TABLE toys ADD COLUMN unit_cost REAL");
+  }
+  // categories 层级
+  if (tableNames.has('categories')) {
+    const catCols = new Set(
+      (db.exec("PRAGMA table_info(categories)")[0]?.values || []).map(r => r[1])
+    );
+    if (!catCols.has('parent_id')) {
+      changes.push("ALTER TABLE categories ADD COLUMN parent_id INTEGER");
+    }
+  }
+  if (!tableNames.has('products')) {
+    changes.push(`CREATE TABLE products (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      name_zh TEXT DEFAULT '',
+      category TEXT DEFAULT '其他',
+      source TEXT DEFAULT 'direct',
+      image TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`);
+  }
+  if (!tableNames.has('sales')) {
+    changes.push(`CREATE TABLE sales (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER,
+      toy_id INTEGER,
+      quantity INTEGER DEFAULT 1,
+      sell_price REAL,
+      total_revenue REAL DEFAULT 0,
+      huabei REAL DEFAULT 0,
+      software_service_fee REAL DEFAULT 0,
+      basic_software_service_fee REAL DEFAULT 0,
+      worry_free_service_fee REAL DEFAULT 0,
+      refund_amount REAL DEFAULT 0,
+      logistics_fee REAL DEFAULT 0,
+      box_fee REAL DEFAULT 0,
+      packing_fee REAL DEFAULT 0,
+      logistics_region TEXT DEFAULT '',
+      logistics_weight REAL DEFAULT 0,
+      sell_date TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`);
+  }
   if (!tableNames.has('shipping_rules')) {
     changes.push(`CREATE TABLE shipping_rules (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

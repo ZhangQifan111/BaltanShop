@@ -35,7 +35,7 @@ function mapItemToToy(it, ord) {
     name: (it.title || '').trim(),
     name_zh: '',
     image_url: it.product_main_img || '',
-    source: 'renrigou',
+    source: '海淘-任你购',
     status: 'procurement',
     procurement_stage: 'stage3',
     category: guessCategory(it.title || ''),

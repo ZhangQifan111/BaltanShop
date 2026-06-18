@@ -115,7 +115,8 @@ router.post('/', async (req, res) => {
       'stage2_date','stage2_amount','stage2_note','stage2_handling','stage2_domestic_ship',
       'stage3_date','stage3_amount','stage3_note','stage3_intl_ship','stage3_tax','stage3_tax_mode',
       'expected_arrival_date',
-      'shipment_id','total_cost','profit','baltan_ref_id','notes'
+      'shipment_id','total_cost','profit','baltan_ref_id','notes',
+      'product_id','quantity'
     ];
 
     const vals = cols.map(c => {
@@ -123,6 +124,8 @@ router.post('/', async (req, res) => {
       if (c === 'profit') return null;
       if (c === 'supplier_id' && !t.supplier_id) return null;
       if (c === 'stage3_tax_mode') return t.stage3_tax_mode || 'normal';
+      if (c === 'quantity') return t.quantity != null ? Number(t.quantity) : (t.product_id ? 1 : null);
+      if (c === 'product_id') return t.product_id ? Number(t.product_id) : null;
       return t[c] ?? null;
     });
 
@@ -195,11 +198,30 @@ router.post('/batch-stockin', async (req, res) => {
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ error: 'ids array required' });
     }
-    const placeholders = ids.map(() => '?').join(',');
-    db.update(
-      "UPDATE toys SET status = 'stock', procurement_stage = 'stocked' WHERE id IN (" + placeholders + ')',
-      ids
-    );
+
+    // 逐条处理，池模式下自动算 unit_cost + remaining
+    for (const id of ids) {
+      const toy = await db.get('SELECT * FROM toys WHERE id = ?', [id]);
+      if (!toy) continue;
+
+      const totalCost = calcTotalCost(toy);
+      const productId = toy.product_id;
+      const qty = toy.quantity;
+
+      if (productId && qty && qty > 0) {
+        const unitCost = totalCost / qty;
+        db.update(
+          `UPDATE toys SET status = 'stock', procurement_stage = 'stocked',
+           total_cost = ?, unit_cost = ?, remaining = ? WHERE id = ?`,
+          [totalCost, unitCost, qty, id]
+        );
+      } else {
+        db.update(
+          `UPDATE toys SET status = 'stock', procurement_stage = 'stocked', total_cost = ? WHERE id = ?`,
+          [totalCost, id]
+        );
+      }
+    }
     res.json({ ok: true, stocked: ids.length });
   } catch (e) {
     res.status(500).json({ error: e.message });

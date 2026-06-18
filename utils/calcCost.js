@@ -12,12 +12,13 @@ function calcTotalCost(toy) {
   let base = 0;
   if (toy.source === 'direct') {
     base = toy.japan_price_cny || 0;
-  } else if (toy.source === 'proxy') {
-    base = (toy.proxy_price || 0) + (toy.proxy_intl_shipping || 0) + (toy.proxy_domestic_shipping || 0);
-  } else if (toy.source === 'domestic') {
+  } else if (toy.source === 'domestic' || toy.source === '咸鱼' || toy.source === 'vx好友') {
     base = (toy.domestic_price || 0) + (toy.domestic_shipping || 0);
   } else if (toy.source === 'secondhand') {
     base = toy.japan_price_cny || 0;
+  } else {
+    // proxy / 海淘-* / 代购-* / 其他代购
+    base = (toy.proxy_price || 0) + (toy.proxy_intl_shipping || 0) + (toy.proxy_domestic_shipping || 0);
   }
   const japanFees = (toy.handling_fee || 0) + (toy.japan_domestic_shipping || 0) + (toy.japan_consumption_tax || 0);
   const intlFees = (toy.intl_shipping || 0) + (toy.import_duty || 0);

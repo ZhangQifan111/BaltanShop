@@ -1,4 +1,5 @@
 import useStore from '../stores/useStore';
+import { sourceLabel } from '../lib/sources';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 const COLORS = ['#f0a030', '#60a5fa', '#a78bfa', '#34d399', '#f87171'];
@@ -92,7 +93,7 @@ export default function Dashboard() {
             <div key={t.id} className="flex justify-between items-center py-2 border-b border-white/[0.04] last:border-0">
               <div>
                 <div className="text-sm font-medium">{t.name}</div>
-                <div className="text-[10px] text-[#6b7085]">{t.category} · {t.source === 'direct' ? '直购' : t.source === 'proxy' ? '代购' : '国内'}</div>
+                <div className="text-[10px] text-[#6b7085]">{t.category} · {sourceLabel(t.source)}</div>
               </div>
               <div className="text-sm font-bold text-accent">¥{t.total_cost?.toFixed(0) || 0}</div>
             </div>

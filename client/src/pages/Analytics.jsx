@@ -1,10 +1,23 @@
+import { useState, useEffect } from 'react';
 import useStore from '../stores/useStore';
+import { api } from '../lib/api';
+import { sourceGroup } from '../lib/sources';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 
 const COLORS = ['#f0a030', '#60a5fa', '#a78bfa', '#34d399', '#f87171'];
 
+const SOURCE_GROUPS = ['direct', 'proxy', 'domestic', 'secondhand'];
+const SOURCE_COLORS = { direct: '#f0a030', proxy: '#60a5fa', domestic: '#34d399', secondhand: '#a78bfa' };
+const SOURCE_NAMES = { direct: '直购', proxy: '海淘/代购', domestic: '国内', secondhand: '二手' };
+
 export default function Analytics() {
   const { toys, stats } = useStore();
+  const [products, setProducts] = useState([]);
+  const [marketPrices, setMarketPrices] = useState({});
+
+  useEffect(() => {
+    api.get('/products').then(prods => setProducts(prods)).catch(() => {});
+  }, [toys]);
 
   // 利润排行
   const profitable = toys
@@ -12,11 +25,12 @@ export default function Analytics() {
     .sort((a, b) => b.profit - a.profit)
     .slice(0, 10);
 
-  // 来源分布
-  const sourceData = ['direct', 'proxy', 'domestic', 'secondhand'].map(s => ({
-    name: { direct: '直购', proxy: '代购', domestic: '国内', secondhand: '二手' }[s],
-    value: toys.filter(t => t.source === s && t.status !== 'procurement' && t.status !== 'transit' && t.status !== 'preorder').length,
-    fill: { direct: '#f0a030', proxy: '#60a5fa', domestic: '#34d399', secondhand: '#a78bfa' }[s],
+  // 来源分布 — 按业务分组聚合（海淘/代购系列归入 proxy，咸鱼/vx好友归入 domestic）
+  const filtered = toys.filter(t => t.status !== 'procurement' && t.status !== 'transit' && t.status !== 'preorder');
+  const sourceData = SOURCE_GROUPS.map(g => ({
+    name: SOURCE_NAMES[g],
+    value: filtered.filter(t => sourceGroup(t.source) === g).length,
+    fill: SOURCE_COLORS[g],
   })).filter(d => d.value > 0);
 
   // 成本构成（直购各费用占比）
@@ -144,6 +158,84 @@ export default function Analytics() {
                 <div className="text-sm font-bold text-red-400">¥{t.profit?.toFixed(0)}</div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* 池商品分析 */}
+      {products.length > 0 && (
+        <div className="card">
+          <div className="text-xs text-[#6b7085] uppercase tracking-widest mb-4">池商品分析 — 回本 / 估值</div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-white/10 text-[#6b7085]">
+                  <th className="text-left py-2 pr-3">商品</th>
+                  <th className="text-right py-2 px-2">总成本</th>
+                  <th className="text-right py-2 px-2">已入库</th>
+                  <th className="text-right py-2 px-2">在库</th>
+                  <th className="text-right py-2 px-2">均价</th>
+                  <th className="text-right py-2 px-2">已回款</th>
+                  <th className="text-center py-2 px-2">回本</th>
+                  <th className="text-right py-2 px-2">待收回</th>
+                  <th className="text-right py-2 px-2">回本卖价</th>
+                  <th className="text-right py-2 px-2">赚10%卖价</th>
+                  <th className="text-right py-2 pl-2">估值</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map(p => {
+                  const mp = Number(marketPrices[p.id]) || 0;
+                  const valuation = mp > 0 ? mp * p.total_remaining : 0;
+                  const recovered = p.total_revenue || 0;
+                  const remaining = p.total_remaining || 0;
+                  const breakEvenPrice = remaining > 0 ? (p.unrecovered_cost || 0) / remaining : 0;
+                  const profit10Price = remaining > 0 ? ((p.total_cost || 0) * 1.1 - recovered) / remaining : 0;
+                  return (
+                    <tr key={p.id} className="border-b border-white/[0.04] hover:bg-white/[0.02]">
+                      <td className="py-2 pr-3 max-w-[180px] truncate">{p.name_zh || p.name}</td>
+                      <td className="text-right py-2 px-2">¥{(p.total_cost || 0).toFixed(0)}</td>
+                      <td className="text-right py-2 px-2">{p.total_qty || 0}</td>
+                      <td className="text-right py-2 px-2 font-bold text-accent">{p.total_remaining || 0}</td>
+                      <td className="text-right py-2 px-2">¥{(p.avg_unit_cost || 0).toFixed(0)}</td>
+                      <td className="text-right py-2 px-2">¥{recovered.toFixed(0)}</td>
+                      <td className="text-center py-2 px-2">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${(p.breakeven_rate || 0) >= 100 ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'}`}>
+                          {p.breakeven || '—'}
+                        </span>
+                      </td>
+                      <td className="text-right py-2 px-2 text-red-400">¥{(p.unrecovered_cost || 0).toFixed(0)}</td>
+                      <td className={`text-right py-2 px-2 font-bold ${remaining > 0 && breakEvenPrice > 0 ? 'text-yellow-400' : 'text-[#6b7085]'}`}>
+                        {remaining > 0 ? `¥${breakEvenPrice.toFixed(0)}` : '—'}
+                      </td>
+                      <td className={`text-right py-2 px-2 font-bold ${remaining > 0 && profit10Price > 0 ? 'text-green-400' : 'text-[#6b7085]'}`}>
+                        {remaining > 0 ? `¥${Math.max(0, profit10Price).toFixed(0)}` : '—'}
+                      </td>
+                      <td className="text-right py-2 pl-2">
+                        <input
+                          className="input text-xs w-20 text-right"
+                          type="text" inputmode="decimal" placeholder="市价"
+                          value={marketPrices[p.id] || ''}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setMarketPrices(prev => ({ ...prev, [p.id]: val }));
+                          }}
+                        />
+                        {mp > 0 && p.total_remaining > 0 && (
+                          <div className={`text-[10px] mt-0.5 ${valuation >= p.unrecovered_cost ? 'text-green-400' : 'text-red-400'}`}>
+                            ¥{valuation.toFixed(0)}
+                            {valuation >= p.unrecovered_cost ? ' ✓覆盖' : ''}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="text-[10px] text-[#6b7085] mt-3">
+            输入市价后自动计算库存估值（在库 × 市价），绿色表示估值可覆盖剩余成本
           </div>
         </div>
       )}

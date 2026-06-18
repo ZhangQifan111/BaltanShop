@@ -2,6 +2,7 @@ import { useState, useEffect, memo, useCallback } from 'react';
 import ConfirmModal from '../components/ConfirmModal';
 import useStore from '../stores/useStore';
 import { api } from '../lib/api';
+import { sourceLabel, sourceGroup, SOURCES } from '../lib/sources';
 
 const FILTERS = [
   { key: 'stock', label: '在库' },
@@ -9,9 +10,7 @@ const FILTERS = [
   { key: 'done', label: '已完成' },
 ];
 
-const SOURCE_LABELS = { direct: '直购', proxy: '代购', domestic: '国内', secondhand: '二手' };
-
-const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn, onDone, onUnsell }) {
+const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn, onDone, onUnsell, onPoolify }) {
   const [expanded, setExpanded] = useState(false);
 
   const statusBadge = {
@@ -52,7 +51,7 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
       </div>
 
       <div className="flex gap-2 flex-wrap text-[10px] text-[#6b7085] mb-3">
-        <span>{SOURCE_LABELS[toy.source] || toy.source}</span>
+        <span>{sourceLabel(toy.source)}</span>
         <span>·</span>
         <span>{toy.category}</span>
         <span>·</span>
@@ -61,7 +60,7 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
 
       {expanded && (
         <div className="border-t border-white/5 pt-3 mt-3 space-y-1 text-xs">
-          {toy.source === 'direct' && (
+          {sourceGroup(toy.source) === 'direct' && (
             <>
               {toy.japan_price_cny > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">本体价</span><span>¥{toy.japan_price_cny}</span></div>}
               {toy.handling_fee > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">手续费</span><span>¥{toy.handling_fee}</span></div>}
@@ -70,7 +69,7 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
               {toy.tax > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">税费</span><span>¥{toy.tax}</span></div>}
             </>
           )}
-          {toy.source === 'proxy' && (
+          {sourceGroup(toy.source) === 'proxy' && (
             <>
               {toy.proxy_price > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">代购价</span><span>¥{toy.proxy_price}</span></div>}
               {toy.proxy_intl_shipping > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">国际运费</span><span>¥{toy.proxy_intl_shipping}</span></div>}
@@ -114,6 +113,9 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
           {toy.status === 'stock' && (
             <button className="btn-outline flex-1" onClick={e => { e.stopPropagation(); onEdit(toy); }}>编辑</button>
           )}
+          {toy.status === 'stock' && (
+            <button className="btn-ghost flex-1 text-xs text-orange-400" onClick={e => { e.stopPropagation(); onPoolify(toy); }}>入池</button>
+          )}
           <button className="btn-danger" onClick={e => { e.stopPropagation(); onDelete(toy.id); }}>删除</button>
           {toy.status === 'sold' && (
             <>
@@ -130,6 +132,74 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
     </div>
   );
 });
+
+/* ─── 入池弹窗 ─── */
+function PoolifyModal({ toy, products, onConfirm, onCancel }) {
+  const [form, setForm] = useState({
+    product_id: '',
+    quantity: '1',
+  });
+  const [newProductName, setNewProductName] = useState('');
+
+  const isNew = form.product_id === '__new__';
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const qty = Number(form.quantity) || 1;
+    if (!isNew && !form.product_id) return;
+
+    onConfirm({
+      product_id: isNew ? null : Number(form.product_id),
+      quantity: qty,
+      new_product_name: isNew ? (newProductName.trim() || toy.name) : null,
+      new_product_category: toy.category,
+      new_product_source: toy.source,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4" onClick={onCancel}>
+      <div className="bg-[#1a1d27] rounded-xl border border-orange-500/20 p-6 w-full max-w-sm space-y-4" onClick={e => e.stopPropagation()}>
+        <h3 className="text-base font-bold">转入池模式</h3>
+        <div className="text-xs text-[#6b7085]">「{toy.name_zh || toy.name}」成本 ¥{(toy.total_cost || 0).toFixed(0)}</div>
+
+        <form className="space-y-3" onSubmit={handleSubmit}>
+          <div>
+            <label className="text-[10px] text-[#6b7085] block mb-1">关联到哪个商品</label>
+            <select className="input text-xs" value={form.product_id}
+              onChange={e => setForm({ ...form, product_id: e.target.value })}>
+              <option value="">— 选择已有商品 —</option>
+              {products.map(p => (
+                <option key={p.id} value={p.id}>{p.name_zh || p.name} [{p.category}]</option>
+              ))}
+              <option value="__new__">+ 新建商品</option>
+            </select>
+          </div>
+
+          {isNew && (
+            <div>
+              <label className="text-[10px] text-[#6b7085] block mb-1">新商品名称</label>
+              <input className="input text-xs" placeholder={toy.name} value={newProductName}
+                onChange={e => setNewProductName(e.target.value)} />
+            </div>
+          )}
+
+          <div>
+            <label className="text-[10px] text-[#6b7085] block mb-1">这批有几件</label>
+            <input className="input text-xs" type="text" inputmode="decimal" value={form.quantity}
+              onChange={e => setForm({ ...form, quantity: e.target.value })} />
+            <div className="text-[9px] text-[#6b7085] mt-1">入库时一条记录实际包含的件数</div>
+          </div>
+
+          <div className="flex gap-2">
+            <button type="submit" className="btn-primary flex-1">确认入池</button>
+            <button type="button" className="btn-ghost" onClick={onCancel}>取消</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 /* ─── 售出弹窗 ─── */
 function SellModal({ toy, onConfirm, onCancel }) {
@@ -504,7 +574,7 @@ function HistoricalSaleModal({ onCancel, categories }) {
               <label className="text-[10px] text-[#6b7085] block mb-1">品类</label>
               <select className="input text-xs" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
                 <option value="">未指定</option>
-                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                {categories.map(c => <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>)}
               </select>
             </div>
             <div>
@@ -515,6 +585,15 @@ function HistoricalSaleModal({ onCancel, categories }) {
                 <option value="proxy">代购</option>
                 <option value="secondhand">二手</option>
                 <option value="domestic">国内</option>
+                <option value="海淘-任你购">海淘·任你购</option>
+                <option value="海淘-任意门">海淘·任意门</option>
+                <option value="海淘-乐淘一番">海淘·乐淘一番</option>
+                <option value="代购-四人帮">代购·四人帮</option>
+                <option value="代购-W">代购·W</option>
+                <option value="代购-Z">代购·Z</option>
+                <option value="其他代购">其他代购</option>
+                <option value="咸鱼">咸鱼</option>
+                <option value="vx好友">vx好友</option>
               </select>
             </div>
           </div>
@@ -608,7 +687,7 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
       updates.stage3_intl_ship = ship;
       updates.stage3_tax_mode = form.stage3_tax_mode || 'normal';
       // 包税线路强制 0 税（与 Procurement 推进弹窗的 computeStage3Tax 同源）
-      const tax = (form.stage3_tax_mode === 'tax_included' && toy.source !== 'proxy')
+      const tax = (form.stage3_tax_mode === 'tax_included' && sourceGroup(toy.source) !== 'proxy')
         ? 0
         : (form.stage3_tax === '' ? 0 : +form.stage3_tax);
       updates.stage3_tax = tax;
@@ -658,7 +737,7 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
             <label className="text-[10px] text-[#6b7085] block mb-1">品类</label>
             <select className="input text-xs" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
               <option value="">选择分类</option>
-              {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              {categories.map(c => <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>)}
             </select>
           </div>
 
@@ -680,7 +759,7 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
               <label className="text-[10px] text-[#6b7085] block mb-1">③税费</label>
               <input className="input text-xs" type="text" inputmode="decimal" placeholder="0" value={form.stage3_tax} onChange={e => setForm({ ...form, stage3_tax: e.target.value })} />
             </div>
-            {toy.source !== 'proxy' && (
+            {sourceGroup(toy.source) !== 'proxy' && (
               <div className="col-span-2 mt-1">
                 <label className="text-[10px] text-[#6b7085] block mb-1">运输方式</label>
                 <div className="flex gap-2">
@@ -883,9 +962,191 @@ function ReturnModal({ toy, onConfirm, onCancel }) {
   );
 }
 
+/* ─── 池商品售出弹窗 ─── */
+function PoolSellModal({ group, onConfirm, onCancel, shippingRules, supplies }) {
+  const boxSupplies = supplies.filter(s => s.category === 'box');
+  const avgCost = group.totalQty > 0 ? group.totalCost / group.totalQty : 0;
+
+  const [form, setForm] = useState({
+    quantity: '1',
+    sell_price: '',
+    bao_you: false,
+    carrier: 'zto',
+    logistics_region: '',
+    logistics_weight: '',
+    selected_boxes: [],
+    software_service_fee: 0,
+    basic_software_service_fee: 0,
+    worry_free_service_fee: 0,
+    huabei: 0,
+  });
+  const [calcLogisticsFee, setCalcLogisticsFee] = useState(0);
+  const [calcBoxFee, setCalcBoxFee] = useState(0);
+  const [packingFee, setPackingFee] = useState(0);
+
+  const qty = Math.min(Number(form.quantity) || 1, group.totalRemaining);
+  const price = Number(form.sell_price) || 0;
+  const totalRevenue = price * qty;
+
+  useEffect(() => { setForm(f => ({ ...f, quantity: String(Math.min(Number(f.quantity) || 1, group.totalRemaining)) })); }, [group.totalRemaining]);
+
+  useEffect(() => {
+    const p = +form.sell_price || 0;
+    setForm(f => ({
+      ...f,
+      software_service_fee: Math.round(p * qty * 0.01 * 100) / 100,
+      basic_software_service_fee: Math.round(p * qty * 0.006 * 100) / 100,
+    }));
+  }, [form.sell_price, qty]);
+
+  useEffect(() => {
+    if (!form.bao_you || form.carrier !== 'zto' || !form.logistics_region || !form.logistics_weight) {
+      setCalcLogisticsFee(0);
+      return;
+    }
+    const w = parseFloat(form.logistics_weight) || 0;
+    if (w <= 0) { setCalcLogisticsFee(0); return; }
+    api.get(`/shipping-rules/calculate?province=${encodeURIComponent(form.logistics_region)}&weight=${w}`)
+      .then(r => setCalcLogisticsFee(r.fee || 0))
+      .catch(() => setCalcLogisticsFee(0));
+  }, [form.logistics_region, form.logistics_weight, form.bao_you, form.carrier]);
+
+  useEffect(() => { if (form.carrier === 'sf') setCalcLogisticsFee(0); }, [form.carrier]);
+
+  useEffect(() => {
+    const total = form.selected_boxes.reduce((sum, id) => {
+      const s = boxSupplies.find(b => b.id === id);
+      return sum + (s ? s.unit_price : 0);
+    }, 0);
+    setCalcBoxFee(total);
+  }, [form.selected_boxes, boxSupplies]);
+
+  const toggleBox = (id) => {
+    setForm(f => ({
+      ...f,
+      selected_boxes: f.selected_boxes.includes(id)
+        ? f.selected_boxes.filter(b => b !== id)
+        : [...f.selected_boxes, id]
+    }));
+  };
+
+  const softwareFee = +form.software_service_fee || 0;
+  const basicFee = +form.basic_software_service_fee || 0;
+  const worryFreeFee = +form.worry_free_service_fee || 0;
+  const huabeiFee = +form.huabei || 0;
+  const totalFees = softwareFee + basicFee + worryFreeFee + huabeiFee;
+  const totalLogistics = form.bao_you ? (calcLogisticsFee + calcBoxFee + packingFee) : 0;
+  const estimatedProfit = totalRevenue - totalFees - totalLogistics - (avgCost * qty);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!price) return;
+    onConfirm({
+      product_id: group.product_id,
+      quantity: qty,
+      sell_price: price,
+      total_revenue: totalRevenue,
+      software_service_fee: Math.round(softwareFee * 100) / 100,
+      basic_software_service_fee: Math.round(basicFee * 100) / 100,
+      worry_free_service_fee: Math.round(worryFreeFee * 100) / 100,
+      huabei: Math.round(huabeiFee * 100) / 100,
+      logistics_fee: form.bao_you ? calcLogisticsFee : 0,
+      logistics_region: form.bao_you ? form.logistics_region : '',
+      logistics_weight: form.bao_you ? (parseFloat(form.logistics_weight) || 0) : 0,
+      box_fee: form.bao_you ? calcBoxFee : 0,
+      packing_fee: form.bao_you ? packingFee : 0,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4" onClick={onCancel}>
+      <div className="bg-[#1a1d27] rounded-xl border border-orange-500/20 p-6 w-full max-w-sm space-y-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <h3 className="text-base font-bold">出售 {group.product?.name_zh || group.product?.name || '池商品'}</h3>
+        <div className="text-xs text-[#6b7085]">库存 {group.totalRemaining} 件 · 均价 ¥{avgCost.toFixed(0)} · {group.batches.length} 批次</div>
+
+        <form className="space-y-3" onSubmit={handleSubmit}>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-[#6b7085] block mb-1">卖出数量</label>
+              <input className="input text-xs" type="text" inputmode="decimal" value={form.quantity}
+                onChange={e => setForm({ ...form, quantity: e.target.value })} autoFocus />
+            </div>
+            <div>
+              <label className="text-[10px] text-[#6b7085] block mb-1">单价 (¥)</label>
+              <input className="input text-xs" type="text" inputmode="decimal" placeholder="0"
+                value={form.sell_price} onChange={e => setForm({ ...form, sell_price: e.target.value })} />
+            </div>
+          </div>
+
+          {qty > 0 && price > 0 && (
+            <div className="text-xs text-[#6b7085]">总价: <span className="text-[#d0d4e8] font-bold">¥{totalRevenue.toFixed(2)}</span></div>
+          )}
+
+          {/* 物流 */}
+          <div className="bg-black/20 rounded-lg p-3 space-y-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" className="accent-orange-500"
+                checked={form.bao_you}
+                onChange={e => {
+                  const checked = e.target.checked;
+                  setForm(f => ({ ...f, bao_you: checked, carrier: checked ? (f.carrier || 'zto') : '' }));
+                  if (!checked) setCalcLogisticsFee(0);
+                }} />
+              <span className="text-xs text-[#d0d4e8]">包邮</span>
+            </label>
+            {form.bao_you && (
+              <>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setForm(f => ({ ...f, carrier: 'zto' }))}
+                    className={`text-xs px-3 py-1.5 rounded border flex-1 ${form.carrier === 'zto' ? 'border-orange-500 bg-orange-500/20' : 'border-white/10'}`}>中通</button>
+                  <button type="button" onClick={() => setForm(f => ({ ...f, carrier: 'sf' }))}
+                    className={`text-xs px-3 py-1.5 rounded border flex-1 ${form.carrier === 'sf' ? 'border-orange-500 bg-orange-500/20' : 'border-white/10'}`}>顺丰</button>
+                </div>
+                {form.carrier === 'zto' && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <select className="input text-xs" value={form.logistics_region}
+                      onChange={e => setForm(f => ({ ...f, logistics_region: e.target.value }))}>
+                      <option value="">省份</option>
+                      {shippingRules.flatMap(r => (r.provinces||'').split(',').map(p=>p.trim()).filter(Boolean).map(p=>(<option key={p} value={p}>{p}</option>)))}
+                    </select>
+                    <input className="input text-xs" type="text" inputmode="decimal" placeholder="重量kg" value={form.logistics_weight}
+                      onChange={e => setForm(f => ({ ...f, logistics_weight: e.target.value }))} />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* 平台费 */}
+          <div className="bg-black/30 rounded-lg p-3 space-y-2 text-xs">
+            <div className="text-[10px] text-[#6b7085]">软件服务费 1%</div>
+            <input className="input text-xs" type="text" inputmode="decimal" value={form.software_service_fee}
+              onChange={e => setForm({ ...form, software_service_fee: e.target.value })} />
+            <div className="text-[10px] text-[#6b7085]">基础服务费 0.6%</div>
+            <input className="input text-xs" type="text" inputmode="decimal" value={form.basic_software_service_fee}
+              onChange={e => setForm({ ...form, basic_software_service_fee: e.target.value })} />
+          </div>
+
+          {price > 0 && qty > 0 && (
+            <div className={`text-right text-sm font-bold ${estimatedProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              预计利润 {estimatedProfit >= 0 ? '+' : ''}¥{estimatedProfit.toFixed(2)}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <button type="submit" className="btn-primary flex-1">确认出售</button>
+            <button type="button" className="btn-ghost" onClick={onCancel}>取消</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function Warehouse() {
-  const { toys, updateToy, deleteToy, setToast } = useStore();
+  const { toys, updateToy, deleteToy, setToast, shippingRules, supplies } = useStore();
   const [filter, setFilter] = useState('stock');
+  const [sourceFilter, setSourceFilter] = useState('');
   const [search, setSearch] = useState('');
   const [selling, setSelling] = useState(null);
   const [editing, setEditing] = useState(null);
@@ -894,9 +1155,15 @@ export default function Warehouse() {
   const [pendingUnsell, setPendingUnsell] = useState(null);
   const [showHistorical, setShowHistorical] = useState(false);
   const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [poolSelling, setPoolSelling] = useState(null);
+  const [poolifying, setPoolifying] = useState(null);
+  const [unpoolifying, setUnpoolifying] = useState(null);
+  const [expandedPool, setExpandedPool] = useState(null);
 
   useEffect(() => {
-    api.get('/settings/categories').then(cats => setCategories(cats)).catch(() => {});
+    api.get('/settings/categories').then(data => setCategories(data.flat || data)).catch(() => {});
+    api.get('/products').then(prods => setProducts(prods)).catch(() => {});
   }, []);
 
   const [page, setPage] = useState(1);
@@ -905,11 +1172,12 @@ export default function Warehouse() {
 
   const filtered = toys.filter(t => {
     if (t.status !== filter) return false;
+    if (sourceFilter && t.source !== sourceFilter) return false;
     if (search) {
       const q = search.toLowerCase();
       if (!t.name?.toLowerCase().includes(q) && !t.name_zh?.toLowerCase().includes(q) && !t.category?.toLowerCase().includes(q)) return false;
     }
-    return t.status !== 'procurement' && t.status !== 'transit' && t.status !== 'preorder';
+    return t.status !== 'procurement' && t.status !== 'transit' && t.status !== 'preorder' && t.product_id == null;
   });
 
   const sorted = [...filtered].sort((a, b) => {
@@ -922,7 +1190,7 @@ export default function Warehouse() {
   const paged = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // 搜素/切 tab 重置页码
-  useEffect(() => { setPage(1); }, [filter, search]);
+  useEffect(() => { setPage(1); }, [filter, search, sourceFilter]);
 
   const handleSell = async (updates) => {
     try {
@@ -947,12 +1215,99 @@ export default function Warehouse() {
     setEditing(null);
   };
 
+  // 池模式卖出
+  const handlePoolSell = async (formData) => {
+    try {
+      await api.post('/sales', formData);
+      setPoolSelling(null);
+      setToast('已售出');
+      // 刷新 products 列表
+      api.get('/products').then(prods => setProducts(prods)).catch(() => {});
+      // 刷新 toys（通过 loadAll 或直接重新拉取）
+      const { loadAll } = useStore.getState();
+      loadAll();
+    } catch (e) {
+      setToast('出售失败: ' + (e.message || JSON.stringify(e)));
+    }
+  };
+
+  // 入池操作
+  const handlePoolify = async (formData) => {
+    try {
+      let productId = formData.product_id;
+      // 如果需要新建 product
+      if (!productId && formData.new_product_name) {
+        const created = await api.post('/products', {
+          name: formData.new_product_name,
+          name_zh: '',
+          category: formData.new_product_category || poolifying.category,
+          source: formData.new_product_source || poolifying.source,
+        });
+        productId = created.id;
+      }
+      if (!productId) return setToast('请选择或新建商品');
+
+      const totalCost = poolifying.total_cost || 0;
+      const qty = formData.quantity;
+      await updateToy(poolifying.id, {
+        ...poolifying,
+        product_id: productId,
+        quantity: qty,
+        remaining: qty,
+        unit_cost: qty > 0 ? totalCost / qty : 0,
+      });
+      setPoolifying(null);
+      setToast('已转入池模式');
+      api.get('/products').then(prods => setProducts(prods)).catch(() => {});
+    } catch (e) {
+      setToast('入池失败: ' + (e.message || ''));
+    }
+  };
+
+  // 退池操作
+  const handleUnpoolify = async () => {
+    try {
+      await updateToy(unpoolifying.id, {
+        ...unpoolifying,
+        product_id: null,
+        quantity: null,
+        remaining: null,
+        unit_cost: null,
+      });
+      setUnpoolifying(null);
+      setToast('已退出池模式');
+      api.get('/products').then(prods => setProducts(prods)).catch(() => {});
+    } catch (e) {
+      setToast('退池失败: ' + (e.message || ''));
+    }
+  };
+
+  // 分离池商品和传统商品（仅看 stock 状态）
+  const poolToys = toys.filter(t => t.product_id != null && t.status === 'stock' && t.remaining > 0);
+  const legacyToys = toys.filter(t => t.product_id == null);
+
+  // 按 product_id 聚合池商品
+  const poolGrouped = (() => {
+    const map = {};
+    for (const t of poolToys) {
+      if (!map[t.product_id]) map[t.product_id] = { batches: [], totalRemaining: 0, totalQty: 0, totalCost: 0 };
+      map[t.product_id].batches.push(t);
+      map[t.product_id].totalRemaining += t.remaining || 0;
+      map[t.product_id].totalQty += t.quantity || 0;
+      map[t.product_id].totalCost += t.total_cost || 0;
+    }
+    return Object.entries(map).map(([pid, data]) => {
+      const prod = products.find(p => p.id === Number(pid));
+      return { product_id: Number(pid), product: prod, ...data };
+    });
+  })();
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <div className="order-2 md:order-1">
           <h2 className="text-lg font-bold">仓库</h2>
-          <p className="text-xs text-[#6b7085]">{sorted.length} 件商品{totalPages > 1 ? ` · 第${page}/${totalPages}页` : ''}</p>
+          <p className="text-xs text-[#6b7085]">{sorted.length} 件单品{totalPages > 1 ? ` · 第${page}/${totalPages}页` : ''}</p>
         </div>
         <button
           className="btn-primary text-sm order-1 md:order-2 shrink-0"
@@ -962,9 +1317,88 @@ export default function Warehouse() {
         </button>
       </div>
 
+      {/* ─── 池商品区域 ─── */}
+      {poolGrouped.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-4 rounded-full bg-orange-500" />
+            <h3 className="text-sm font-bold">池商品</h3>
+            <span className="text-[10px] text-[#6b7085]">{poolGrouped.length} 款 · 库存 {poolGrouped.reduce((s,g) => s+g.totalRemaining,0)} 件</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {poolGrouped.map(g => {
+              const prod = g.product;
+              const avgCost = g.totalQty > 0 ? g.totalCost / g.totalQty : 0;
+              const isExpanded = expandedPool === g.product_id;
+              return (
+                <div key={g.product_id} className="card border border-orange-500/20 cursor-pointer"
+                  onClick={() => setExpandedPool(isExpanded ? null : g.product_id)}>
+                  <div className="flex items-start gap-3 mb-2">
+                    {prod?.image && <img src={prod.image} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 bg-white/5" loading="lazy" onError={e => e.target.style.display='none'} />}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold truncate">{prod?.name_zh || prod?.name || '未命名'}</div>
+                      <div className="text-[10px] text-[#6b7085]">{prod?.category || ''} · {g.batches.length} 批次</div>
+                    </div>
+                    <span className="text-lg font-bold text-accent shrink-0 ml-2">{g.totalRemaining}</span>
+                  </div>
+                  <div className="flex justify-between text-[10px] text-[#6b7085] mb-2">
+                    <span>均价 ¥{avgCost.toFixed(0)}</span>
+                    <span>总成本 ¥{g.totalCost.toFixed(0)}</span>
+                  </div>
+                  <div className="text-[9px] text-[#6b7085] mb-2">
+                    共 {g.totalQty} 件 · 在库 {g.totalRemaining} 件
+                  </div>
+
+                  {isExpanded && (
+                    <div className="border-t border-white/10 pt-3 mt-2 space-y-2" onClick={e => e.stopPropagation()}>
+                      {g.batches.map(b => (
+                        <div key={b.id} className="bg-white/[0.03] rounded-lg p-3 text-xs flex gap-3">
+                          {b.image && (
+                            <img src={b.image} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0 bg-white/5" loading="lazy" onError={e => e.target.style.display = 'none'} />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between mb-1">
+                              <span className="truncate flex-1 mr-2">{b.name_zh || b.name}</span>
+                              <span className="font-bold text-accent shrink-0">剩 {b.remaining}/{b.quantity}</span>
+                            </div>
+                            <div className="flex justify-between text-[10px] text-[#6b7085]">
+                              <span>成本 ¥{(b.total_cost || 0).toFixed(0)} · 单价 ¥{(b.unit_cost || 0).toFixed(0)}</span>
+                              <span>{b.purchase_date || b.created_at?.slice(0, 10)}</span>
+                            </div>
+                            <div className="text-right mt-1">
+                              <button className="text-[10px] text-yellow-400 hover:text-yellow-300"
+                                onClick={(e) => { e.stopPropagation(); setUnpoolifying(b); }}>
+                                退池
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <button
+                    className="btn-primary w-full text-sm py-2 mt-2"
+                    onClick={e => { e.stopPropagation(); setPoolSelling(g); }}
+                  >
+                    出售
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ─── 单品区域 ─── */}
+      <div className="flex items-center gap-2">
+        <div className="w-1.5 h-4 rounded-full bg-white/20" />
+        <h3 className="text-sm font-bold">单品</h3>
+      </div>
+
       <input
         className="input"
-        placeholder="🔍 搜索商品..."
+        placeholder="🔍 搜索单品..."
         value={search}
         onChange={e => setSearch(e.target.value)}
       />
@@ -979,6 +1413,16 @@ export default function Warehouse() {
             {f.label}
           </button>
         ))}
+        <select
+          className="input text-xs w-32"
+          value={sourceFilter}
+          onChange={e => setSourceFilter(e.target.value)}
+        >
+          <option value="">全部来源</option>
+          {SOURCES.map(s => (
+            <option key={s} value={s}>{sourceLabel(s)}</option>
+          ))}
+        </select>
         <button
           className="btn-ghost text-xs px-2 py-1.5 ml-auto"
           onClick={() => { setSortNewest(!sortNewest); setPage(1); }}
@@ -998,6 +1442,7 @@ export default function Warehouse() {
             onDone={id => updateToy(id, { ...toys.find(t => t.id === id), status: 'done' })}
             onUnsell={id => setPendingUnsell(id)}
             onDelete={id => setPendingDelete(id)}
+            onPoolify={toy => setPoolifying(toy)}
           />
         ))}
       </div>
@@ -1095,6 +1540,34 @@ export default function Warehouse() {
           toy={returning}
           onConfirm={confirmReturn}
           onCancel={() => setReturning(null)}
+        />
+      )}
+
+      {poolSelling && (
+        <PoolSellModal
+          group={poolSelling}
+          onConfirm={handlePoolSell}
+          onCancel={() => setPoolSelling(null)}
+          shippingRules={shippingRules || []}
+          supplies={supplies || []}
+        />
+      )}
+
+      {unpoolifying && (
+        <ConfirmModal
+          title="退出池模式"
+          message={`确定将「${unpoolifying.name_zh || unpoolifying.name}」退出池模式吗？\n数量、均价信息将被清空，恢复为普通单品。`}
+          onConfirm={handleUnpoolify}
+          onCancel={() => setUnpoolifying(null)}
+        />
+      )}
+
+      {poolifying && (
+        <PoolifyModal
+          toy={poolifying}
+          products={products}
+          onConfirm={handlePoolify}
+          onCancel={() => setPoolifying(null)}
         />
       )}
     </div>
