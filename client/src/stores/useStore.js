@@ -53,7 +53,6 @@ const useStore = create((set, get) => ({
   updateToy: async (id, toy) => {
     const updated = await api.put(`/toys/${id}`, toy);
     set(s => ({ toys: s.toys.map(t => t.id == id ? updated : t) }));
-    get().loadAll();
     return updated;
   },
 

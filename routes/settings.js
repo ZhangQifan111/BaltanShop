@@ -49,7 +49,16 @@ router.get('/categories', async (req, res) => {
         tree.push(map[r.id]);
       }
     }
-    res.json({ flat: rows, tree });
+    // 平铺列表：深度优先，子项紧跟在父项后面
+    function flatten(nodes) {
+      const out = [];
+      for (const n of nodes) {
+        out.push({ id: n.id, name: n.name, color: n.color, parent_id: n.parent_id, created_at: n.created_at });
+        if (n.children.length) out.push(...flatten(n.children));
+      }
+      return out;
+    }
+    res.json({ flat: flatten(tree), tree });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

@@ -19,12 +19,28 @@ router.post('/', async (req, res) => {
     }
 
     // 查出该 product 下所有有库存的批次，按创建时间升序（FIFO）
-    const batches = await db.all(
-      `SELECT * FROM toys
-       WHERE product_id = ? AND status = 'stock' AND remaining > 0
-       ORDER BY created_at ASC`,
-      [productId]
-    );
+    // 如果指定了 toy_id，只从该批次扣减
+    let batches;
+    if (t.toy_id) {
+      const batch = await db.get(
+        `SELECT * FROM toys WHERE id = ? AND product_id = ? AND status = 'stock' AND remaining > 0`,
+        [Number(t.toy_id), productId]
+      );
+      if (!batch) {
+        return res.status(400).json({ error: '指定批次不可用（已售罄或不属于该商品）' });
+      }
+      if (sellQty > batch.remaining) {
+        return res.status(400).json({ error: `该批次库存不足：需 ${sellQty} 件，库存 ${batch.remaining} 件` });
+      }
+      batches = [batch];
+    } else {
+      batches = await db.all(
+        `SELECT * FROM toys
+         WHERE product_id = ? AND status = 'stock' AND remaining > 0
+         ORDER BY created_at ASC`,
+        [productId]
+      );
+    }
 
     if (batches.length === 0) {
       return res.status(400).json({ error: '该商品无可用库存' });

@@ -11,6 +11,7 @@ const FILTERS = [
 ];
 
 const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn, onDone, onUnsell, onPoolify }) {
+  const [doneLoading, setDoneLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   const statusBadge = {
@@ -121,7 +122,10 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
             <>
               <button className="btn-ghost flex-1 text-xs text-yellow-400" onClick={e => { e.stopPropagation(); onUnsell(toy.id); }}>退回仓库</button>
               <button className="btn-warn flex-1" onClick={e => { e.stopPropagation(); onReturn(toy); }}>退换</button>
-              <button className="btn-success flex-1" onClick={e => { e.stopPropagation(); onDone(toy.id); }}>确认完成</button>
+              <button className="btn-success flex-1 disabled:opacity-50" disabled={doneLoading}
+                onClick={async e => { e.stopPropagation(); setDoneLoading(true); try { await onDone(toy.id); } finally { setDoneLoading(false); } }}>
+                {doneLoading ? '处理中…' : '确认完成'}
+              </button>
             </>
           )}
           {toy.status === 'done' && (
@@ -140,8 +144,21 @@ function PoolifyModal({ toy, products, onConfirm, onCancel }) {
     quantity: '1',
   });
   const [newProductName, setNewProductName] = useState('');
+  const [search, setSearch] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
 
   const isNew = form.product_id === '__new__';
+
+  const filtered = search.trim()
+    ? products.filter(p => {
+        const s = search.toLowerCase();
+        return (p.name_zh || '').toLowerCase().includes(s)
+          || (p.name || '').toLowerCase().includes(s)
+          || (p.category || '').toLowerCase().includes(s);
+      })
+    : products;
+
+  const selectedProduct = products.find(p => p.id === Number(form.product_id));
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -164,16 +181,46 @@ function PoolifyModal({ toy, products, onConfirm, onCancel }) {
         <div className="text-xs text-[#6b7085]">「{toy.name_zh || toy.name}」成本 ¥{(toy.total_cost || 0).toFixed(0)}</div>
 
         <form className="space-y-3" onSubmit={handleSubmit}>
-          <div>
+          <div className="relative">
             <label className="text-[10px] text-[#6b7085] block mb-1">关联到哪个商品</label>
-            <select className="input text-xs" value={form.product_id}
-              onChange={e => setForm({ ...form, product_id: e.target.value })}>
-              <option value="">— 选择已有商品 —</option>
-              {products.map(p => (
-                <option key={p.id} value={p.id}>{p.name_zh || p.name} [{p.category}]</option>
-              ))}
-              <option value="__new__">+ 新建商品</option>
-            </select>
+            {form.product_id && !isNew ? (
+              <div className="flex items-center gap-1">
+                <div className="flex-1 input text-xs bg-white/5 flex items-center gap-2">
+                  <span className="truncate">{selectedProduct?.name_zh || selectedProduct?.name || '—'}</span>
+                  <span className="text-[10px] text-[#6b7085] shrink-0">[{selectedProduct?.category}]</span>
+                </div>
+                <button type="button" className="text-[10px] text-[#6b7085] hover:text-white px-1"
+                  onClick={() => { setForm({ ...form, product_id: '' }); setSearch(''); }}>✕</button>
+              </div>
+            ) : (
+              <>
+                <input className="input text-xs w-full" placeholder="输入关键字搜索商品…"
+                  value={search}
+                  onFocus={() => setShowDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                  onChange={e => { setSearch(e.target.value); setShowDropdown(true); }} />
+                {showDropdown && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-[#1a1d27] border border-gray-600 rounded-lg max-h-48 overflow-y-auto z-50 shadow-xl">
+                    {filtered.map(p => (
+                      <button type="button" key={p.id}
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-white/10 flex items-center gap-2 border-b border-gray-700/50 last:border-b-0"
+                        onPointerDown={() => { setForm({ ...form, product_id: String(p.id) }); setSearch(''); setShowDropdown(false); }}>
+                        <span className="truncate flex-1">{p.name_zh || p.name}</span>
+                        <span className="text-[10px] text-[#6b7085] shrink-0">{p.category}</span>
+                      </button>
+                    ))}
+                    <button type="button"
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-orange-500/10 text-orange-400 border-t border-gray-600"
+                      onPointerDown={() => { setForm({ ...form, product_id: '__new__' }); setSearch(''); setShowDropdown(false); }}>
+                      + 新建商品
+                    </button>
+                    {filtered.length === 0 && search && (
+                      <div className="px-3 py-2 text-xs text-[#6b7085]">无匹配结果，可直接新建</div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           {isNew && (
@@ -963,11 +1010,12 @@ function ReturnModal({ toy, onConfirm, onCancel }) {
 }
 
 /* ─── 池商品售出弹窗 ─── */
-function PoolSellModal({ group, onConfirm, onCancel, shippingRules, supplies }) {
+function PoolSellModal({ group, onConfirm, onCancel, shippingRules, supplies, preselectedBatchId }) {
   const boxSupplies = supplies.filter(s => s.category === 'box');
   const avgCost = group.totalQty > 0 ? group.totalCost / group.totalQty : 0;
 
   const [form, setForm] = useState({
+    toy_id: preselectedBatchId ? String(preselectedBatchId) : '',
     quantity: '1',
     sell_price: '',
     bao_you: false,
@@ -984,11 +1032,13 @@ function PoolSellModal({ group, onConfirm, onCancel, shippingRules, supplies }) 
   const [calcBoxFee, setCalcBoxFee] = useState(0);
   const [packingFee, setPackingFee] = useState(0);
 
-  const qty = Math.min(Number(form.quantity) || 1, group.totalRemaining);
+  const selectedBatch = form.toy_id ? group.batches.find(b => b.id === Number(form.toy_id)) : null;
+  const maxQty = selectedBatch ? selectedBatch.remaining : group.totalRemaining;
+  const qty = Math.min(Number(form.quantity) || 1, maxQty);
   const price = Number(form.sell_price) || 0;
   const totalRevenue = price * qty;
 
-  useEffect(() => { setForm(f => ({ ...f, quantity: String(Math.min(Number(f.quantity) || 1, group.totalRemaining)) })); }, [group.totalRemaining]);
+  useEffect(() => { setForm(f => ({ ...f, quantity: String(Math.min(Number(f.quantity) || 1, maxQty)) })); }, [maxQty]);
 
   useEffect(() => {
     const p = +form.sell_price || 0;
@@ -1036,13 +1086,15 @@ function PoolSellModal({ group, onConfirm, onCancel, shippingRules, supplies }) 
   const huabeiFee = +form.huabei || 0;
   const totalFees = softwareFee + basicFee + worryFreeFee + huabeiFee;
   const totalLogistics = form.bao_you ? (calcLogisticsFee + calcBoxFee + packingFee) : 0;
-  const estimatedProfit = totalRevenue - totalFees - totalLogistics - (avgCost * qty);
+  const batchUnitCost = selectedBatch ? (selectedBatch.unit_cost || 0) : avgCost;
+  const estimatedProfit = totalRevenue - totalFees - totalLogistics - (batchUnitCost * qty);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!price) return;
     onConfirm({
       product_id: group.product_id,
+      toy_id: form.toy_id ? Number(form.toy_id) : null,
       quantity: qty,
       sell_price: price,
       total_revenue: totalRevenue,
@@ -1063,6 +1115,19 @@ function PoolSellModal({ group, onConfirm, onCancel, shippingRules, supplies }) 
       <div className="bg-[#1a1d27] rounded-xl border border-orange-500/20 p-6 w-full max-w-sm space-y-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <h3 className="text-base font-bold">出售 {group.product?.name_zh || group.product?.name || '池商品'}</h3>
         <div className="text-xs text-[#6b7085]">库存 {group.totalRemaining} 件 · 均价 ¥{avgCost.toFixed(0)} · {group.batches.length} 批次</div>
+
+        <div>
+          <label className="text-[10px] text-[#6b7085] block mb-1">指定批次（可选，不选则 FIFO 自动扣）</label>
+          <select className="input text-xs" value={form.toy_id}
+            onChange={e => setForm({ ...form, toy_id: e.target.value })}>
+            <option value="">— 全部批次（FIFO）—</option>
+            {group.batches.map(b => (
+              <option key={b.id} value={b.id}>
+                {b.name_zh || b.name} · 剩{b.remaining}/{b.quantity} · ¥{(b.unit_cost || 0).toFixed(0)}/件 · {b.purchase_date || b.created_at?.slice(0, 10)}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <form className="space-y-3" onSubmit={handleSubmit}>
           <div className="grid grid-cols-2 gap-2">
@@ -1168,7 +1233,7 @@ export default function Warehouse() {
 
   const [page, setPage] = useState(1);
   const [sortNewest, setSortNewest] = useState(true);
-  const PAGE_SIZE = 20;
+  const PAGE_SIZE = 12;
 
   const filtered = toys.filter(t => {
     if (t.status !== filter) return false;
@@ -1181,8 +1246,8 @@ export default function Warehouse() {
   });
 
   const sorted = [...filtered].sort((a, b) => {
-    const da = a.created_at || '';
-    const db = b.created_at || '';
+    const da = a.purchase_date || a.created_at || '';
+    const db = b.purchase_date || b.created_at || '';
     return sortNewest ? db.localeCompare(da) : da.localeCompare(db);
   });
 
@@ -1211,8 +1276,31 @@ export default function Warehouse() {
   };
 
   const handleEdit = async (id, updates) => {
-    await updateToy(id, { ...toys.find(t => t.id === id), ...updates });
+    const toy = toys.find(t => t.id === id);
+    await updateToy(id, { ...toy, ...updates });
     setEditing(null);
+
+    // 自动入池：有分类但未入池的，自动匹配已有池或新建
+    const newCat = updates.category || toy?.category;
+    if (!toy?.product_id && newCat) {
+      try {
+        const existing = await api.get(`/products?category=${encodeURIComponent(newCat)}`);
+        let pid;
+        if (existing.length > 0) {
+          pid = existing[0].id;
+        } else {
+          const created = await api.post('/products', {
+            name: newCat,
+            name_zh: toy.name_zh || toy.name || newCat,
+            category: newCat,
+            source: toy.source || 'direct',
+          });
+          pid = created.id;
+        }
+        const tc = toy.total_cost || 0;
+        await updateToy(id, { product_id: pid, quantity: 1, remaining: 1, unit_cost: tc });
+      } catch (_) { /* 入池失败不影响编辑 */ }
+    }
   };
 
   // 池模式卖出
@@ -1365,8 +1453,12 @@ export default function Warehouse() {
                               <span>成本 ¥{(b.total_cost || 0).toFixed(0)} · 单价 ¥{(b.unit_cost || 0).toFixed(0)}</span>
                               <span>{b.purchase_date || b.created_at?.slice(0, 10)}</span>
                             </div>
-                            <div className="text-right mt-1">
-                              <button className="text-[10px] text-yellow-400 hover:text-yellow-300"
+                            <div className="flex justify-end gap-1.5 mt-1">
+                              <button className="text-[10px] px-2 py-0.5 rounded border border-accent/40 bg-accent/10 text-accent hover:bg-accent/20"
+                                onClick={(e) => { e.stopPropagation(); setPoolSelling({ ...g, preselectedBatchId: b.id }); }}>
+                                出售
+                              </button>
+                              <button className="text-[10px] px-2 py-0.5 rounded border border-yellow-500/40 bg-yellow-500/10 text-yellow-300 hover:bg-yellow-500/20"
                                 onClick={(e) => { e.stopPropagation(); setUnpoolifying(b); }}>
                                 退池
                               </button>
@@ -1430,6 +1522,15 @@ export default function Warehouse() {
           {sortNewest ? '↓ 最新' : '↑ 最早'}
         </button>
       </div>
+
+      {/* 顶部翻页 */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 py-1">
+          <button className="btn-ghost text-xs px-3 py-1" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>◀ 上一页</button>
+          <span className="text-xs text-[#6b7085]">{page} / {totalPages}</span>
+          <button className="btn-ghost text-xs px-3 py-1" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>下一页 ▶</button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {paged.map(toy => (
@@ -1546,6 +1647,7 @@ export default function Warehouse() {
       {poolSelling && (
         <PoolSellModal
           group={poolSelling}
+          preselectedBatchId={poolSelling.preselectedBatchId || null}
           onConfirm={handlePoolSell}
           onCancel={() => setPoolSelling(null)}
           shippingRules={shippingRules || []}

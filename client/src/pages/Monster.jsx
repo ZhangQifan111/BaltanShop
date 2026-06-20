@@ -327,13 +327,15 @@ function LinkPickerModal({ character_slug, ref_id, currentLinkedId, onLinked, on
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(null);
 
-  const filtered = toys
+  const filtered = [...toys]
+    .sort((a, b) => (b.id || 0) - (a.id || 0))
     .filter(t => {
       if (!search.trim()) return true;
       const q = search.toLowerCase();
-      return t.name?.toLowerCase().includes(q) || t.category?.toLowerCase().includes(q);
-    })
-    .slice(0, 100);
+      return t.name?.toLowerCase().includes(q)
+        || t.name_zh?.toLowerCase().includes(q)
+        || t.category?.toLowerCase().includes(q);
+    });
 
   const handleLink = async (toy) => {
     setLoading(toy.id);
@@ -363,31 +365,29 @@ function LinkPickerModal({ character_slug, ref_id, currentLinkedId, onLinked, on
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[#1a1d27] rounded-xl border border-white/10 p-5 w-full max-w-md space-y-3 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold">关联已有库存</h3>
-          {currentLinkedId && (
-            <button
-              type="button"
-              onClick={handleUnlink}
-              disabled={loading === 'unlink'}
-              className="text-xs text-red-300 hover:underline disabled:opacity-50"
-            >
-              {loading === 'unlink' ? '解除中…' : '解除当前关联'}
-            </button>
-          )}
-        </div>
-        <p className="text-[10px] text-[#6b7085] -mt-1">挑一件已有的 toys 记录关联到这个 ref。选了之后该收藏会自动从「收藏」视图搬到「已拥有」视图。</p>
+      <div className="bg-[#1a1d27] rounded-xl border border-white/10 p-5 w-full max-w-md flex flex-col" style={{ height: '85vh' }} onClick={e => e.stopPropagation()}>
+        <h3 className="text-base font-bold">关联已有库存</h3>
+        {currentLinkedId && (
+          <button
+            type="button"
+            onClick={handleUnlink}
+            disabled={loading === 'unlink'}
+            className="text-xs text-red-300 hover:underline disabled:opacity-50 self-end -mt-5"
+          >
+            {loading === 'unlink' ? '解除中…' : '解除当前关联'}
+          </button>
+        )}
+        <p className="text-[10px] text-[#6b7085] mt-2">挑一件已有的 toys 记录关联到这个 ref。选了之后该收藏会自动从「收藏」视图搬到「已拥有」视图。</p>
 
         <input
-          className="input text-sm"
+          className="input text-sm mt-2"
           placeholder="🔍 搜索商品名称 / 品类…"
           value={search}
           onChange={e => setSearch(e.target.value)}
           autoFocus
         />
 
-        <div className="space-y-1 max-h-96 overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto mt-2 -mx-1 px-1 space-y-1">
           {filtered.length === 0 ? (
             <div className="text-xs text-[#6b7085] text-center py-6">没有匹配的商品</div>
           ) : filtered.map(toy => {
@@ -400,16 +400,22 @@ function LinkPickerModal({ character_slug, ref_id, currentLinkedId, onLinked, on
                 onClick={() => !isCurrent && handleLink(toy)}
                 disabled={isCurrent || loading !== null}
                 className={
-                  'w-full text-left px-3 py-2 rounded-lg border text-xs flex justify-between items-center gap-2 transition-colors ' +
+                  'w-full text-left px-3 py-2 rounded-lg border text-xs flex items-center gap-3 transition-colors ' +
                   (isCurrent
                     ? 'border-emerald-500/50 bg-emerald-500/10 cursor-default'
                     : 'border-white/5 hover:bg-white/5 cursor-pointer')
                 }
               >
+                {toy.image ? (
+                  <img src={toy.image} alt="" className="w-10 h-10 rounded object-cover shrink-0 bg-white/5" onError={e => e.target.style.display = 'none'} />
+                ) : (
+                  <div className="w-10 h-10 rounded shrink-0 bg-white/5 flex items-center justify-center text-[9px] text-[#6b7085]">无图</div>
+                )}
                 <div className="flex-1 min-w-0">
-                  <div className="truncate">{toy.name}</div>
+                  <div className="truncate font-medium">{toy.name_zh || toy.name}</div>
+                  {toy.name_zh && <div className="text-[10px] text-[#6b7085] truncate">{toy.name}</div>}
                   <div className="text-[10px] text-[#6b7085] mt-0.5">
-                    {status} · {sourceLabel(toy.source)} · ¥{(toy.total_cost || 0).toFixed(0)}
+                    {toy.category || '-'} · {status} · {sourceLabel(toy.source)} · ¥{(toy.total_cost || 0).toFixed(0)}
                   </div>
                 </div>
                 {isCurrent ? (
@@ -1211,10 +1217,6 @@ function ToyCard({ it, onZoom, onOpenForm, addToy, isFav, onToggleFav, reference
 
 function OwnedCard({ it, onZoom, isFav, onToggleFav, onOpenLinkPicker, onUnlink }) {
   const toy = it.linked_toy;
-  const status = TOY_STATUS_LABELS[toy.status] || toy.status;
-  const sourceDisp = sourceLabel(toy.source);
-  const profit = toy.profit;
-  const profitTone = profit == null ? 'text-[#6b7085]' : profit >= 0 ? 'text-green-400' : 'text-red-400';
   const [unlinking, setUnlinking] = useState(false);
   const handleUnlink = async () => {
     if (!confirm('确定解除关联？这只会断开 monster 收藏与该 toy 的关联，不会删除玩具本身。')) return;
@@ -1222,6 +1224,45 @@ function OwnedCard({ it, onZoom, isFav, onToggleFav, onOpenLinkPicker, onUnlink 
     try { await onUnlink(); }
     finally { setUnlinking(false); }
   };
+
+  // 关联的 toy 已被删除：只显示基本信息 + 解除关联按钮
+  if (!toy) {
+    return (
+      <div className="card overflow-hidden flex flex-col relative ring-2 ring-red-500/40 shadow-lg shadow-red-500/10">
+        {it.image_url ? (
+          <button type="button" onClick={onZoom} className="bg-black/30 cursor-zoom-in hover:opacity-80 transition-opacity">
+            <img src={it.image_url} alt={`${it.character_name_zh || it.character_slug} ${it.source}`}
+              className="block w-full h-auto object-contain" style={{ aspectRatio: '100 / 147' }} loading="lazy" />
+          </button>
+        ) : (
+          <div className="w-full bg-black/30 flex items-center justify-center text-[10px] text-[#6b7085]" style={{ aspectRatio: '100 / 147' }}>无图</div>
+        )}
+        <div className="absolute top-2 right-2 z-10">
+          <StarButton active={isFav} onClick={onToggleFav} />
+        </div>
+        <div className="p-2.5 flex-1 flex flex-col gap-1.5 min-w-0">
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            <span className="text-xs text-accent">#{it.ref_id.split('-').pop()}</span>
+            <span className="text-[10px] text-[#6b7085] truncate">{it.source}</span>
+          </div>
+          <div className="text-[10px] text-[#a0a4b8] bg-red-500/10 border border-red-500/30 rounded px-1.5 py-1">
+            <span className="text-red-300">关联的库存已删除</span>
+          </div>
+        </div>
+        <div className="px-2.5 pb-2.5 flex gap-1.5 border-t border-white/5 pt-1.5">
+          <button type="button" onClick={handleUnlink} disabled={unlinking}
+            className="flex-1 text-xs font-semibold py-1.5 rounded bg-red-500/15 text-red-300 border border-red-500/40 hover:bg-red-500/25">
+            {unlinking ? '解除中…' : '解除关联'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const status = TOY_STATUS_LABELS[toy.status] || toy.status;
+  const sourceDisp = sourceLabel(toy.source);
+  const profit = toy.profit;
+  const profitTone = profit == null ? 'text-[#6b7085]' : profit >= 0 ? 'text-green-400' : 'text-red-400';
 
   return (
     <div className="card overflow-hidden flex flex-col relative ring-2 ring-emerald-500/60 shadow-lg shadow-emerald-500/15">
@@ -1770,22 +1811,22 @@ export default function Monster() {
         favLoading ? (
           <div className="text-xs text-[#6b7085]">加载中…</div>
         ) : (() => {
-          const list = viewMode === 'favorites'
-            ? favToys.filter(t => !t.linked_toy_id)
-            : favToys.filter(t => t.linked_toy_id);
+          const list = viewMode === 'owned'
+            ? favToys.filter(t => t.linked_toy_id)
+            : favToys;
           if (list.length === 0) {
             return (
               <div className="text-xs text-[#6b7085]">
-                {viewMode === 'favorites'
-                  ? '还没有收藏。进入角色页后，点玩具卡右上角的 ☆ 收藏喜欢的单品。'
-                  : '还没有已拥有的收藏。点收藏卡上的「➕ 录入 ▾ → 📦 关联已有库存」就能搬过来。'}
+                {viewMode === 'owned'
+                  ? '还没有已拥有的收藏。点收藏卡上的「➕ 录入 ▾ → 📦 关联已有库存」就能搬过来。'
+                  : '还没有收藏。进入角色页后，点玩具卡右上角的 ☆ 收藏喜欢的单品。'}
               </div>
             );
           }
           return (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {list.map(it => {
-                if (viewMode === 'owned') {
+                if (viewMode === 'owned' && it.linked_toy_id) {
                   return (
                     <OwnedCard
                       key={it.ref_id}
