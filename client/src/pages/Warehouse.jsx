@@ -137,6 +137,66 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
   );
 });
 
+/* ─── 池详情弹窗 ─── */
+function PoolDetailModal({ group, onClose, onSell, onUnpoolify }) {
+  const prod = group.product;
+  const avgCost = group.totalQty > 0 ? group.totalCost / group.totalQty : 0;
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-[#1a1d27] rounded-xl border border-orange-500/20 w-full max-w-md flex flex-col" style={{ maxHeight: '85vh' }} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="p-4 border-b border-white/10 shrink-0">
+          <div className="flex items-center gap-3">
+            {prod?.image && <img src={prod.image} alt="" className="w-12 h-12 rounded-lg object-cover bg-white/5" onError={e => e.target.style.display = 'none'} />}
+            <div className="flex-1 min-w-0">
+              <h3 className="text-base font-bold truncate">{prod?.name_zh || prod?.name || '未命名'}</h3>
+              <div className="text-[10px] text-[#6b7085]">{prod?.category || ''} · {group.batches.length} 批次</div>
+            </div>
+            <button className="text-[#6b7085] hover:text-white text-lg px-1" onClick={onClose}>✕</button>
+          </div>
+          <div className="flex justify-between mt-3 text-xs">
+            <span>均价 <span className="text-white font-bold">¥{avgCost.toFixed(0)}</span></span>
+            <span>总成本 <span className="text-white font-bold">¥{group.totalCost.toFixed(0)}</span></span>
+            <span>在库 <span className="text-accent font-bold">{group.totalRemaining}</span>/{group.totalQty} 件</span>
+          </div>
+        </div>
+
+        {/* Batch list */}
+        <div className="p-4 space-y-2 overflow-y-auto flex-1">
+          {group.batches.map(b => (
+            <div key={b.id} className="bg-white/[0.03] rounded-lg p-3 text-xs flex gap-3">
+              {b.image && (
+                <img src={b.image} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 bg-white/5" onError={e => e.target.style.display = 'none'} />
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex justify-between mb-1">
+                  <span className="truncate flex-1 mr-2 font-medium">{b.name_zh || b.name}</span>
+                  <span className="font-bold text-accent shrink-0">剩 {b.remaining}/{b.quantity}</span>
+                </div>
+                <div className="flex justify-between text-[10px] text-[#6b7085] mb-2">
+                  <span>成本 ¥{(b.total_cost || 0).toFixed(0)} · 单价 ¥{(b.unit_cost || 0).toFixed(0)}</span>
+                  <span>{b.purchase_date || b.created_at?.slice(0, 10)}</span>
+                </div>
+                <div className="flex justify-end gap-1.5">
+                  <button className="text-[10px] px-2 py-0.5 rounded border border-accent/40 bg-accent/10 text-accent hover:bg-accent/20"
+                    onClick={() => onSell(group, b.id)}>
+                    出售
+                  </button>
+                  <button className="text-[10px] px-2 py-0.5 rounded border border-yellow-500/40 bg-yellow-500/10 text-yellow-300 hover:bg-yellow-500/20"
+                    onClick={() => onUnpoolify(b)}>
+                    退池
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── 入池弹窗 ─── */
 function PoolifyModal({ toy, products, onConfirm, onCancel }) {
   const [form, setForm] = useState({
@@ -195,6 +255,7 @@ function PoolifyModal({ toy, products, onConfirm, onCancel }) {
             ) : (
               <>
                 <input className="input text-xs w-full" placeholder="输入关键字搜索商品…"
+                  lang="zh-CN" spellCheck={false} autoComplete="off"
                   value={search}
                   onFocus={() => setShowDropdown(true)}
                   onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
@@ -1224,7 +1285,7 @@ export default function Warehouse() {
   const [poolSelling, setPoolSelling] = useState(null);
   const [poolifying, setPoolifying] = useState(null);
   const [unpoolifying, setUnpoolifying] = useState(null);
-  const [expandedPool, setExpandedPool] = useState(null);
+  const [viewingPool, setViewingPool] = useState(null);
 
   useEffect(() => {
     api.get('/settings/categories').then(data => setCategories(data.flat || data)).catch(() => {});
@@ -1417,10 +1478,9 @@ export default function Warehouse() {
             {poolGrouped.map(g => {
               const prod = g.product;
               const avgCost = g.totalQty > 0 ? g.totalCost / g.totalQty : 0;
-              const isExpanded = expandedPool === g.product_id;
               return (
                 <div key={g.product_id} className="card border border-orange-500/20 cursor-pointer"
-                  onClick={() => setExpandedPool(isExpanded ? null : g.product_id)}>
+                  onClick={() => setViewingPool(g)}>
                   <div className="flex items-start gap-3 mb-2">
                     {prod?.image && <img src={prod.image} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 bg-white/5" loading="lazy" onError={e => e.target.style.display='none'} />}
                     <div className="flex-1 min-w-0">
@@ -1436,38 +1496,6 @@ export default function Warehouse() {
                   <div className="text-[9px] text-[#6b7085] mb-2">
                     共 {g.totalQty} 件 · 在库 {g.totalRemaining} 件
                   </div>
-
-                  {isExpanded && (
-                    <div className="border-t border-white/10 pt-3 mt-2 space-y-2" onClick={e => e.stopPropagation()}>
-                      {g.batches.map(b => (
-                        <div key={b.id} className="bg-white/[0.03] rounded-lg p-3 text-xs flex gap-3">
-                          {b.image && (
-                            <img src={b.image} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0 bg-white/5" loading="lazy" onError={e => e.target.style.display = 'none'} />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex justify-between mb-1">
-                              <span className="truncate flex-1 mr-2">{b.name_zh || b.name}</span>
-                              <span className="font-bold text-accent shrink-0">剩 {b.remaining}/{b.quantity}</span>
-                            </div>
-                            <div className="flex justify-between text-[10px] text-[#6b7085]">
-                              <span>成本 ¥{(b.total_cost || 0).toFixed(0)} · 单价 ¥{(b.unit_cost || 0).toFixed(0)}</span>
-                              <span>{b.purchase_date || b.created_at?.slice(0, 10)}</span>
-                            </div>
-                            <div className="flex justify-end gap-1.5 mt-1">
-                              <button className="text-[10px] px-2 py-0.5 rounded border border-accent/40 bg-accent/10 text-accent hover:bg-accent/20"
-                                onClick={(e) => { e.stopPropagation(); setPoolSelling({ ...g, preselectedBatchId: b.id }); }}>
-                                出售
-                              </button>
-                              <button className="text-[10px] px-2 py-0.5 rounded border border-yellow-500/40 bg-yellow-500/10 text-yellow-300 hover:bg-yellow-500/20"
-                                onClick={(e) => { e.stopPropagation(); setUnpoolifying(b); }}>
-                                退池
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
 
                   <button
                     className="btn-primary w-full text-sm py-2 mt-2"
@@ -1670,6 +1698,15 @@ export default function Warehouse() {
           products={products}
           onConfirm={handlePoolify}
           onCancel={() => setPoolifying(null)}
+        />
+      )}
+
+      {viewingPool && (
+        <PoolDetailModal
+          group={viewingPool}
+          onClose={() => setViewingPool(null)}
+          onSell={(g, batchId) => { setViewingPool(null); setPoolSelling({ ...g, preselectedBatchId: batchId }); }}
+          onUnpoolify={(b) => { setViewingPool(null); setUnpoolifying(b); }}
         />
       )}
     </div>

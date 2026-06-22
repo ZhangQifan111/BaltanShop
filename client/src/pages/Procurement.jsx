@@ -657,7 +657,7 @@ export default function Procurement() {
         body.procurement_stage = null;
         body.stage1_amount = body.stage1_amount === '' || body.stage1_amount == null ? 0 : +body.stage1_amount;
       }
-      if (!poolMode) { body.product_id = null; body.quantity = null; }
+      if (!poolMode) { body.product_id = null; if (!body.quantity) body.quantity = 1; }
       // 池模式下选了"新建商品" → 自动创建 product
       if (poolMode && !body.product_id) {
         const created = await api.post('/products', {
@@ -815,6 +815,11 @@ export default function Procurement() {
               <input className="input text-xs" type="text" inputmode={isTouch ? "decimal" : undefined} lang="zh-CN" value={form.stage1_amount ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage1_amount: e.target.value === '' ? '' : +e.target.value })} />
             </div>
             <div>
+              <label className="text-[10px] text-[#6b7085] block mb-1">数量</label>
+              <input className="input text-xs" type="text" inputmode="decimal" lang="zh-CN" placeholder="1"
+                value={form.quantity || ''} onChange={e => setForm({ ...form, quantity: e.target.value })} />
+            </div>
+            <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">
                 {isPreorderForm ? '上市/到货日' : '购入日期'}
               </label>
@@ -833,26 +838,19 @@ export default function Procurement() {
               <span className="text-xs text-[#d0d4e8]">批量入库（池模式）— 同一商品一次进多件</span>
             </label>
             {poolMode && (
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-[#6b7085] block mb-1">关联商品</label>
-                  <select className="input text-xs" value={form.product_id || ''}
-                    onChange={e => {
-                      const pid = e.target.value ? Number(e.target.value) : null;
-                      const prod = pid ? products.find(p => p.id === pid) : null;
-                      setForm({ ...form, product_id: pid, name: prod ? prod.name : form.name, category: prod ? prod.category : form.category });
-                    }}>
-                    <option value="">— 新建商品 —</option>
-                    {products.map(p => (
-                      <option key={p.id} value={p.id}>{p.name_zh || p.name} [{p.category}]</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] text-[#6b7085] block mb-1">数量</label>
-                  <input className="input text-xs" type="text" inputmode="decimal" lang="zh-CN" placeholder="1"
-                    value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} />
-                </div>
+              <div>
+                <label className="text-[10px] text-[#6b7085] block mb-1">关联商品</label>
+                <select className="input text-xs" value={form.product_id || ''}
+                  onChange={e => {
+                    const pid = e.target.value ? Number(e.target.value) : null;
+                    const prod = pid ? products.find(p => p.id === pid) : null;
+                    setForm({ ...form, product_id: pid, name: prod ? prod.name : form.name, category: prod ? prod.category : form.category });
+                  }}>
+                  <option value="">— 新建商品 —</option>
+                  {products.map(p => (
+                    <option key={p.id} value={p.id}>{p.name_zh || p.name} [{p.category}]</option>
+                  ))}
+                </select>
               </div>
             )}
           </div>
