@@ -103,10 +103,14 @@ router.post('/', async (req, res) => {
       // 更新批次库存
       const newRemaining = batch.remaining - take;
       if (newRemaining <= 0) {
-        // 该批次卖光了
+        // 该批次卖光了：汇总该批次所有 sale 的总收入作为 sell_price
+        const { total } = await db.get(
+          `SELECT COALESCE(SUM(total_revenue), 0) AS total FROM sales WHERE toy_id = ?`,
+          [batch.id]
+        );
         db.update(
           `UPDATE toys SET remaining = 0, status = 'sold', sell_price = ?, sell_date = ? WHERE id = ?`,
-          [sellPricePerUnit, sellDate, batch.id]
+          [total, sellDate, batch.id]
         );
       } else {
         db.update(
