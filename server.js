@@ -33,6 +33,7 @@ app.use('/api/fee-rules', require('./routes/feeRules'));
 app.use('/api/shipping-rules', require('./routes/shippingRules'));
 app.use('/api/baltan', require('./routes/baltan'));
 app.use('/api/monster', require('./routes/baltan'));
+app.use('/api/xplus', require('./routes/xplus'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/stats', require('./routes/stats'));
 const { router: backupRouter } = require('./routes/backup');

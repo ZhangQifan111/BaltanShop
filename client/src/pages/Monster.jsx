@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import useStore from '../stores/useStore';
 import { sourceLabel, sourceGroup, SOURCE_CATEGORIES, toSourceValue, parseSource } from '../lib/sources';
 import ImageModal from '../components/ImageModal';
+import Xplus from './Xplus';
 import {
   ESTIMATE_DEFAULTS,
   num,
@@ -1375,6 +1376,7 @@ export default function Monster() {
   const [favLoading, setFavLoading] = useState(false);
   const [linkPicker, setLinkPicker] = useState(null);
   const [deletingChar, setDeletingChar] = useState(false);
+  const [catalog, setCatalog] = useState('sofubi'); // 'sofubi' | 'xplus'
 
   const [showCustomToyForm, setShowCustomToyForm] = useState(false);
   const [showCustomCharForm, setShowCustomCharForm] = useState(false);
@@ -1656,13 +1658,40 @@ export default function Monster() {
   const favCount = favorites.length;
   const ownedCount = favorites.filter(f => f.linked_toy_id).length;
 
+  if (catalog === 'xplus') {
+    return (
+      <div style={{ background: '#FFFFCC', margin: '-1.5rem -1rem', padding: '1rem' }}>
+        <div className="flex items-center gap-3 mb-3 px-2">
+          <span style={{ color: '#990000', fontWeight: 'bold', fontSize: 14 }}>大玩具博物館</span>
+          <div className="flex rounded border overflow-hidden" style={{ borderColor: '#CC6600' }}>
+            <button type="button" onClick={() => setCatalog('sofubi')}
+              className="px-3 py-1 text-xs transition-colors"
+              style={{ background: 'transparent', color: '#CC6600', border: 'none' }}>sofubi</button>
+            <button type="button" onClick={() => setCatalog('xplus')}
+              className="px-3 py-1 text-xs font-bold transition-colors"
+              style={{ background: '#CC6600', color: '#fff', border: 'none' }}>XPLUS</button>
+          </div>
+        </div>
+        <Xplus />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-bold flex items-center gap-2">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_2px_rgba(245,158,11,0.6)]" />
-          怪兽图鉴
-        </h2>
+        <div className="flex items-center gap-3 mb-1">
+          <h2 className="text-lg font-bold flex items-center gap-2">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_2px_rgba(245,158,11,0.6)]" />
+            怪兽图鉴
+          </h2>
+          <div className="flex bg-white/5 rounded-lg p-0.5">
+            <button type="button" onClick={() => setCatalog('sofubi')}
+              className="px-3 py-1 text-xs rounded-md bg-amber-500 text-[#0f1117] font-semibold transition-colors">sofubi</button>
+            <button type="button" onClick={() => setCatalog('xplus')}
+              className="px-3 py-1 text-xs rounded-md text-[#6b7085] hover:text-white transition-colors">XPLUS</button>
+          </div>
+        </div>
         <p className="text-xs text-[#6b7085]">
           来源：<a href="https://ultrakaijyu.com/" target="_blank" rel="noreferrer" className="text-accent hover:underline">ウルトラ怪獣.com 資料室</a>
         </p>
@@ -1823,8 +1852,36 @@ export default function Monster() {
               </div>
             );
           }
+          // 已拥有统计
+          let ownedStats = null;
+          if (viewMode === 'owned') {
+            const ownedToys = list.map(it => it.linked_toy).filter(Boolean);
+            const totalValue = ownedToys.reduce((s, t) => s + (t.total_cost || 0), 0);
+            const catMap = {};
+            ownedToys.forEach(t => { const cat = t.category || '未分类'; catMap[cat] = (catMap[cat] || 0) + 1; });
+            const cats = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
+            ownedStats = (
+              <div className="card bg-black/20 border border-orange-500/20 p-3 space-y-2">
+                <div className="flex items-center gap-4 text-xs flex-wrap">
+                  <span>自留 <span className="text-white font-bold">{ownedToys.length}</span> 件</span>
+                  <span>总价值 <span className="text-accent font-bold">¥{totalValue.toFixed(0)}</span></span>
+                  {ownedToys.length > 0 && <span>均价 <span className="text-white font-bold">¥{(totalValue / ownedToys.length).toFixed(0)}</span></span>}
+                </div>
+                <div className="flex gap-1.5 text-[10px] flex-wrap">
+                  {cats.map(([cat, count]) => (
+                    <span key={cat} className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10">
+                      {cat} <span className="text-[#6b7085]">{count}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+
           return (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            <>
+              {ownedStats}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {list.map(it => {
                 if (viewMode === 'owned' && it.linked_toy_id) {
                   return (
@@ -1864,6 +1921,7 @@ export default function Monster() {
                 );
               })}
             </div>
+            </>
           );
         })()
       )}

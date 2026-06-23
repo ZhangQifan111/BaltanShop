@@ -200,6 +200,39 @@ function migrate() {
       changes.push("ALTER TABLE monster_favorites ADD COLUMN linked_toy_id INTEGER");
     }
   }
+  if (!tableNames.has('xplus_reference')) {
+    changes.push(`CREATE TABLE xplus_reference (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ref_id TEXT NOT NULL,
+      series TEXT NOT NULL,
+      series_name_ja TEXT,
+      product_name TEXT,
+      release_date TEXT,
+      material TEXT,
+      specs TEXT,
+      height TEXT,
+      price TEXT,
+      package_info TEXT,
+      accessories TEXT,
+      variations TEXT,
+      detail_url TEXT,
+      image_url TEXT,
+      images TEXT,
+      source_type TEXT,
+      position INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`);
+  } else {
+    const xplusCols = new Set(
+      (db.exec("PRAGMA table_info(xplus_reference)")[0]?.values || []).map(r => r[1])
+    );
+    if (!xplusCols.has('images')) {
+      changes.push("ALTER TABLE xplus_reference ADD COLUMN images TEXT");
+    }
+    if (!xplusCols.has('character_name')) {
+      changes.push("ALTER TABLE xplus_reference ADD COLUMN character_name TEXT");
+    }
+  }
   // 一次性迁移：旧 ref_id 格式纯数字 "01" (无 prefix) 改为 "{slug}-{nn}"，并补 series/slug/name
   if (tableNames.has('baltan_reference')) {
     const oldFormatCount = (db.exec(
