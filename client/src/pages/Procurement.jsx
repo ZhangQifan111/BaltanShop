@@ -623,6 +623,7 @@ export default function Procurement() {
   const [products, setProducts] = useState([]);
   const [tab, setTab] = useState('all');
   const [poolMode, setPoolMode] = useState(false);
+  const [poolLines, setPoolLines] = useState([{ product_id: null, quantity: '' }]);
   const [form, setForm] = useState({
     name: '', category: '其他', source: 'direct', status: 'procurement', procurement_stage: 'stage1',
     stage1_amount: '', stage2_amount: '', stage3_amount: '',
@@ -658,22 +659,49 @@ export default function Procurement() {
         body.stage1_amount = body.stage1_amount === '' || body.stage1_amount == null ? 0 : +body.stage1_amount;
       }
       if (!poolMode) { body.product_id = null; if (!body.quantity) body.quantity = 1; }
-      // 池模式下选了"新建商品" → 自动创建 product
-      if (poolMode && !body.product_id) {
-        const created = await api.post('/products', {
-          name: body.name,
-          name_zh: body.name_zh || '',
-          category: body.category,
-          source: body.source,
+      // 池模式：支持多行拆分
+      if (poolMode) {
+        const validLines = poolLines.filter(l => l.product_id && (Number(l.quantity) || 0) > 0);
+        if (validLines.length === 0) return setToast('请至少选择一件商品并填写数量');
+        const totalStage1 = Number(form.stage1_amount) || 0;
+        // 计算各行参考成本（历史均价 × 数量）
+        const linesWithRef = validLines.map(l => {
+          const prod = products.find(p => p.id === Number(l.product_id));
+          const refCost = (prod?.avg_unit_cost || 0) * (Number(l.quantity) || 0);
+          return { ...l, refCost };
         });
-        body.product_id = created.id;
+        const totalRefCost = linesWithRef.reduce((s, l) => s + l.refCost, 0);
+        const ratio = totalRefCost > 0 ? totalStage1 / totalRefCost : 0;
+        for (const line of linesWithRef) {
+          const lineAmount = totalRefCost > 0
+            ? Math.round(line.refCost * ratio * 100) / 100
+            : 0;
+          // 池模式 + 新建商品 → 自动创建 product
+          let pid = Number(line.product_id);
+          const prod = products.find(p => p.id === pid);
+          if (!prod) {
+            const created = await api.post('/products', {
+              name: body.name,
+              name_zh: body.name_zh || '',
+              category: body.category,
+              source: body.source,
+            });
+            pid = created.id;
+          }
+          await addToy({
+            ...body,
+            product_id: pid,
+            quantity: Number(line.quantity),
+            stage1_amount: lineAmount,
+          });
+        }
+      } else {
+        // 非池模式（原有逻辑）
+        await addToy(body);
       }
-      if (body.product_id) body.product_id = Number(body.product_id);
-      if (body.quantity !== '' && body.quantity != null) body.quantity = Number(body.quantity);
-      else if (body.product_id) body.quantity = 1;
-      await addToy(body);
       setShowForm(false);
       setPoolMode(false);
+      setPoolLines([{ product_id: null, quantity: '' }]);
       setForm({ name: '', category: '其他', source: 'direct', status: 'procurement', procurement_stage: 'stage1', stage1_amount: '', stage2_amount: '', stage3_amount: '', stage1_date: new Date().toISOString().slice(0, 10), expected_arrival_date: '', product_id: null, quantity: '' });
     } catch (e) {
       setToast('添加失败');
@@ -810,15 +838,17 @@ export default function Procurement() {
             </div>
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">
-                {isPreorderForm ? '已付金额 (¥)' : '①买价 (¥)'}
+                {isPreorderForm ? '已付金额 (¥)' : (poolMode ? '①总买价 (¥) — 按均价配比分摊' : '①买价 (¥)')}
               </label>
               <input className="input text-xs" type="text" inputmode={isTouch ? "decimal" : undefined} lang="zh-CN" value={form.stage1_amount ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage1_amount: e.target.value === '' ? '' : +e.target.value })} />
             </div>
+            {!poolMode && (
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">数量</label>
               <input className="input text-xs" type="text" inputmode="decimal" lang="zh-CN" placeholder="1"
                 value={form.quantity || ''} onChange={e => setForm({ ...form, quantity: e.target.value })} />
             </div>
+            )}
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">
                 {isPreorderForm ? '上市/到货日' : '购入日期'}
@@ -833,26 +863,106 @@ export default function Procurement() {
                 checked={poolMode}
                 onChange={e => {
                   setPoolMode(e.target.checked);
-                  if (!e.target.checked) setForm({ ...form, product_id: null, quantity: '' });
+                  if (!e.target.checked) {
+                    setForm({ ...form, product_id: null, quantity: '' });
+                    setPoolLines([{ product_id: null, quantity: '' }]);
+                  }
                 }} />
-              <span className="text-xs text-[#d0d4e8]">批量入库（池模式）— 同一商品一次进多件</span>
+              <span className="text-xs text-[#d0d4e8]">批量入库（池模式）— 点下方「＋ 添加商品行」可拆分到多个池</span>
             </label>
-            {poolMode && (
-              <div>
-                <label className="text-[10px] text-[#6b7085] block mb-1">关联商品</label>
-                <select className="input text-xs" value={form.product_id || ''}
-                  onChange={e => {
-                    const pid = e.target.value ? Number(e.target.value) : null;
-                    const prod = pid ? products.find(p => p.id === pid) : null;
-                    setForm({ ...form, product_id: pid, name: prod ? prod.name : form.name, category: prod ? prod.category : form.category });
-                  }}>
-                  <option value="">— 新建商品 —</option>
-                  {products.map(p => (
-                    <option key={p.id} value={p.id}>{p.name_zh || p.name} [{p.category}]</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            {poolMode && (() => {
+              const totalStage1 = Number(form.stage1_amount) || 0;
+              // 计算各行参考成本
+              const linesWithRef = poolLines.map(l => {
+                const prod = l.product_id ? products.find(p => p.id === Number(l.product_id)) : null;
+                const qty = Number(l.quantity) || 0;
+                const refUnit = prod?.avg_unit_cost || 0;
+                const refCost = refUnit * qty;
+                return { ...l, prod, qty, refUnit, refCost };
+              });
+              const totalQty = linesWithRef.reduce((s, l) => s + l.qty, 0);
+              const totalRefCost = linesWithRef.reduce((s, l) => s + l.refCost, 0);
+              const ratio = totalRefCost > 0 ? totalStage1 / totalRefCost : 0;
+
+              const updateLine = (idx, field, value) => {
+                const next = poolLines.map((l, i) => i === idx ? { ...l, [field]: value } : l);
+                setPoolLines(next);
+              };
+              const addLine = () => setPoolLines([...poolLines, { product_id: null, quantity: '' }]);
+              const removeLine = (idx) => {
+                if (poolLines.length <= 1) return;
+                setPoolLines(poolLines.filter((_, i) => i !== idx));
+              };
+
+              return (
+                <div className="space-y-2">
+                  {poolLines.map((line, idx) => {
+                    const ref = linesWithRef[idx];
+                    const allocated = totalRefCost > 0 && ref.refCost > 0
+                      ? Math.round(ref.refCost * ratio * 100) / 100
+                      : 0;
+                    return (
+                      <div key={idx} className="flex items-center gap-1.5">
+                        <select className="input text-xs flex-1 min-w-0" value={line.product_id || ''}
+                          onChange={e => {
+                            const pid = e.target.value ? Number(e.target.value) : null;
+                            const prod = pid ? products.find(p => p.id === pid) : null;
+                            updateLine(idx, 'product_id', pid);
+                            // 自动填充 name/category（第一行）
+                            if (idx === 0 && prod) {
+                              setForm(f => ({ ...f, name: prod.name || f.name, category: prod.category || f.category }));
+                            }
+                          }}>
+                          <option value="">— 新建 —</option>
+                          {products.map(p => (
+                            <option key={p.id} value={p.id}>{p.name_zh || p.name}</option>
+                          ))}
+                        </select>
+                        <input className="input text-xs w-14 text-center" type="text" inputmode="decimal" placeholder="数量"
+                          value={line.quantity || ''}
+                          onChange={e => updateLine(idx, 'quantity', e.target.value)} />
+                        <span className="text-[10px] text-[#6b7085] w-20 text-right shrink-0 leading-tight">
+                          {ref.refUnit > 0 ? (
+                            <>参考 ¥{ref.refUnit.toFixed(0)}<br/>= ¥{ref.refCost.toFixed(0)}</>
+                          ) : (
+                            <span className="text-[#4b5065]">无参考</span>
+                          )}
+                        </span>
+                        {poolLines.length > 1 && (
+                          <button type="button" className="text-[#6b7085] hover:text-red-400 text-xs px-1 shrink-0"
+                            onClick={() => removeLine(idx)}>✕</button>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <button type="button" className="text-[11px] text-accent font-medium hover:text-white border border-accent/40 rounded-lg px-3 py-1.5 w-full bg-accent/5 hover:bg-accent/10"
+                    onClick={addLine}>＋ 添加商品行</button>
+                  {/* 汇总 */}
+                  {totalQty > 0 && (
+                    <div className="text-[10px] text-[#6b7085] space-y-0.5 pt-1 border-t border-white/5">
+                      <div className="flex justify-between">
+                        <span>总数量 {totalQty} 件 · 参考总成本</span>
+                        <span>¥{totalRefCost.toFixed(0)}</span>
+                      </div>
+                      {totalStage1 > 0 && totalRefCost > 0 && (
+                        <div className="flex justify-between text-accent">
+                          <span>分摊预览（比例 {(ratio * 100).toFixed(0)}%）</span>
+                          <span>
+                            {linesWithRef.filter(l => l.refCost > 0).map(l => {
+                              const a = Math.round(l.refCost * ratio * 100) / 100;
+                              return `${l.prod?.name_zh || l.prod?.name || '?'} ¥${a.toFixed(0)}`;
+                            }).join(' · ')}
+                          </span>
+                        </div>
+                      )}
+                      {totalStage1 > 0 && totalRefCost === 0 && (
+                        <div className="text-yellow-400">所有商品无历史均价，无法自动分摊</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {isPreorderForm && (

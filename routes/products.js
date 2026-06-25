@@ -22,11 +22,12 @@ router.get('/', async (req, res) => {
     // 对每个 product 算汇总
     const enriched = [];
     for (const p of products) {
-      // 总成本 + 总数量 + 剩余 (from toys)
+      // 总成本 + 总数量 + 剩余 + 剩余加权成本 (from toys)
       const batchStats = await db.get(
         `SELECT COALESCE(SUM(total_cost),0) as total_cost,
                 COALESCE(SUM(quantity),0) as total_qty,
-                COALESCE(SUM(remaining),0) as total_remaining
+                COALESCE(SUM(remaining),0) as total_remaining,
+                COALESCE(SUM(unit_cost * remaining), 0) as total_remaining_cost
          FROM toys WHERE product_id = ? AND status = 'stock'`,
         [p.id]
       );
@@ -40,8 +41,13 @@ router.get('/', async (req, res) => {
       const totalCost = batchStats.total_cost || 0;
       const totalQty = batchStats.total_qty || 0;
       const totalRemaining = batchStats.total_remaining || 0;
+      const totalRemainingCost = batchStats.total_remaining_cost || 0;
       const totalRevenue = salesStats.total_revenue || 0;
       const soldQty = salesStats.sold_qty || 0;
+      // 按实际库存加权均价（精确到分）
+      const avgUnitCost = totalRemaining > 0
+        ? Math.round((totalRemainingCost / totalRemaining) * 100) / 100
+        : 0;
 
       enriched.push({
         ...p,
@@ -49,13 +55,13 @@ router.get('/', async (req, res) => {
         total_qty: totalQty,
         total_remaining: totalRemaining,
         sold_qty: soldQty,
-        avg_unit_cost: totalQty > 0 ? totalCost / totalQty : 0,
+        avg_unit_cost: avgUnitCost,
         total_revenue: totalRevenue,
         breakeven: totalCost > 0 ? (totalRevenue / totalCost >= 1 ? '回本' : '未回本') : '无成本',
         breakeven_rate: totalCost > 0 ? ((totalRevenue / totalCost) * 100) : 0,
         // 库存待覆盖成本 = 剩余成本(总成本-已回收)
         unrecovered_cost: Math.max(0, totalCost - totalRevenue),
-        inventory_value_at_cost: totalRemaining > 0 && totalQty > 0 ? (totalCost / totalQty) * totalRemaining : 0,
+        inventory_value_at_cost: Math.round(totalRemainingCost * 100) / 100,
       });
     }
 
@@ -165,11 +171,8 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/products/:id
 router.delete('/:id', async (req, res) => {
   try {
-    // 检查是否有关联的 toys
-    const count = (await db.get('SELECT COUNT(*) as c FROM toys WHERE product_id = ?', [req.params.id]))?.c || 0;
-    if (count > 0) {
-      return res.status(400).json({ error: `该商品下还有 ${count} 条进货记录，无法删除` });
-    }
+    // 解除所有关联 toys 的池绑定
+    db.update('UPDATE toys SET product_id = NULL, quantity = NULL, remaining = NULL, unit_cost = NULL WHERE product_id = ?', [req.params.id]);
     db.update('DELETE FROM products WHERE id = ?', [req.params.id]);
     res.json({ ok: true });
   } catch (e) {
