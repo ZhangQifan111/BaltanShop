@@ -85,7 +85,7 @@ function DetailModal({ item, onClose }) {
     if (item.image_url) imgs.push(item.image_url);
     if (item.images) {
       try { (typeof item.images === 'string' ? JSON.parse(item.images) : item.images)
-        .forEach(u => { if (u !== item.image_url) imgs.push(u); }); } catch {}
+        .forEach(u => { if (u.split('?')[0] !== (item.image_url || '').split('?')[0]) imgs.push(u); }); } catch {}
     }
     return imgs;
   })();

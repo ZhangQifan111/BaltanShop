@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import useStore from '../stores/useStore';
 import { sourceLabel } from '../lib/sources';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
@@ -17,6 +18,10 @@ function StatCard({ label, value, sub, color = '#d0d4e8' }) {
 export default function Dashboard() {
   const { stats, toys, loadAll } = useStore();
 
+  useEffect(() => {
+    loadAll();
+  }, []);
+
   if (!stats) return <div className="text-center text-[#6b7085] py-20">加载中...</div>;
 
   const stageData = [
@@ -35,7 +40,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="flex gap-3 flex-wrap">
-        <StatCard label="总成本" value={`¥${(stats.total_cost || 0).toLocaleString()}`} sub="含在途+在库+已完成" />
+        <StatCard label="总成本" value={`¥${(stats.total_cost || 0).toLocaleString()}`} sub="含在途+在库+已发货+已完成" />
         <StatCard label="在途成本" value={`¥${(stats.total_cost_transit || 0).toLocaleString()}`} sub={`${stats.counts?.in_transit || 0} 件`} color="#f0a030" />
         <StatCard label="在库价值" value={`¥${(stats.total_cost_stock || 0).toLocaleString()}`} sub={`${stats.counts?.in_stock || 0} 件`} color="#60a5fa" />
       </div>

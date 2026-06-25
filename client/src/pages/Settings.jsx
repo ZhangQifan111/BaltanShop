@@ -15,6 +15,26 @@ export default function Settings() {
   const [pendingDelete, setPendingDelete] = useState(null);
   const [products, setProducts] = useState([]);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [bgLeft, setBgLeft] = useState('');
+  const [bgRight, setBgRight] = useState('');
+  const [processing, setProcessing] = useState(false);
+  const [monsterImages, setMonsterImages] = useState([]);
+
+  const saveBg = async (key, value) => {
+    let finalUrl = value;
+    if (value && !value.includes('-toy')) {
+      setProcessing(true);
+      try {
+        const r = await api.post('/process-toy-image', { url: value });
+        finalUrl = r.toy_url;
+      } catch { /* use original value if processing fails */ }
+      setProcessing(false);
+    }
+    api.put('/settings', { [key]: finalUrl }).then(s => {
+      setBgLeft(s.bg_left_url || '');
+      setBgRight(s.bg_right_url || '');
+    }).catch(() => {});
+  };
 
   useEffect(() => {
     api.get('/settings/categories')
@@ -25,6 +45,12 @@ export default function Settings() {
       .catch(() => {});
     api.get('/products')
       .then(prods => setProducts(prods))
+      .catch(() => {});
+    api.get('/settings')
+      .then(s => { setBgLeft(s.bg_left_url || ''); setBgRight(s.bg_right_url || ''); })
+      .catch(() => {});
+    api.get('/process-toy-image')
+      .then(d => setMonsterImages(d.images || []))
       .catch(() => {});
   }, []);
 
@@ -154,6 +180,50 @@ export default function Settings() {
         <p className="text-xs text-[#6b7085]">分类管理、池商品管理、数据备份</p>
       </div>
 
+      {/* 背景装饰 */}
+      <div className="card">
+        <div className="text-xs text-[#6b7085] uppercase tracking-widest mb-4">背景装饰</div>
+        <p className="text-xs text-[#6b7085] mb-3">选择左右两侧的玩具角色（自动抠图）</p>
+        <div className="space-y-3">
+          <div>
+            <label className="text-[10px] text-[#6b7085]">左侧图片</label>
+            <select
+              className="input text-xs w-full"
+              value={bgLeft || ''}
+              onChange={e => saveBg('bg_left_url', e.target.value)}
+            >
+              <option value="">默认（巴尔坦星人）</option>
+              {monsterImages.map(g => (
+                <optgroup key={g.character} label={g.character}>
+                  {g.images.map(img => (
+                    <option key={img.url} value={img.url}>{img.name}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] text-[#6b7085]">右侧图片（自动镜像翻转）</label>
+            <select
+              className="input text-xs w-full"
+              value={bgRight || ''}
+              onChange={e => saveBg('bg_right_url', e.target.value)}
+            >
+              <option value="">默认（奥特曼）</option>
+              {monsterImages.map(g => (
+                <optgroup key={g.character} label={g.character}>
+                  {g.images.map(img => (
+                    <option key={img.url} value={img.url}>{img.name}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+          <p className="text-[10px] text-[#6b7085]">选择后自动抠图处理，刷新页面即可看到效果。</p>
+          {processing && <p className="text-[10px] text-accent mt-1">正在抠图处理中...</p>}
+        </div>
+      </div>
+
 {/* 供应商管理 — 暂不启用 */}
       {false && <div className="card">
         <div className="text-xs text-[#6b7085] uppercase tracking-widest mb-4">供应商</div>
@@ -270,8 +340,25 @@ export default function Settings() {
         <p className="text-[10px] text-[#6b7085] mt-3">点击名称可编辑 · 仅无关联记录的商品可删除</p>
       </div>
 
-      {/* 任你购订单分析 */}
-      <OrderAnalyzer />
+      {/* 备份 */}
+      <div className="card">
+        <div className="text-xs text-[#6b7085] uppercase tracking-widest mb-4">数据备份</div>
+        <p className="text-xs text-[#6b7085] mb-3">启动时会自动备份，最近 10 份保存在服务器上</p>
+        <button
+          className="btn-primary text-xs"
+          onClick={async () => {
+            try {
+              const res = await fetch('/api/backup', { method: 'POST' });
+              const data = await res.json();
+              setToast('备份成功: ' + data.filename);
+            } catch (e) {
+              setToast('备份失败');
+            }
+          }}
+        >
+          立即备份
+        </button>
+      </div>
 
       {pendingDelete && (
         <ConfirmModal
@@ -295,25 +382,8 @@ export default function Settings() {
         />
       )}
 
-      {/* 备份 */}
-      <div className="card">
-        <div className="text-xs text-[#6b7085] uppercase tracking-widest mb-4">数据备份</div>
-        <p className="text-xs text-[#6b7085] mb-3">启动时会自动备份，最近 10 份保存在服务器上</p>
-        <button
-          className="btn-primary text-xs"
-          onClick={async () => {
-            try {
-              const res = await fetch('/api/backup', { method: 'POST' });
-              const data = await res.json();
-              setToast('备份成功: ' + data.filename);
-            } catch (e) {
-              setToast('备份失败');
-            }
-          }}
-        >
-          立即备份
-        </button>
-      </div>
+      {/* 任你购订单分析 */}
+      <OrderAnalyzer />
     </div>
   );
 }

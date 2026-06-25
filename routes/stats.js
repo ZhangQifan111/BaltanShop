@@ -27,9 +27,10 @@ router.get('/', async (req, res) => {
                   OR (procurement_stage IS NOT NULL AND procurement_stage != 'stocked')
                  THEN cost ELSE 0 END) AS total_cost_transit,
         SUM(CASE WHEN status = 'stock' THEN cost ELSE 0 END) AS total_cost_stock,
+        SUM(CASE WHEN status = 'sold' THEN cost ELSE 0 END) AS total_cost_sold,
         SUM(CASE WHEN status = 'done' THEN cost ELSE 0 END) AS total_cost_done,
         SUM(CASE WHEN sell_price IS NOT NULL AND sell_price > 0 THEN sell_price ELSE 0 END) AS total_sell,
-        SUM(CASE WHEN profit IS NOT NULL THEN profit ELSE 0 END) AS total_profit,
+        SUM(CASE WHEN profit IS NOT NULL AND sell_price > 0 THEN profit ELSE 0 END) AS total_profit,
         SUM(CASE WHEN date_month = strftime('%Y-%m','now') THEN cost ELSE 0 END) AS month_cost,
         SUM(CASE WHEN date_month = strftime('%Y-%m','now') AND sell_price IS NOT NULL AND sell_price > 0 THEN sell_price ELSE 0 END) AS month_sell,
         SUM(CASE WHEN date_month = strftime('%Y-%m','now') THEN 1 ELSE 0 END) AS month_count
@@ -82,8 +83,9 @@ router.get('/', async (req, res) => {
 
     const total_cost_transit = r.total_cost_transit || 0;
     const total_cost_stock = r.total_cost_stock || 0;
+    const total_cost_sold = r.total_cost_sold || 0;
     const total_cost_done = r.total_cost_done || 0;
-    const total_cost = total_cost_transit + total_cost_stock + total_cost_done;
+    const total_cost = total_cost_transit + total_cost_stock + total_cost_sold + total_cost_done;
     const total_sell = r.total_sell || 0;
     const total_profit = r.total_profit || 0;
     const margin_rate = total_sell > 0 ? (total_profit / total_sell * 100) : 0;
@@ -92,6 +94,7 @@ router.get('/', async (req, res) => {
       total_cost: round2(total_cost),
       total_cost_transit: round2(total_cost_transit),
       total_cost_stock: round2(total_cost_stock),
+      total_cost_sold: round2(total_cost_sold),
       total_cost_done: round2(total_cost_done),
       total_sell: round2(total_sell),
       total_profit: round2(total_profit),

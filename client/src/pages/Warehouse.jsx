@@ -1,4 +1,5 @@
 import { useState, useEffect, memo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import ConfirmModal from '../components/ConfirmModal';
 import useStore from '../stores/useStore';
 import { api } from '../lib/api';
@@ -13,6 +14,7 @@ const FILTERS = [
 const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn, onDone, onUnsell, onPoolify }) {
   const [doneLoading, setDoneLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
 
   const statusBadge = {
     stock: { label: '在库', bg: 'rgba(74,222,128,0.15)', color: '#34d399' },
@@ -24,7 +26,7 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
   return (
     <div className="card cursor-pointer" onClick={() => setExpanded(!expanded)}>
       <div className="flex items-start gap-3 mb-3">
-        {toy.image && <img src={toy.image} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 bg-white/5" loading="lazy" onError={e => e.target.style.display='none'} />}
+        {toy.image && <img src={toy.image} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 bg-white/5 cursor-zoom-in hover:ring-2 hover:ring-accent/50 transition-all" loading="lazy" onError={e => e.target.style.display='none'} onClick={e => { e.stopPropagation(); setPreviewImage(toy.image); }} />}
         <div className="flex-1 min-w-0">
           <div className="text-sm font-bold truncate mb-1">{toy.name_zh || toy.name}</div>
           <span className="inline-block text-[10px] px-2 py-0.5 rounded-full" style={{ background: statusBadge.bg, color: statusBadge.color }}>
@@ -133,6 +135,21 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
           )}
         </div>
       </div>
+
+      {/* 图片大图预览 — Portal 到 body 确保全屏 */}
+      {previewImage && createPortal(
+        <div className="fixed inset-0 bg-black/95 z-[9999]"
+          onMouseDown={e => e.stopPropagation()}
+          onClick={e => { e.stopPropagation(); setPreviewImage(null); }}>
+          <button className="absolute top-4 right-4 text-white/60 hover:text-white text-2xl z-10"
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); setPreviewImage(null); }}>✕</button>
+          <img src={previewImage} alt="" className="absolute inset-0 w-full h-full object-contain"
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => e.stopPropagation()} />
+        </div>,
+        document.body
+      )}
     </div>
   );
 });

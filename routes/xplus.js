@@ -75,7 +75,7 @@ router.get('/items', async (req, res) => {
     res.json({ items: rows.map(r => ({
       ...r,
       image_url: withVersion(r.image_url),
-      images: r.images ? (() => { try { return JSON.parse(r.images); } catch { return null; } })() : null,
+      images: r.images ? (() => { try { return JSON.parse(r.images).map(u => withVersion(u)); } catch { return null; } })() : null,
     })) });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -88,7 +88,7 @@ router.get('/item/:ref_id', async (req, res) => {
     const row = await db.get('SELECT * FROM xplus_reference WHERE ref_id = ?', [req.params.ref_id]);
     if (!row) return res.status(404).json({ error: 'not found' });
     row.image_url = withVersion(row.image_url);
-    row.images = row.images ? (() => { try { return JSON.parse(row.images); } catch { return null; } })() : null;
+    row.images = row.images ? (() => { try { return JSON.parse(row.images).map(u => withVersion(u)); } catch { return null; } })() : null;
     res.json({ item: row });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -136,11 +136,11 @@ router.post('/download-images', async (req, res) => {
       }
       if (r.errors.length) errors.push({ ref_id: r.ref_id, errors: r.errors });
 
-      // 更新 DB：image_url 指向本地路径
-      const mainImg = r.images.find(i => i.local);
-      if (mainImg && mainImg.local) {
-        await db.update('UPDATE xplus_reference SET image_url = ? WHERE ref_id = ?',
-          [mainImg.local, r.ref_id]);
+      // 更新 DB：image_url + images 都指向本地路径
+      const localImgs = r.images.filter(i => i.local).map(i => i.local);
+      if (localImgs.length > 0) {
+        await db.update('UPDATE xplus_reference SET image_url = ?, images = ? WHERE ref_id = ?',
+          [localImgs[0], JSON.stringify(localImgs), r.ref_id]);
       }
     }
 

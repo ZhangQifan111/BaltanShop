@@ -42,6 +42,7 @@ app.use('/api/order-data', require('./routes/orderData'));
 app.use('/api/fetch-renrigou', require('./routes/renrigou'));
 app.use('/api/import-renrigou', require('./routes/importRenrigou'));
 app.use('/api/translate', require('./routes/translate'));
+app.use('/api/process-toy-image', require('./routes/processToyImage'));
 
 // Misc sales
 const db = require('./db/database');

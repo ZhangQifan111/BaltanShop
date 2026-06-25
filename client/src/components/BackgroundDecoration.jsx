@@ -1,4 +1,9 @@
-// Deterministic pseudo-random so the starfield is identical on every render
+import { useState, useEffect } from 'react';
+import { api } from '../lib/api';
+
+const DEFAULT_LEFT = '/uploads/monster/alienbaltan/alienbaltan-01-toy.png';
+const DEFAULT_RIGHT = '/uploads/monster/ultraman/ultraman-01-toy.png';
+
 function makeStars(count, seed = 1337) {
   const stars = [];
   let s = seed;
@@ -19,21 +24,31 @@ function makeStars(count, seed = 1337) {
 
 export default function BackgroundDecoration() {
   const stars = makeStars(90);
+  const [bgLeft, setBgLeft] = useState(null);
+  const [bgRight, setBgRight] = useState(null);
+
+  useEffect(() => {
+    api.get('/settings').then(s => {
+      setBgLeft(s.bg_left_url || null);
+      setBgRight(s.bg_right_url || null);
+    }).catch(() => {});
+  }, []);
+
+  const leftSrc = bgLeft || DEFAULT_LEFT;
+  const rightSrc = bgRight || DEFAULT_RIGHT;
+
   return (
     <div
       className="fixed inset-0 pointer-events-none z-0 overflow-hidden"
       aria-hidden="true"
     >
-      {/* 巴尔坦星人 - 实物图（已裁掉文字条），左侧偏下居中。
-          mask-image: luminance 把图本身的亮度当 alpha——亮处（玩具）保留，
-          暗处（黑底）变透明，不再覆盖背后内容。 */}
       <img
-        src="/uploads/monster/alienbaltan/alienbaltan-01-toy.png"
+        src={leftSrc}
         alt=""
         className="hidden md:block absolute left-0 top-[45%] -translate-y-1/2 w-[420px] h-auto opacity-100 pointer-events-none"
         style={{
-          WebkitMaskImage: 'url(/uploads/monster/alienbaltan/alienbaltan-01-toy.png)',
-          maskImage: 'url(/uploads/monster/alienbaltan/alienbaltan-01-toy.png)',
+          WebkitMaskImage: `url(${leftSrc})`,
+          maskImage: `url(${leftSrc})`,
           WebkitMaskMode: 'luminance',
           maskMode: 'luminance',
           WebkitMaskSize: 'contain',
@@ -47,7 +62,6 @@ export default function BackgroundDecoration() {
         decoding="async"
       />
 
-      {/* Starfield */}
       <svg
         className="absolute inset-0 w-full h-full"
         viewBox="0 0 1000 1000"
@@ -65,15 +79,13 @@ export default function BackgroundDecoration() {
         ))}
       </svg>
 
-      {/* 奥特曼 - 实物图（已裁掉文字条），右侧偏下居中。
-          同样 luminance mask + 镜像。 */}
       <img
-        src="/uploads/monster/ultraman/ultraman-01-toy.png"
+        src={rightSrc}
         alt=""
         className="hidden md:block absolute right-0 top-[45%] -translate-y-1/2 w-[420px] h-auto opacity-100 -scale-x-100 pointer-events-none"
         style={{
-          WebkitMaskImage: 'url(/uploads/monster/ultraman/ultraman-01-toy.png)',
-          maskImage: 'url(/uploads/monster/ultraman/ultraman-01-toy.png)',
+          WebkitMaskImage: `url(${rightSrc})`,
+          maskImage: `url(${rightSrc})`,
           WebkitMaskMode: 'luminance',
           maskMode: 'luminance',
           WebkitMaskSize: 'contain',
