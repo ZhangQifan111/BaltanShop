@@ -159,9 +159,23 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
   const prod = group.product;
   const avgCost = group.totalQty > 0 ? group.totalCost / group.totalQty : 0;
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [poolLogs, setPoolLogs] = useState(null); // null=加载中, []=空, [...]有数据
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ name_zh: '', name: '', category: '' });
   const allIds = group.batches.map(b => b.id);
   const allSelected = allIds.length > 0 && allIds.every(id => selectedIds.has(id));
   const someSelected = allIds.some(id => selectedIds.has(id));
+
+  useEffect(() => {
+    if (group.product_id) {
+      setPoolLogs(null); // 开始加载
+      api.get(`/toys/pool-logs?product_id=${group.product_id}`)
+        .then(logs => setPoolLogs(Array.isArray(logs) ? logs : []))
+        .catch((e) => { console.error('pool-logs fetch error:', e); setPoolLogs([]); });
+    } else {
+      setPoolLogs([]);
+    }
+  }, [group.product_id]);
 
   const toggleAll = () => {
     if (allSelected) {
@@ -192,8 +206,52 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
           <div className="flex items-center gap-3">
             {prod?.image && <img src={prod.image} alt="" className="w-12 h-12 rounded-lg object-cover bg-white/5" onError={e => e.target.style.display = 'none'} />}
             <div className="flex-1 min-w-0">
-              <h3 className="text-base font-bold truncate">{prod?.name_zh || prod?.name || '未命名'}</h3>
-              <div className="text-[10px] text-[#6b7085]">{prod?.category || ''} · {group.batches.length} 批次</div>
+              {editing ? (
+                <div className="space-y-1.5">
+                  <input className="input text-xs w-full" placeholder="中文名"
+                    value={editForm.name_zh}
+                    onChange={e => setEditForm({ ...editForm, name_zh: e.target.value })}
+                    lang="zh" spellCheck={false} autoComplete="off" autoFocus />
+                  <input className="input text-xs w-full" placeholder="系列（category）"
+                    value={editForm.category}
+                    onChange={e => setEditForm({ ...editForm, category: e.target.value })}
+                    lang="zh" spellCheck={false} autoComplete="off" />
+                  <div className="flex gap-1.5">
+                    <button className="text-[10px] px-2.5 py-1 rounded bg-accent text-[#0f1117] font-medium"
+                      onClick={async () => {
+                        await api.put(`/products/${group.product_id}`, {
+                          name_zh: editForm.name_zh || prod?.name_zh || '',
+                          name: editForm.name_zh || prod?.name || '',
+                          category: editForm.category || prod?.category || '其他',
+                        }).catch(() => {});
+                        setEditing(false);
+                        api.get('/products').then(prods => {
+                          // 更新 products 列表，触发重渲染
+                          const { loadAll } = useStore.getState();
+                          loadAll();
+                        }).catch(() => {});
+                      }}>保存</button>
+                    <button className="text-[10px] px-2.5 py-1 rounded border border-white/10 text-[#6b7085]"
+                      onClick={() => setEditing(false)}>取消</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold truncate">{prod?.name_zh || prod?.name || '未命名'}</h3>
+                    <button className="text-[10px] text-[#6b7085] hover:text-white shrink-0"
+                      onClick={() => {
+                        setEditForm({
+                          name_zh: prod?.name_zh || '',
+                          name: prod?.name || '',
+                          category: prod?.category || '',
+                        });
+                        setEditing(true);
+                      }}>✎</button>
+                  </div>
+                  <div className="text-[10px] text-[#6b7085]">{prod?.category || ''} · {group.batches.length} 批次</div>
+                </>
+              )}
             </div>
             <button className="text-[#6b7085] hover:text-white text-lg px-1" onClick={onClose}>✕</button>
           </div>
@@ -257,6 +315,40 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
             </div>
           ))}
         </div>
+
+        {/* 操作记录 */}
+        <div className="border-t border-white/10 p-4 shrink-0 bg-white/[0.02]">
+          <h4 className="text-xs font-bold text-white mb-3">📋 操作记录</h4>
+          {poolLogs === null ? (
+            <p className="text-[11px] text-[#6b7085]">加载中...</p>
+          ) : poolLogs.length === 0 ? (
+            <p className="text-[11px] text-[#6b7085]">暂无记录 · 新操作将自动记录在此</p>
+          ) : (
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {poolLogs.map(log => {
+                const actionColor = log.action === '入池' ? 'bg-green-400' : log.action === '退池' ? 'bg-yellow-400' : 'bg-blue-400';
+                const actionTextColor = log.action === '入池' ? 'text-green-300' : log.action === '退池' ? 'text-yellow-300' : 'text-blue-300';
+                return (
+                <div key={log.id} className="bg-white/[0.04] rounded-md px-2.5 py-1.5 space-y-0.5">
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <span className={`shrink-0 w-2 h-2 rounded-full ${actionColor}`} />
+                    <span className="text-[#9ba0b5] w-28 shrink-0">{log.created_at?.slice(0, 16) || ''}</span>
+                    <span className={`font-semibold ${actionTextColor}`}>{log.action}</span>
+                    <span className="text-white/80 truncate flex-1">{log.toy_name}</span>
+                    <span className="text-white/60 shrink-0">{log.quantity || 0}件</span>
+                    {log.unit_cost != null && (
+                      <span className="text-[#9ba0b5] shrink-0">¥{Number(log.unit_cost).toFixed(0)}/件</span>
+                    )}
+                  </div>
+                  {log.notes && (
+                    <div className="text-[11px] text-[#9ba0b5] pl-5">{log.notes}</div>
+                  )}
+                </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -264,34 +356,48 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
 
 /* ─── 入池弹窗 ─── */
 function PoolifyModal({ toy, products, onConfirm, onCancel }) {
-  const [poolLines, setPoolLines] = useState([{ product_id: '', quantity: '', search: '', showDropdown: false }]);
+  const [poolLines, setPoolLines] = useState([{ product_id: '', quantity: '', search: '', showDropdown: false, custom_name: '', manual_price: '' }]);
   const totalCost = toy.total_cost || 0;
   const toyQty = toy.quantity || 1;
 
-  // 各行参考成本
+  // 各行参考成本 (prod 统一从此处取，JSX 不再重复查找)
   const linesWithRef = poolLines.map(l => {
-    const prod = l.product_id ? products.find(p => p.id === Number(l.product_id)) : null;
+    const isNew = l.product_id === '__new__';
+    const prod = (l.product_id && !isNew) ? products.find(p => String(p.id) === String(l.product_id)) : null;
     const qty = Number(l.quantity) || 0;
-    const refUnit = prod?.avg_unit_cost || 0;
+    const poolRefUnit = (prod && prod.avg_unit_cost > 0 ? prod.avg_unit_cost : 0)
+      || (prod && prod.total_qty > 0 ? prod.total_cost / prod.total_qty : 0);
+    const manualPrice = Number(l.manual_price) > 0 ? Number(l.manual_price) : 0;
+    const refUnit = poolRefUnit
+      || manualPrice
+      || (toy.total_cost / (toy.quantity || 1))
+      || 0;
     const refCost = refUnit * qty;
-    return { ...l, prod, qty, refUnit, refCost };
+    return { ...l, isNew, prod, qty, refUnit, refCost, poolRefUnit, manualPrice };
   });
   const totalQty = linesWithRef.reduce((s, l) => s + l.qty, 0);
   const totalRefCost = linesWithRef.reduce((s, l) => s + l.refCost, 0);
   const ratio = totalRefCost > 0 ? totalCost / totalRefCost : 0;
 
   const updateLine = (idx, field, value) => setPoolLines(prev => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l));
-  const addLine = () => setPoolLines(prev => [...prev, { product_id: '', quantity: '', search: '', showDropdown: false }]);
+  const addLine = () => setPoolLines(prev => [...prev, { product_id: '', quantity: '', search: '', showDropdown: false, custom_name: '', manual_price: '' }]);
   const removeLine = (idx) => { if (poolLines.length <= 1) return; setPoolLines(prev => prev.filter((_, i) => i !== idx)); };
+
+  const [submitError, setSubmitError] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
     const validLines = poolLines.filter(l => l.product_id && (Number(l.quantity) || 0) > 0);
-    if (validLines.length === 0) return;
+    if (validLines.length === 0) {
+      setSubmitError('请先选择商品并填写数量');
+      return;
+    }
+    setSubmitError('');
     onConfirm({
       lines: validLines.map(l => ({
         product_id: l.product_id === '__new__' ? null : Number(l.product_id),
         quantity: Number(l.quantity),
+        custom_name: l.custom_name || '',
       })),
       totalCost,
       totalRefCost,
@@ -310,9 +416,7 @@ function PoolifyModal({ toy, products, onConfirm, onCancel }) {
             const allocated = totalRefCost > 0 && ref.refCost > 0
               ? Math.round(ref.refCost * ratio * 100) / 100
               : 0;
-            const selectedProd = line.product_id && line.product_id !== '__new__'
-              ? products.find(p => p.id === Number(line.product_id)) : null;
-            const isNew = line.product_id === '__new__';
+            const { prod: selectedProd, isNew } = ref;
             const filtered = line.search?.trim()
               ? products.filter(p => {
                   const s = line.search.toLowerCase();
@@ -338,7 +442,11 @@ function PoolifyModal({ toy, products, onConfirm, onCancel }) {
                       </div>
                     ) : isNew ? (
                       <div className="flex items-center gap-1">
-                        <div className="flex-1 input text-xs bg-white/5 text-orange-400">新建商品（名称同玩具）</div>
+                        <input className="input text-xs flex-1"
+                          placeholder={toy.name_zh || toy.name || '输入池号名称'}
+                          value={line.custom_name || ''}
+                          onChange={e => updateLine(idx, 'custom_name', e.target.value)}
+                          lang="zh" spellCheck={false} autoComplete="off" />
                         <button type="button" className="text-[10px] text-[#6b7085] hover:text-white px-1 shrink-0"
                           onClick={() => updateLine(idx, 'product_id', '')}>✕</button>
                       </div>
@@ -382,10 +490,19 @@ function PoolifyModal({ toy, products, onConfirm, onCancel }) {
                     value={line.quantity || ''}
                     onChange={e => updateLine(idx, 'quantity', e.target.value)} />
                   <span className="text-[10px] text-[#6b7085] flex-1 leading-tight">
-                    {ref.refUnit > 0 ? (
+                    {ref.poolRefUnit > 0 ? (
                       <>参考 ¥{ref.refUnit.toFixed(0)}/件 = ¥{ref.refCost.toFixed(0)}{allocated > 0 ? <><br/>实摊 ¥{allocated.toFixed(0)}</> : ''}</>
                     ) : line.product_id ? (
-                      <span className="text-[#4b5065]">新品 · 无参考均价</span>
+                      <span className="inline-flex items-center gap-1 flex-wrap">
+                        <span className="text-[#4b5065]">估价</span>
+                        <input className="input text-xs w-14 text-center px-1 py-0.5" type="text" inputmode="decimal" placeholder="单价"
+                          value={line.manual_price || ''}
+                          onChange={e => updateLine(idx, 'manual_price', e.target.value)} />
+                        <span className="text-[#4b5065]">/件</span>
+                        {ref.manualPrice > 0 && (
+                          <span className="text-[#9ba0b5]">= ¥{ref.refCost.toFixed(0)}{allocated > 0 ? <> · 实摊 ¥{allocated.toFixed(0)}</> : ''}</span>
+                        )}
+                      </span>
                     ) : null}
                   </span>
                 </div>
@@ -413,6 +530,7 @@ function PoolifyModal({ toy, products, onConfirm, onCancel }) {
             </div>
           )}
 
+          {submitError && <div className="text-red-400 text-xs">{submitError}</div>}
           <div className="flex gap-2">
             <button type="submit" className="btn-primary flex-1">确认入池</button>
             <button type="button" className="btn-ghost" onClick={onCancel}>取消</button>
@@ -1202,6 +1320,7 @@ function PoolSellModal({ group, onConfirm, onCancel, shippingRules, supplies, pr
     basic_software_service_fee: 0,
     worry_free_service_fee: 0,
     huabei: 0,
+    notes: '',
   });
   const [calcLogisticsFee, setCalcLogisticsFee] = useState(0);
   const [calcBoxFee, setCalcBoxFee] = useState(0);
@@ -1282,6 +1401,7 @@ function PoolSellModal({ group, onConfirm, onCancel, shippingRules, supplies, pr
       logistics_weight: form.bao_you ? (parseFloat(form.logistics_weight) || 0) : 0,
       box_fee: form.bao_you ? calcBoxFee : 0,
       packing_fee: form.bao_you ? packingFee : 0,
+      notes: form.notes || '',
     });
   };
 
@@ -1365,6 +1485,15 @@ function PoolSellModal({ group, onConfirm, onCancel, shippingRules, supplies, pr
             <div className="text-[10px] text-[#6b7085]">基础服务费 0.6%</div>
             <input className="input text-xs" type="text" inputmode="decimal" value={form.basic_software_service_fee}
               onChange={e => setForm({ ...form, basic_software_service_fee: e.target.value })} />
+          </div>
+
+          {/* 备注 */}
+          <div>
+            <label className="text-[10px] text-[#6b7085] block mb-1">备注（出售内容说明）</label>
+            <input className="input text-xs" placeholder="例如：闲鱼卖出、送朋友..."
+              value={form.notes}
+              onChange={e => setForm({ ...form, notes: e.target.value })}
+              lang="zh" spellCheck={false} autoComplete="off" />
           </div>
 
           {price > 0 && qty > 0 && (
@@ -1485,6 +1614,17 @@ export default function Warehouse() {
   const handlePoolSell = async (formData) => {
     try {
       await api.post('/sales', formData);
+      // 售出日志
+      const selectedToy = formData.toy_id ? toys.find(t => Number(t.id) === Number(formData.toy_id)) : null;
+      api.post('/toys/pool-logs', {
+        product_id: formData.product_id,
+        toy_id: formData.toy_id,
+        action: '售出',
+        toy_name: selectedToy ? (selectedToy.name_zh || selectedToy.name) : (poolSelling?.product?.name_zh || poolSelling?.product?.name || ''),
+        quantity: formData.quantity,
+        total_cost: formData.total_revenue,
+        notes: formData.notes || '',
+      }).catch(() => {});
       setPoolSelling(null);
       setToast('已售出');
       // 刷新 products 列表
@@ -1507,19 +1647,19 @@ export default function Warehouse() {
       const first = lines[0];
       let productId = first.product_id;
       // 新建商品
-      const prod = products.find(p => p.id === productId);
+      const prod = products.find(p => String(p.id) === String(productId));
       if (!prod) {
         const created = await api.post('/products', {
-          name: poolifying.name,
-          name_zh: poolifying.name_zh || '',
+          name: first.custom_name || poolifying.name,
+          name_zh: first.custom_name || poolifying.name_zh || '',
           category: poolifying.category,
           source: poolifying.source,
         });
         productId = created.id;
       }
       const firstRefCost = (() => {
-        const p = products.find(p => p.id === first.product_id);
-        const refUnit = p?.avg_unit_cost || 0;
+        const p = products.find(p => String(p.id) === String(first.product_id));
+        const refUnit = p?.avg_unit_cost || (poolifying.total_cost / (poolifying.quantity || 1)) || 0;
         return refUnit * first.quantity;
       })();
       const firstAllocated = ratio > 0 ? Math.round(firstRefCost * ratio * 100) / 100 : 0;
@@ -1533,30 +1673,40 @@ export default function Warehouse() {
         total_cost: firstAllocated,
         unit_cost: Math.round(firstUnitCost * 100) / 100,
       });
+      // 入池日志 — 第一行
+      await api.post('/toys/pool-logs', {
+        product_id: productId,
+        toy_id: poolifying.id,
+        action: '入池',
+        toy_name: poolifying.name_zh || poolifying.name,
+        quantity: first.quantity,
+        unit_cost: Math.round(firstUnitCost * 100) / 100,
+        total_cost: firstAllocated,
+      }).catch(() => {});
 
       // 其余行：创建新的 toy 记录
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
         let pid = line.product_id;
-        const lp = products.find(p => p.id === pid);
+        const lp = products.find(p => String(p.id) === String(pid));
         if (!lp) {
           const created = await api.post('/products', {
-            name: poolifying.name,
-            name_zh: poolifying.name_zh || '',
+            name: line.custom_name || poolifying.name,
+            name_zh: line.custom_name || poolifying.name_zh || '',
             category: poolifying.category,
             source: poolifying.source,
           });
           pid = created.id;
         }
         const refCost = (() => {
-          const p = products.find(p => p.id === line.product_id);
-          const refUnit = p?.avg_unit_cost || 0;
+          const p = products.find(p => String(p.id) === String(line.product_id));
+          const refUnit = p?.avg_unit_cost || (poolifying.total_cost / (poolifying.quantity || 1)) || 0;
           return refUnit * line.quantity;
         })();
         const allocated = ratio > 0 ? Math.round(refCost * ratio * 100) / 100 : 0;
         const unitCost = line.quantity > 0 ? allocated / line.quantity : 0;
 
-        await api.post('/toys', {
+        const createdToy = await api.post('/toys', {
           name: poolifying.name,
           name_zh: poolifying.name_zh || '',
           category: poolifying.category,
@@ -1572,6 +1722,16 @@ export default function Warehouse() {
           purchase_date: poolifying.purchase_date || new Date().toISOString().slice(0, 10),
           image: poolifying.image || null,
         });
+        // 入池日志 — 拆分行
+        await api.post('/toys/pool-logs', {
+          product_id: pid,
+          toy_id: createdToy.id,
+          action: '入池',
+          toy_name: poolifying.name_zh || poolifying.name,
+          quantity: line.quantity,
+          unit_cost: Math.round(unitCost * 100) / 100,
+          total_cost: allocated,
+        }).catch(() => {});
       }
 
       setPoolifying(null);
@@ -1584,19 +1744,43 @@ export default function Warehouse() {
     }
   };
 
-  // 退池操作
+  // 退池操作 — 同名商品全部退出
   const handleUnpoolify = async () => {
     try {
-      await updateToy(unpoolifying.id, {
-        ...unpoolifying,
-        product_id: null,
-        quantity: null,
-        remaining: null,
-        unit_cost: null,
-      });
+      const name = unpoolifying.name;
+      // 找到所有同名且正在池中的商品
+      const { toys: allToys } = useStore.getState();
+      const siblings = allToys.filter(t =>
+        t.name === name && t.product_id != null && t.remaining > 0
+      );
+      let done = 0;
+      for (const t of siblings) {
+        try {
+          await updateToy(t.id, {
+            ...t,
+            product_id: null,
+            quantity: null,
+            remaining: null,
+            unit_cost: null,
+          });
+          // 退池日志
+          await api.post('/toys/pool-logs', {
+            product_id: t.product_id,
+            toy_id: t.id,
+            action: '退池',
+            toy_name: t.name_zh || t.name,
+            quantity: t.remaining,
+            unit_cost: t.unit_cost,
+            total_cost: t.total_cost,
+          }).catch(() => {});
+          done++;
+        } catch (e) { /* skip */ }
+      }
       setUnpoolifying(null);
-      setToast('已退出池模式');
+      setToast(done > 1 ? `已退出 ${done} 件商品（同名全部退出）` : '已退出池模式');
       api.get('/products').then(prods => setProducts(prods)).catch(() => {});
+      const { loadAll } = useStore.getState();
+      loadAll();
     } catch (e) {
       setToast('退池失败: ' + (e.message || ''));
     }
@@ -1616,6 +1800,16 @@ export default function Warehouse() {
           remaining: null,
           unit_cost: null,
         });
+        // 退池日志
+        await api.post('/toys/pool-logs', {
+          product_id: b.product_id,
+          toy_id: b.id,
+          action: '退池',
+          toy_name: b.name_zh || b.name,
+          quantity: b.remaining,
+          unit_cost: b.unit_cost,
+          total_cost: b.total_cost,
+        }).catch(() => {});
         done++;
       } catch (e) {
         fail++;
@@ -1646,6 +1840,22 @@ export default function Warehouse() {
     });
   })();
 
+  // 按 category 分组池商品
+  const poolsByCategory = (() => {
+    const map = new Map();
+    for (const g of poolGrouped) {
+      const cat = g.product?.category || '未分类';
+      if (!map.has(cat)) map.set(cat, []);
+      map.get(cat).push(g);
+    }
+    return [...map.entries()].sort((a, b) => {
+      // "其他" 排最后
+      if (a[0] === '其他') return 1;
+      if (b[0] === '其他') return -1;
+      return a[0].localeCompare(b[0]);
+    });
+  })();
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
@@ -1663,33 +1873,73 @@ export default function Warehouse() {
 
       {/* ─── 池商品区域 ─── */}
       {poolGrouped.length > 0 && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-4 rounded-full bg-orange-500" />
             <h3 className="text-sm font-bold">池商品</h3>
-            <span className="text-[10px] text-[#6b7085]">{poolGrouped.length} 款 · 库存 {poolGrouped.reduce((s,g) => s+g.totalRemaining,0)} 件</span>
+            <span className="text-[10px] text-[#6b7085]">{poolGrouped.length} 款 · {poolsByCategory.length} 个系列 · 库存 {poolGrouped.reduce((s,g) => s+g.totalRemaining,0)} 件</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {poolGrouped.map(g => {
+          {poolsByCategory.map(([cat, pools]) => (
+            <div key={cat} className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <div className="w-1 h-3 rounded-full bg-orange-500/60" />
+                <h4 className="text-[11px] font-bold text-[#9ba0b5]">{cat}</h4>
+                <span className="text-[10px] text-[#6b7085]">{pools.length} 款 · {pools.reduce((s,p) => s+p.totalRemaining, 0)} 件</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {pools.map(g => {
               const prod = g.product;
               const avgCost = g.totalQty > 0 ? g.totalCost / g.totalQty : 0;
+              const unrecovered = prod?.unrecovered_cost ?? Math.max(0, g.totalCost - (prod?.total_revenue || 0));
+              const isBreakeven = g.totalCost > 0 && unrecovered <= 0;
+              const cardBorder = isBreakeven
+                ? 'border border-green-500/30'
+                : 'border border-orange-500/30';
+              const cardBg = isBreakeven
+                ? 'bg-gradient-to-b from-green-500/5 to-transparent'
+                : 'bg-gradient-to-b from-orange-500/5 to-transparent';
               return (
-                <div key={g.product_id} className="card border border-orange-500/20 cursor-pointer"
+                <div key={g.product_id} className={`card ${cardBorder} ${cardBg} cursor-pointer`}
                   onClick={() => setViewingPool(g)}>
                   <div className="flex items-start gap-3 mb-2">
                     {prod?.image && <img src={prod.image} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 bg-white/5" loading="lazy" onError={e => e.target.style.display='none'} />}
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold truncate">{prod?.name_zh || prod?.name || '未命名'}</div>
-                      <div className="text-[10px] text-[#6b7085]">{prod?.category || ''} · {g.batches.length} 批次</div>
+                      <div className="text-base font-bold truncate text-white">{prod?.name_zh || prod?.name || '未命名'}</div>
+                      <div className="text-[11px] text-[#8b90a5]">{prod?.category || ''} · {g.batches.length} 批次</div>
                     </div>
                     <span className="text-lg font-bold text-accent shrink-0 ml-2">{g.totalRemaining}</span>
                   </div>
-                  <div className="flex justify-between text-[10px] text-[#6b7085] mb-2">
-                    <span>均价 ¥{avgCost.toFixed(0)}</span>
-                    <span>总成本 ¥{g.totalCost.toFixed(0)}</span>
+                  <div className="flex justify-between text-[11px] text-[#9ba0b5] mb-0.5">
+                    <span className="font-semibold text-white/80">总成本 ¥{g.totalCost.toFixed(0)}</span>
+                    <span>{g.totalQty} 件 · 在库 <span className="text-accent font-semibold">{g.totalRemaining}</span> 件</span>
                   </div>
-                  <div className="text-[9px] text-[#6b7085] mb-2">
-                    共 {g.totalQty} 件 · 在库 {g.totalRemaining} 件
+
+                  <div className="space-y-1.5 mt-2 p-2.5 rounded-lg bg-gradient-to-br from-orange-500/10 to-green-500/5 border border-orange-500/15">
+                    <div className="flex justify-between text-[12px]">
+                      <span className="text-white font-medium">📦 成本均价</span>
+                      <span className="text-white font-bold">¥{avgCost.toFixed(0)}<span className="text-[10px] font-normal text-[#6b7085]">/件</span></span>
+                    </div>
+                    {g.totalRemaining > 0 && (() => {
+                      const breakeven = g.totalRemaining > 0 ? unrecovered / g.totalRemaining : 0;
+                      const profit10 = breakeven * 1.1;
+                      const profit20 = breakeven * 1.2;
+                      return (
+                        <>
+                          <div className="flex justify-between text-[12px]">
+                            <span className="text-orange-300 font-medium">🎯 回本价</span>
+                            <span className="text-orange-300 font-bold">¥{breakeven.toFixed(0)}<span className="text-[10px] font-normal">/件</span></span>
+                          </div>
+                          <div className="flex justify-between text-[12px]">
+                            <span className="text-green-300 font-medium">💰 +10%利润</span>
+                            <span className="text-green-300 font-bold">¥{profit10.toFixed(0)}<span className="text-[10px] font-normal">/件</span></span>
+                          </div>
+                          <div className="flex justify-between text-[12px]">
+                            <span className="text-emerald-300 font-medium">💰 +20%利润</span>
+                            <span className="text-emerald-300 font-bold">¥{profit20.toFixed(0)}<span className="text-[10px] font-normal">/件</span></span>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
 
                   <button
@@ -1701,7 +1951,9 @@ export default function Warehouse() {
                 </div>
               );
             })}
-          </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -1878,14 +2130,20 @@ export default function Warehouse() {
         />
       )}
 
-      {unpoolifying && (
-        <ConfirmModal
-          title="退出池模式"
-          message={`确定将「${unpoolifying.name_zh || unpoolifying.name}」退出池模式吗？\n数量、均价信息将被清空，恢复为普通单品。`}
-          onConfirm={handleUnpoolify}
-          onCancel={() => setUnpoolifying(null)}
-        />
-      )}
+      {unpoolifying && (() => {
+        const { toys: allToys } = useStore.getState();
+        const siblingCount = allToys.filter(t =>
+          t.name === unpoolifying.name && t.product_id != null && t.remaining > 0
+        ).length;
+        return (
+          <ConfirmModal
+            title="退出池模式"
+            message={`确定将「${unpoolifying.name_zh || unpoolifying.name}」退出池模式吗？${siblingCount > 1 ? `\n\n⚠ 同名商品共 ${siblingCount} 件分布在各个池中，将全部退出。` : ''}\n数量、均价信息将被清空，恢复为普通单品。`}
+            onConfirm={handleUnpoolify}
+            onCancel={() => setUnpoolifying(null)}
+          />
+        );
+      })()}
 
       {batchUnpoolifying && batchUnpoolifying.length > 0 && (
         <ConfirmModal

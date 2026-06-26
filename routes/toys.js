@@ -82,6 +82,42 @@ router.post('/estimate', async (req, res) => {
   }
 });
 
+// POST /api/toys/pool-logs — 写入池操作日志
+router.post('/pool-logs', async (req, res) => {
+  try {
+    const { product_id, toy_id, action, toy_name, quantity, unit_cost, total_cost, notes } = req.body || {};
+    if (!action || !product_id) {
+      return res.status(400).json({ error: 'product_id and action are required' });
+    }
+    const id = await db.insert(
+      `INSERT INTO pool_logs (product_id, toy_id, action, toy_name, quantity, unit_cost, total_cost, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [product_id, toy_id || null, action, toy_name || '', quantity || null, unit_cost || null, total_cost || null, notes || null]
+    );
+    const log = await db.get('SELECT * FROM pool_logs WHERE id = ?', [id]);
+    res.json(log);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/toys/pool-logs — 查询池操作日志
+router.get('/pool-logs', async (req, res) => {
+  try {
+    const { product_id } = req.query;
+    if (!product_id) {
+      return res.status(400).json({ error: 'product_id is required' });
+    }
+    const logs = await db.all(
+      'SELECT * FROM pool_logs WHERE product_id = ? ORDER BY created_at DESC',
+      [Number(product_id)]
+    );
+    res.json(logs);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/toys/:id
 router.get('/:id', async (req, res) => {
   try {
@@ -115,8 +151,8 @@ router.post('/', async (req, res) => {
       'stage2_date','stage2_amount','stage2_note','stage2_handling','stage2_domestic_ship',
       'stage3_date','stage3_amount','stage3_note','stage3_intl_ship','stage3_tax','stage3_tax_mode',
       'expected_arrival_date',
-      'shipment_id','total_cost','profit','baltan_ref_id','notes',
-      'product_id','quantity'
+      'shipment_id','total_cost','profit','baltan_ref_id','notes','image',
+      'product_id','quantity','remaining','unit_cost'
     ];
 
     const vals = cols.map(c => {
@@ -126,6 +162,8 @@ router.post('/', async (req, res) => {
       if (c === 'stage3_tax_mode') return t.stage3_tax_mode || 'normal';
       if (c === 'quantity') return t.quantity != null ? Number(t.quantity) : (t.product_id ? 1 : null);
       if (c === 'product_id') return t.product_id ? Number(t.product_id) : null;
+      if (c === 'remaining') return t.remaining != null ? Number(t.remaining) : (t.quantity != null ? Number(t.quantity) : null);
+      if (c === 'unit_cost') return t.unit_cost != null ? Number(t.unit_cost) : null;
       return t[c] ?? null;
     });
 
@@ -147,9 +185,13 @@ router.put('/:id', async (req, res) => {
     const t = req.body;
     const merged = { ...existing, ...t };
 
-    // 重新计算 total_cost (与 calcTotalCost 同源)
-    const totalCost = calcTotalCost(merged);
-    merged.total_cost = totalCost;
+    // 如果请求体明确传了 total_cost（如入池分摊），尊重前端计算值
+    // 否则用 calcTotalCost 重新计算
+    if ('total_cost' in t && t.total_cost !== undefined) {
+      merged.total_cost = Number(t.total_cost);
+    } else {
+      merged.total_cost = calcTotalCost(merged);
+    }
     merged.profit = null; // recalculated by enrichToy
 
     const skip = ['id', 'created_at'];

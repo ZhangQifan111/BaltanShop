@@ -9,6 +9,7 @@ import Estimate from './pages/Estimate';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import Monster from './pages/Monster';
+import Renrigou from './pages/Renrigou';
 import BackgroundDecoration from './components/BackgroundDecoration';
 
 const NAV = [
@@ -19,6 +20,7 @@ const NAV = [
   { path: '/monster', label: '怪兽', icon: '👹' },
   { path: '/analytics', label: '分析', icon: '📊' },
   { path: '/settings', label: '设置', icon: '⚙️' },
+  { path: '/renrigou', label: '任你购', icon: '📋' },
 ];
 
 function Layout({ children }) {
@@ -89,6 +91,7 @@ export default function App() {
           <Route path="/monster" element={<Monster />} />
 
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/renrigou" element={<Renrigou />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </Layout>

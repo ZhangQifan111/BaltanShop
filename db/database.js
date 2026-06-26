@@ -98,6 +98,20 @@ function migrate() {
       created_at TEXT DEFAULT (datetime('now'))
     )`);
   }
+  if (!tableNames.has('pool_logs')) {
+    changes.push(`CREATE TABLE pool_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER,
+      toy_id INTEGER,
+      action TEXT NOT NULL,
+      toy_name TEXT,
+      quantity INTEGER,
+      unit_cost REAL,
+      total_cost REAL,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`);
+  }
   if (!tableNames.has('sales')) {
     changes.push(`CREATE TABLE sales (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

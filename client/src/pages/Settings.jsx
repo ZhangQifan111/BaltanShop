@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import useStore from '../stores/useStore';
 import { api } from '../lib/api';
 import ConfirmModal from '../components/ConfirmModal';
-import OrderAnalyzer from '../components/OrderAnalyzer';
+
 
 export default function Settings() {
   const { suppliers, feeRules, addSupplier, addFeeRule, deleteFeeRule, setToast } = useStore();
@@ -382,8 +382,6 @@ export default function Settings() {
         />
       )}
 
-      {/* 任你购订单分析 */}
-      <OrderAnalyzer />
     </div>
   );
 }

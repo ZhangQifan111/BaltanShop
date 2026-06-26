@@ -140,6 +140,19 @@ CREATE TABLE IF NOT EXISTS supply_logs (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS pool_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id INTEGER,
+  toy_id INTEGER,
+  action TEXT NOT NULL,
+  toy_name TEXT,
+  quantity INTEGER,
+  unit_cost REAL,
+  total_cost REAL,
+  notes TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS fee_rules (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
