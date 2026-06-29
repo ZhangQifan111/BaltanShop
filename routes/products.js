@@ -22,12 +22,13 @@ router.get('/', async (req, res) => {
     // 对每个 product 算汇总
     const enriched = [];
     for (const p of products) {
-      // 总成本 + 总数量 + 剩余 + 剩余加权成本 (from toys)
+      // 总成本 + 总数量 + 剩余 + 剩余加权成本 + 批次数 (from toys)
       const batchStats = await db.get(
         `SELECT COALESCE(SUM(total_cost),0) as total_cost,
                 COALESCE(SUM(quantity),0) as total_qty,
                 COALESCE(SUM(remaining),0) as total_remaining,
-                COALESCE(SUM(unit_cost * remaining), 0) as total_remaining_cost
+                COALESCE(SUM(unit_cost * remaining), 0) as total_remaining_cost,
+                COUNT(*) as batch_count
          FROM toys WHERE product_id = ? AND status = 'stock'`,
         [p.id]
       );
@@ -49,11 +50,14 @@ router.get('/', async (req, res) => {
         ? Math.round((totalRemainingCost / totalRemaining) * 100) / 100
         : 0;
 
+      const batchCount = batchStats.batch_count || 0;
+
       enriched.push({
         ...p,
         total_cost: totalCost,
         total_qty: totalQty,
         total_remaining: totalRemaining,
+        batch_count: batchCount,
         sold_qty: soldQty,
         avg_unit_cost: avgUnitCost,
         total_revenue: totalRevenue,

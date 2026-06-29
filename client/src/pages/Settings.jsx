@@ -103,17 +103,34 @@ export default function Settings() {
     return node;
   };
 
+  const [expanded, setExpanded] = useState(new Set());
+
+  const toggleExpand = (id) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const renderTree = (nodes, depth, onDelete, onAddChild) => {
     if (!nodes || nodes.length === 0) return null;
-    return nodes.map(node => (
+    return nodes.map(node => {
+      const hasChildren = node.children?.length > 0;
+      const isOpen = expanded.has(node.id);
+      return (
       <div key={node.id}>
         <div
-          className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs group"
+          className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs group cursor-pointer select-none"
           style={{ marginLeft: depth * 16 }}
+          onClick={() => hasChildren && toggleExpand(node.id)}
         >
-          <span className="text-[#6b7085]">{depth > 0 ? '└' : ''}</span>
+          <span className="text-[#6b7085] w-3 text-center shrink-0">
+            {hasChildren ? (isOpen ? '▼' : '▶') : (depth > 0 ? '└' : '')}
+          </span>
           <span>{node.name}</span>
-          {node.children?.length > 0 && <span className="text-[10px] text-[#6b7085]">({node.children.length})</span>}
+          {hasChildren && <span className="text-[10px] text-[#6b7085]">({node.children.length})</span>}
           <button
             className="text-accent opacity-0 group-hover:opacity-100 text-[10px] px-1 transition-opacity"
             onClick={(e) => { e.stopPropagation(); onAddChild(node); }}
@@ -125,9 +142,10 @@ export default function Settings() {
             title="删除"
           >×</button>
         </div>
-        {node.children && renderTree(node.children, depth + 1, onDelete, onAddChild)}
+        {hasChildren && isOpen && renderTree(node.children, depth + 1, onDelete, onAddChild)}
       </div>
-    ));
+      );
+    });
   };
 
   const handleDeleteCategory = async (id) => {
@@ -301,43 +319,48 @@ export default function Settings() {
       <div className="card">
         <div className="text-xs text-[#6b7085] uppercase tracking-widest mb-4">池商品管理</div>
         {products.length > 0 ? (
-          <div className="space-y-2">
-            {products.map(p => (
-              <div key={p.id} className="flex items-center justify-between py-2 border-b border-white/[0.04] last:border-0">
-                {editingProduct === p.id ? (
-                  <div className="flex-1 flex gap-2 flex-wrap">
-                    <input className="input text-xs flex-1" placeholder="名称" defaultValue={p.name}
-                      onKeyDown={e => { if (e.key === 'Enter') handleUpdateProduct(p.id, { name: e.target.value, name_zh: p.name_zh, category: p.category }); }}
-                      onBlur={e => handleUpdateProduct(p.id, { name: e.target.value, name_zh: p.name_zh, category: p.category })} />
-                    <input className="input text-xs w-24" placeholder="中文名" defaultValue={p.name_zh || ''}
-                      onKeyDown={e => { if (e.key === 'Enter') handleUpdateProduct(p.id, { name: p.name, name_zh: e.target.value, category: p.category }); }} />
-                    <select className="input text-xs w-20" defaultValue={p.category}
-                      onChange={e => handleUpdateProduct(p.id, { name: p.name, name_zh: p.name_zh, category: e.target.value })}>
-                      {categories.map(c => <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>)}
-                    </select>
-                  </div>
-                ) : (
-                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setEditingProduct(p.id)}>
-                    <div className="text-sm truncate">{p.name_zh || p.name}</div>
-                    <div className="text-[10px] text-[#6b7085]">
-                      {p.category} · {p.total_qty || 0} 件入库 · 在库 {p.total_remaining || 0}
-                      {p.name_zh && <span className="ml-1">({p.name})</span>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {products.map(p => {
+              return (
+                <div key={p.id} className="rounded-lg p-3 border border-white/[0.08] bg-white/[0.02] cursor-pointer"
+                  onClick={() => setEditingProduct(p.id)}>
+                  {editingProduct === p.id ? (
+                    <div className="space-y-1.5" onClick={e => e.stopPropagation()}>
+                      <input className="input text-xs w-full" placeholder="名称" defaultValue={p.name_zh || p.name}
+                        onBlur={e => handleUpdateProduct(p.id, { name: e.target.value, name_zh: e.target.value, category: p.category })} />
+                      <select className="input text-xs w-full" defaultValue={p.category}
+                        onChange={e => handleUpdateProduct(p.id, { name: p.name, name_zh: p.name_zh, category: e.target.value })}>
+                        {categories.map(c => <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>)}
+                      </select>
+                      <button className="text-[10px] text-[#6b7085]"
+                        onClick={() => setEditingProduct(null)}>完成编辑</button>
                     </div>
-                  </div>
-                )}
-                <button
-                  className="btn-ghost text-xs text-red-400 shrink-0 ml-2"
-                  onClick={() => setPendingDelete({ type: 'product', id: p.id, name: p.name_zh || p.name })}
-                >
-                  删除
-                </button>
-              </div>
-            ))}
+                  ) : (
+                    <>
+                      <div className="flex items-start gap-2 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-bold truncate text-white">{p.name_zh || p.name || '未命名'}</div>
+                          <div className="text-[10px] text-[#8b90a5]">{p.category || ''} · {p.batch_count || 0} 批次</div>
+                        </div>
+                        <span className="text-base font-bold text-accent shrink-0">{p.total_remaining}</span>
+                      </div>
+                      <div className="text-[10px] text-[#9ba0b5]">
+                        {p.total_qty} 件 · 在库 {p.total_remaining} 件
+                      </div>
+                      <button className="btn-ghost text-[10px] text-red-400 mt-2"
+                        onClick={e => { e.stopPropagation(); setPendingDelete({ type: 'product', id: p.id, name: p.name_zh || p.name }); }}>
+                        删除
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="text-xs text-[#6b7085] text-center py-4">暂无池商品</div>
         )}
-        <p className="text-[10px] text-[#6b7085] mt-3">点击名称可编辑 · 仅无关联记录的商品可删除</p>
+        <p className="text-[10px] text-[#6b7085] mt-3">点击卡片可编辑名称和分类 · 仅无关联记录的商品可删除</p>
       </div>
 
       {/* 备份 */}

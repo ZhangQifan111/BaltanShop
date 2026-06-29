@@ -155,7 +155,7 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
 });
 
 /* ─── 池详情弹窗 ─── */
-function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify }) {
+function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify, categories }) {
   const prod = group.product;
   const avgCost = group.totalQty > 0 ? group.totalCost / group.totalQty : 0;
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -208,20 +208,34 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
             <div className="flex-1 min-w-0">
               {editing ? (
                 <div className="space-y-1.5">
-                  <input className="input text-xs w-full" placeholder="中文名"
-                    value={editForm.name_zh}
-                    onChange={e => setEditForm({ ...editForm, name_zh: e.target.value })}
-                    lang="zh" spellCheck={false} autoComplete="off" autoFocus />
-                  <input className="input text-xs w-full" placeholder="系列（category）"
-                    value={editForm.category}
-                    onChange={e => setEditForm({ ...editForm, category: e.target.value })}
-                    lang="zh" spellCheck={false} autoComplete="off" />
+                  <div>
+                    <label className="text-[10px] text-[#6b7085] block mb-0.5">名称</label>
+                    <input className="input text-xs w-full" placeholder="输入池名称"
+                      value={editForm.name_zh}
+                      onChange={e => setEditForm({ ...editForm, name_zh: e.target.value })}
+                      lang="zh" spellCheck={false} autoComplete="off" autoFocus />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-[#6b7085] block mb-0.5">系列（从商品分类中选择）</label>
+                    <select className="input text-xs w-full"
+                      value={editForm.category}
+                      onChange={e => setEditForm({ ...editForm, category: e.target.value })}>
+                      <option value="">— 选择系列 —</option>
+                      {!categories.some(c => c.name === editForm.category) && editForm.category && (
+                        <option value={editForm.category} disabled>{editForm.category}（旧值，请重新选择）</option>
+                      )}
+                      {categories.map(c => (
+                        <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="flex gap-1.5">
                     <button className="text-[10px] px-2.5 py-1 rounded bg-accent text-[#0f1117] font-medium"
                       onClick={async () => {
+                        const newName = editForm.name_zh || prod?.name_zh || '';
                         await api.put(`/products/${group.product_id}`, {
-                          name_zh: editForm.name_zh || prod?.name_zh || '',
-                          name: editForm.name_zh || prod?.name || '',
+                          name_zh: newName,
+                          name: newName,
                           category: editForm.category || prod?.category || '其他',
                         }).catch(() => {});
                         setEditing(false);
@@ -247,18 +261,31 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
                           category: prod?.category || '',
                         });
                         setEditing(true);
-                      }}>✎</button>
+                      }}>✎ 编辑</button>
                   </div>
-                  <div className="text-[10px] text-[#6b7085]">{prod?.category || ''} · {group.batches.length} 批次</div>
+                  <div className="text-[10px] text-[#6b7085] mt-0.5">系列：{prod?.category || '未设置'}　|　批次：{group.batches.length} 批</div>
                 </>
               )}
             </div>
             <button className="text-[#6b7085] hover:text-white text-lg px-1" onClick={onClose}>✕</button>
           </div>
-          <div className="flex justify-between mt-3 text-xs">
-            <span>均价 <span className="text-white font-bold">¥{avgCost.toFixed(0)}</span></span>
-            <span>总成本 <span className="text-white font-bold">¥{group.totalCost.toFixed(0)}</span></span>
-            <span>在库 <span className="text-accent font-bold">{group.totalRemaining}</span>/{group.totalQty} 件</span>
+          {/* 汇总数据卡片 */}
+          <div className="grid grid-cols-3 gap-2 mt-3 text-[10px]">
+            <div className="bg-white/[0.03] rounded-lg p-2 text-center">
+              <div className="text-[#6b7085] mb-0.5">成本均价</div>
+              <div className="text-white font-bold text-sm">¥{avgCost.toFixed(0)}</div>
+              <div className="text-[#6b7085]">/件</div>
+            </div>
+            <div className="bg-white/[0.03] rounded-lg p-2 text-center">
+              <div className="text-[#6b7085] mb-0.5">池总成本</div>
+              <div className="text-white font-bold text-sm">¥{group.totalCost.toFixed(0)}</div>
+              <div className="text-[#6b7085]">{group.totalQty} 件入库</div>
+            </div>
+            <div className="bg-white/[0.03] rounded-lg p-2 text-center">
+              <div className="text-[#6b7085] mb-0.5">当前库存</div>
+              <div className="text-accent font-bold text-sm">{group.totalRemaining}<span className="text-[#6b7085] text-[10px]">/{group.totalQty}</span></div>
+              <div className="text-[#6b7085]">件在库</div>
+            </div>
           </div>
           {/* 批量操作栏 */}
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
@@ -267,7 +294,7 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
                 checked={allSelected}
                 onChange={toggleAll}
               />
-              <span className="text-[#9ca3af]">{allSelected ? '取消全选' : '全选'}</span>
+              <span className="text-[#9ca3af]">{allSelected ? '取消全选' : '全选批次'}</span>
             </label>
             {someSelected && (
               <button className="text-[11px] px-3 py-1 rounded border border-yellow-500/40 bg-yellow-500/10 text-yellow-300 hover:bg-yellow-500/20 font-medium"
@@ -278,8 +305,9 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
           </div>
         </div>
 
-        {/* Batch list */}
+        {/* 库存批次列表 */}
         <div className="p-4 space-y-2 overflow-y-auto flex-1">
+          <div className="text-[10px] text-[#6b7085] mb-1">📦 库存批次（池内每一条商品记录）</div>
           {group.batches.map(b => (
             <div key={b.id} className={`bg-white/[0.03] rounded-lg p-3 text-xs flex gap-3 ${selectedIds.has(b.id) ? 'ring-1 ring-yellow-500/50 bg-yellow-500/[0.05]' : ''}`}>
               {/* 选择框 */}
@@ -294,12 +322,12 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
               )}
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between mb-1">
-                  <span className="truncate flex-1 mr-2 font-medium">{b.name_zh || b.name}</span>
-                  <span className="font-bold text-accent shrink-0">剩 {b.remaining}/{b.quantity}</span>
+                  <span className="truncate flex-1 mr-2 font-medium">商品：{b.name_zh || b.name}</span>
+                  <span className="font-bold text-accent shrink-0">在库 {b.remaining}/{b.quantity}</span>
                 </div>
                 <div className="flex justify-between text-[10px] text-[#6b7085] mb-2">
-                  <span>成本 ¥{(b.total_cost || 0).toFixed(0)} · 单价 ¥{(b.unit_cost || 0).toFixed(0)}</span>
-                  <span>{b.purchase_date || b.created_at?.slice(0, 10)}</span>
+                  <span>批次成本 ¥{(b.total_cost || 0).toFixed(0)}　|　单价 ¥{(b.unit_cost || 0).toFixed(0)}/件</span>
+                  <span>入库日 {b.purchase_date || b.created_at?.slice(0, 10)}</span>
                 </div>
                 <div className="flex justify-end gap-1.5">
                   <button className="text-[10px] px-2 py-0.5 rounded border border-accent/40 bg-accent/10 text-accent hover:bg-accent/20"
@@ -322,7 +350,7 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
           {poolLogs === null ? (
             <p className="text-[11px] text-[#6b7085]">加载中...</p>
           ) : poolLogs.length === 0 ? (
-            <p className="text-[11px] text-[#6b7085]">暂无记录 · 新操作将自动记录在此</p>
+            <p className="text-[11px] text-[#6b7085]">暂无记录 · 入池/退池/售出操作将自动记录在此</p>
           ) : (
             <div className="space-y-2 max-h-40 overflow-y-auto">
               {poolLogs.map(log => {
@@ -341,7 +369,7 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
                     )}
                   </div>
                   {log.notes && (
-                    <div className="text-[11px] text-[#9ba0b5] pl-5">{log.notes}</div>
+                    <div className="text-[11px] text-[#9ba0b5] pl-5">备注：{log.notes}</div>
                   )}
                 </div>
                 );
@@ -1840,19 +1868,39 @@ export default function Warehouse() {
     });
   })();
 
-  // 按 category 分组池商品
+  // 构建分类名 → 顶级分类名 的映射
+  const catNameToRoot = {};
+  for (const c of categories) {
+    let current = c;
+    // 向上追溯到顶级
+    let maxDepth = 20;
+    while (current.parent_id && maxDepth-- > 0) {
+      const parent = categories.find(p => p.id === current.parent_id);
+      if (!parent) break;
+      current = parent;
+    }
+    catNameToRoot[c.name] = current.name;
+  }
+
+  // 按顶级分类分组池商品
   const poolsByCategory = (() => {
     const map = new Map();
     for (const g of poolGrouped) {
-      const cat = g.product?.category || '未分类';
-      if (!map.has(cat)) map.set(cat, []);
-      map.get(cat).push(g);
+      const rawCat = g.product?.category || '未分类';
+      // 查找该分类对应的顶级分类，找不到则用原值
+      const rootCat = catNameToRoot[rawCat] || rawCat;
+      if (!map.has(rootCat)) map.set(rootCat, []);
+      map.get(rootCat).push(g);
+    }
+    // 每组内按在库数量从多到少排序
+    for (const pools of map.values()) {
+      pools.sort((a, b) => b.totalRemaining - a.totalRemaining);
     }
     return [...map.entries()].sort((a, b) => {
-      // "其他" 排最后
+      // 按款数从多到少，「其他」排最后
       if (a[0] === '其他') return 1;
       if (b[0] === '其他') return -1;
-      return a[0].localeCompare(b[0]);
+      return b[1].length - a[1].length;
     });
   })();
 
@@ -1883,7 +1931,7 @@ export default function Warehouse() {
             <div key={cat} className="space-y-2">
               <div className="flex items-center gap-1.5">
                 <div className="w-1 h-3 rounded-full bg-orange-500/60" />
-                <h4 className="text-[11px] font-bold text-[#9ba0b5]">{cat}</h4>
+                <h4 className="text-[11px] font-bold text-[#9ba0b5]">系列：{cat}</h4>
                 <span className="text-[10px] text-[#6b7085]">{pools.length} 款 · {pools.reduce((s,p) => s+p.totalRemaining, 0)} 件</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1923,20 +1971,30 @@ export default function Warehouse() {
                       const breakeven = g.totalRemaining > 0 ? unrecovered / g.totalRemaining : 0;
                       const profit10 = breakeven * 1.1;
                       const profit20 = breakeven * 1.2;
+                      const alreadyRecovered = unrecovered <= 0;
                       return (
                         <>
-                          <div className="flex justify-between text-[12px]">
-                            <span className="text-orange-300 font-medium">🎯 回本价</span>
-                            <span className="text-orange-300 font-bold">¥{breakeven.toFixed(0)}<span className="text-[10px] font-normal">/件</span></span>
-                          </div>
-                          <div className="flex justify-between text-[12px]">
-                            <span className="text-green-300 font-medium">💰 +10%利润</span>
-                            <span className="text-green-300 font-bold">¥{profit10.toFixed(0)}<span className="text-[10px] font-normal">/件</span></span>
-                          </div>
-                          <div className="flex justify-between text-[12px]">
-                            <span className="text-emerald-300 font-medium">💰 +20%利润</span>
-                            <span className="text-emerald-300 font-bold">¥{profit20.toFixed(0)}<span className="text-[10px] font-normal">/件</span></span>
-                          </div>
+                          {alreadyRecovered ? (
+                            <div className="flex justify-between text-[12px]">
+                              <span className="text-green-300 font-medium">🎯 回本价</span>
+                              <span className="text-green-300 font-bold">已回本 ✓</span>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex justify-between text-[12px]">
+                                <span className="text-orange-300 font-medium">🎯 回本价</span>
+                                <span className="text-orange-300 font-bold">¥{breakeven.toFixed(0)}<span className="text-[10px] font-normal">/件</span></span>
+                              </div>
+                              <div className="flex justify-between text-[12px]">
+                                <span className="text-green-300 font-medium">💰 +10%利润</span>
+                                <span className="text-green-300 font-bold">¥{profit10.toFixed(0)}<span className="text-[10px] font-normal">/件</span></span>
+                              </div>
+                              <div className="flex justify-between text-[12px]">
+                                <span className="text-emerald-300 font-medium">💰 +20%利润</span>
+                                <span className="text-emerald-300 font-bold">¥{profit20.toFixed(0)}<span className="text-[10px] font-normal">/件</span></span>
+                              </div>
+                            </>
+                          )}
                         </>
                       );
                     })()}
@@ -2166,6 +2224,7 @@ export default function Warehouse() {
       {viewingPool && (
         <PoolDetailModal
           group={viewingPool}
+          categories={categories}
           onClose={() => setViewingPool(null)}
           onSell={(g, batchId) => { setViewingPool(null); setPoolSelling({ ...g, preselectedBatchId: batchId }); }}
           onUnpoolify={(b) => { setViewingPool(null); setUnpoolifying(b); }}
