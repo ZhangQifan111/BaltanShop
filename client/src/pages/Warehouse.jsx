@@ -11,10 +11,9 @@ const FILTERS = [
   { key: 'done', label: '已完成' },
 ];
 
-const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn, onDone, onUnsell, onPoolify }) {
+const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn, onDone, onUnsell, onPoolify, onPreviewImage }) {
   const [doneLoading, setDoneLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [previewImage, setPreviewImage] = useState(null);
 
   const statusBadge = {
     stock: { label: '在库', bg: 'rgba(74,222,128,0.15)', color: '#34d399' },
@@ -26,7 +25,7 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
   return (
     <div className="card cursor-pointer" onClick={() => setExpanded(!expanded)}>
       <div className="flex items-start gap-3 mb-3">
-        {toy.image && <img src={toy.image} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 bg-white/5 cursor-zoom-in hover:ring-2 hover:ring-accent/50 transition-all" loading="lazy" onError={e => e.target.style.display='none'} onClick={e => { e.stopPropagation(); setPreviewImage(toy.image); }} />}
+        {toy.image && <img src={toy.image} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 bg-white/5 cursor-zoom-in hover:ring-2 hover:ring-accent/50 transition-all" loading="lazy" onError={e => e.target.style.display='none'} onClick={e => { e.stopPropagation(); onPreviewImage && onPreviewImage(toy.image); }} />}
         <div className="flex-1 min-w-0">
           <div className="text-sm font-bold truncate mb-1">{toy.name_zh || toy.name}</div>
           <span className="inline-block text-[10px] px-2 py-0.5 rounded-full" style={{ background: statusBadge.bg, color: statusBadge.color }}>
@@ -65,11 +64,13 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
         <div className="border-t border-white/5 pt-3 mt-3 space-y-1 text-xs">
           {sourceGroup(toy.source) === 'direct' && (
             <>
-              {toy.japan_price_cny > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">本体价</span><span>¥{toy.japan_price_cny}</span></div>}
-              {toy.handling_fee > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">手续费</span><span>¥{toy.handling_fee}</span></div>}
-              {toy.japan_domestic_shipping > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">日本运费</span><span>¥{toy.japan_domestic_shipping}</span></div>}
-              {toy.intl_shipping > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">国际运费</span><span>¥{toy.intl_shipping}</span></div>}
-              {toy.tax > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">税费</span><span>¥{toy.tax}</span></div>}
+              {toy.japan_price_cny > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">本体价</span><span>¥{toy.japan_price_cny} <span className="text-[10px] text-[#6b7085]">RMB</span></span></div>}
+              {toy.japan_price_jpy > 0 && toy.japan_price_cny !== toy.japan_price_jpy && <div className="flex justify-between"><span className="text-[#6b7085]">本体价(日元)</span><span>¥{toy.japan_price_jpy} <span className="text-[10px] text-[#6b7085]">JPY</span></span></div>}
+              {toy.handling_fee > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">代购手续费</span><span>¥{toy.handling_fee} <span className="text-[10px] text-[#6b7085]">JPY</span></span></div>}
+              {toy.japan_domestic_shipping > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">日本运费</span><span>¥{toy.japan_domestic_shipping} <span className="text-[10px] text-[#6b7085]">JPY</span></span></div>}
+              {toy.japan_consumption_tax > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">日本消费税</span><span>¥{toy.japan_consumption_tax} <span className="text-[10px] text-[#6b7085]">JPY</span></span></div>}
+              {toy.intl_shipping > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">国际运费</span><span>¥{toy.intl_shipping} <span className="text-[10px] text-[#6b7085]">RMB</span></span></div>}
+              {toy.tax > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">税费</span><span>¥{toy.tax} <span className="text-[10px] text-[#6b7085]">RMB</span></span></div>}
             </>
           )}
           {sourceGroup(toy.source) === 'proxy' && (
@@ -136,26 +137,13 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
         </div>
       </div>
 
-      {/* 图片大图预览 — Portal 到 body 确保全屏 */}
-      {previewImage && createPortal(
-        <div className="fixed inset-0 bg-black/95 z-[9999]"
-          onMouseDown={e => e.stopPropagation()}
-          onClick={e => { e.stopPropagation(); setPreviewImage(null); }}>
-          <button className="absolute top-4 right-4 text-white/60 hover:text-white text-2xl z-10"
-            onMouseDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); setPreviewImage(null); }}>✕</button>
-          <img src={previewImage} alt="" className="absolute inset-0 w-full h-full object-contain"
-            onMouseDown={e => e.stopPropagation()}
-            onClick={e => e.stopPropagation()} />
-        </div>,
-        document.body
-      )}
+    {/* 图片大图预览 — Portal 到 body 确保全屏（由 Warehouse 顶层渲染） */}
     </div>
   );
 });
 
 /* ─── 池详情弹窗 ─── */
-function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify, categories }) {
+function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify, categories, onPreviewImage }) {
   const prod = group.product;
   const avgCost = group.totalQty > 0 ? group.totalCost / group.totalQty : 0;
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -318,7 +306,7 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
                 />
               </div>
               {b.image && (
-                <img src={b.image} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 bg-white/5" onError={e => e.target.style.display = 'none'} />
+                <img src={b.image} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 bg-white/5 cursor-zoom-in hover:ring-2 hover:ring-accent/50 transition-all" onError={e => e.target.style.display = 'none'} onClick={e => { e.stopPropagation(); onPreviewImage && onPreviewImage(b.image); }} />
               )}
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between mb-1">
@@ -1566,6 +1554,7 @@ export default function Warehouse() {
 
   const [page, setPage] = useState(1);
   const [sortNewest, setSortNewest] = useState(true);
+  const [previewImage, setPreviewImage] = useState(null);
   const PAGE_SIZE = 12;
 
   const filtered = toys.filter(t => {
@@ -1856,11 +1845,13 @@ export default function Warehouse() {
   const poolGrouped = (() => {
     const map = {};
     for (const t of poolToys) {
-      if (!map[t.product_id]) map[t.product_id] = { batches: [], totalRemaining: 0, totalQty: 0, totalCost: 0 };
+      if (!map[t.product_id]) map[t.product_id] = { batches: [], totalRemaining: 0, totalQty: 0, totalCost: 0, fallbackImage: null };
       map[t.product_id].batches.push(t);
       map[t.product_id].totalRemaining += t.remaining || 0;
       map[t.product_id].totalQty += t.quantity || 0;
       map[t.product_id].totalCost += t.total_cost || 0;
+      // 取池内第一条有图的玩具图作为池代表图（任你购导入的玩具一般都有图）
+      if (!map[t.product_id].fallbackImage && t.image) map[t.product_id].fallbackImage = t.image;
     }
     return Object.entries(map).map(([pid, data]) => {
       const prod = products.find(p => p.id === Number(pid));
@@ -1937,6 +1928,7 @@ export default function Warehouse() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {pools.map(g => {
               const prod = g.product;
+              const poolImage = prod?.image || g.fallbackImage;
               const avgCost = g.totalQty > 0 ? g.totalCost / g.totalQty : 0;
               const unrecovered = prod?.unrecovered_cost ?? Math.max(0, g.totalCost - (prod?.total_revenue || 0));
               const isBreakeven = g.totalCost > 0 && unrecovered <= 0;
@@ -1950,7 +1942,7 @@ export default function Warehouse() {
                 <div key={g.product_id} className={`card ${cardBorder} ${cardBg} cursor-pointer`}
                   onClick={() => setViewingPool(g)}>
                   <div className="flex items-start gap-3 mb-2">
-                    {prod?.image && <img src={prod.image} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 bg-white/5" loading="lazy" onError={e => e.target.style.display='none'} />}
+                    {poolImage && <img src={poolImage} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 bg-white/5 cursor-zoom-in hover:ring-2 hover:ring-accent/50 transition-all" loading="lazy" onError={e => e.target.style.display='none'} onClick={e => { e.stopPropagation(); setPreviewImage(poolImage); }} />}
                     <div className="flex-1 min-w-0">
                       <div className="text-base font-bold truncate text-white">{prod?.name_zh || prod?.name || '未命名'}</div>
                       <div className="text-[11px] text-[#8b90a5]">{prod?.category || ''} · {g.batches.length} 批次</div>
@@ -2077,6 +2069,7 @@ export default function Warehouse() {
             onUnsell={id => setPendingUnsell(id)}
             onDelete={id => setPendingDelete(id)}
             onPoolify={toy => setPoolifying(toy)}
+            onPreviewImage={setPreviewImage}
           />
         ))}
       </div>
@@ -2229,7 +2222,23 @@ export default function Warehouse() {
           onSell={(g, batchId) => { setViewingPool(null); setPoolSelling({ ...g, preselectedBatchId: batchId }); }}
           onUnpoolify={(b) => { setViewingPool(null); setUnpoolifying(b); }}
           onBatchUnpoolify={(batches) => { setViewingPool(null); setBatchUnpoolifying(batches); }}
+          onPreviewImage={setPreviewImage}
         />
+      )}
+
+      {/* 全局图片大图预览（单品卡片 + 池卡片共用） */}
+      {previewImage && createPortal(
+        <div className="fixed inset-0 bg-black/95 z-[9999]"
+          onMouseDown={e => e.stopPropagation()}
+          onClick={e => { e.stopPropagation(); setPreviewImage(null); }}>
+          <button className="absolute top-4 right-4 text-white/60 hover:text-white text-2xl z-10"
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); setPreviewImage(null); }}>✕</button>
+          <img src={previewImage} alt="" className="absolute inset-0 w-full h-full object-contain"
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => e.stopPropagation()} />
+        </div>,
+        document.body
       )}
     </div>
   );

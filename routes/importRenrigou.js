@@ -124,4 +124,51 @@ router.post('/', async (req, res) => {
   res.json({ created, skipped, total: items.length, createdCount: created.length, skippedCount: skipped.length });
 });
 
+// 预检：哪些 item_id 已存在（dry-run，不入库）
+// 入参 { items: [...] } 或 { itemIds: [...] }；返回 { existing: [{ itemId, existingId, title }], missing: [...] }
+router.post('/check', async (req, res) => {
+  try {
+    const items = Array.isArray(req.body?.items) ? req.body.items : null;
+    const itemIds = Array.isArray(req.body?.itemIds) ? req.body.itemIds : null;
+    if (!items && !itemIds) return res.status(400).json({ error: 'items 或 itemIds 必填' });
+
+    const existing = [];
+    const seen = new Set();
+
+    async function checkOne(it) {
+      // 从 notes 提取
+      let id = null;
+      const m = (it.notes || '').match(/renrigou_item_id:(\d+)/);
+      if (m) id = m[1];
+      // 或者直接给 itemId
+      if (!id && it.item_id) id = String(it.item_id);
+      // 或者顶层传 itemIds
+      if (!id && typeof it === 'string') id = it;
+      if (!id) return null;
+      if (seen.has(id)) return null;
+      seen.add(id);
+
+      const row = await db.get(
+        "SELECT id, name FROM toys WHERE notes LIKE ? LIMIT 1",
+        ['%renrigou_item_id:' + id + '%']
+      );
+      if (row) return { itemId: id, existingId: row.id, title: row.name };
+      return { itemId: id };
+    }
+
+    const sourceList = items || itemIds.map(id => ({ item_id: id }));
+    for (const it of sourceList) {
+      const r = await checkOne(it);
+      if (r) existing.push(r);
+    }
+
+    res.json({
+      existing: existing.filter(e => e.existingId),  // 已存在的
+      missing: existing.filter(e => !e.existingId).map(e => e.itemId)  // 未存在的 itemId
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

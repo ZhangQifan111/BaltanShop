@@ -25,7 +25,7 @@ const NAV = [
 
 function Layout({ children }) {
   const location = useLocation();
-  const { toast } = useStore();
+  const { toast, bulkImport, dismissBulkImport } = useStore();
 
   return (
     <div className="min-h-screen bg-bg text-[#d0d4e8] font-mono relative">
@@ -62,6 +62,39 @@ function Layout({ children }) {
           ))}
         </div>
       </nav>
+
+      {/* 全局一键导入进度浮层（切页不丢失） */}
+      {bulkImport.active && (
+        <div className="fixed top-16 left-3 right-3 z-[110] max-w-md mx-auto">
+          <div className="bg-[#1e1e1e] border-2 border-accent rounded-lg p-3 shadow-2xl">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin shrink-0" />
+              <div className="flex-1 text-xs text-white font-bold">
+                {bulkImport.phase === 'check' && '预检去重中…'}
+                {bulkImport.phase === 'translate' && `翻译中 ${bulkImport.done}/${bulkImport.total}`}
+                {bulkImport.phase === 'import' && `入库中 ${bulkImport.done}/${bulkImport.total}`}
+              </div>
+              {bulkImport.skippedCount > 0 && (
+                <span className="text-[10px] text-[#8b90a5]">跳过 {bulkImport.skippedCount}</span>
+              )}
+              <button
+                onClick={dismissBulkImport}
+                className="text-[#8b90a5] hover:text-white text-base leading-none px-1"
+                title="隐藏（不影响后台执行）"
+              >✕</button>
+            </div>
+            {bulkImport.total > 0 && (
+              <div className="w-full h-1 bg-white/[0.08] rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-accent rounded-full transition-all duration-300"
+                  style={{ width: (bulkImport.done / bulkImport.total * 100) + '%' }}
+                />
+              </div>
+            )}
+            <div className="text-[10px] text-[#6b7085] mt-1.5">可切到其他页面，进度不丢失</div>
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {toast && (

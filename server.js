@@ -5,7 +5,16 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json({ limit: '10mb' }));
+// 全局 CORS：放通浏览器侧 fetch（书签抓取脚本需要从 rennigou.jp 域 POST 到本地）
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
+
+app.use(express.json({ limit: '20mb' }));
 
 // 静态文件（React build 输出）
 const staticPath = path.join(__dirname, 'dist');
@@ -40,6 +49,7 @@ const { router: backupRouter } = require('./routes/backup');
 app.use('/api/backup', backupRouter);
 app.use('/api/order-data', require('./routes/orderData'));
 app.use('/api/fetch-renrigou', require('./routes/renrigou'));
+app.use('/api/ingest-renrigou', require('./routes/ingestRenrigou'));
 app.use('/api/import-renrigou', require('./routes/importRenrigou'));
 app.use('/api/translate', require('./routes/translate'));
 app.use('/api/process-toy-image', require('./routes/processToyImage'));

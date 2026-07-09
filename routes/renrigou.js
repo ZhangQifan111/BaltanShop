@@ -1,3 +1,14 @@
+/*
+ * 任你购抓取路由（残留路径 - 当前不使用）
+ *
+ * 主流程已切换到：用户在已登录的 rennigou.jp 浏览器 Console 跑升级版
+ * fetch_all_details.js，脚本自动 POST 数据到 /api/ingest-renrigou。
+ *
+ * 本路由保留只为：万一前端还在引用、或临时手动测试时可用：
+ *   POST /api/fetch-renrigou { jwt }   → SSE 流式抓取（30s 过期 token 快速路径）
+ *
+ * 没有 puppeteer 自动登录：rennigou 部署了盾 SDK 阻挡 headless chrome。
+ */
 const express = require('express');
 const https = require('https');
 const http = require('http');
@@ -6,10 +17,6 @@ const path = require('path');
 const router = express.Router();
 
 const DATA_DIR = path.join(__dirname, '..', 'data', 'orders');
-
-function ensureDir() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 
 function fetchJson(url, { headers = {}, timeout = 15000 } = {}) {
   return new Promise((resolve, reject) => {
@@ -37,10 +44,8 @@ function parseFee(s) {
   var rmb = 0;
   if (parts.length > 1) {
     rmb = parseInt(parts[1].replace(/[^0-9]/g, ''), 10) || 0;
-    // "246日元" 后面没有数字 → 前面的数字就是 RMB
     if (!rmb && jpy > 0) rmb = jpy;
   } else if (jpy > 0) {
-    // 没有"日元"分隔符 → 直接是 RMB
     rmb = jpy;
   }
   return [jpy, rmb];
@@ -65,188 +70,14 @@ async function batchFetch(items, batchSize, fn, onProgress) {
   return { results, ok, fail };
 }
 
+function ensureDir() {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
 router.post('/', async (req, res) => {
-  const { jwt } = req.body || {};
-  if (!jwt) return res.status(400).json({ error: 'missing jwt' });
-
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'X-Accel-Buffering': 'no'
+  return res.status(410).json({
+    error: '此接口已弃用。请在 rennigou.jp 已登录页面的浏览器 Console 跑 /fetch_all_details.js（点巴坦「任你购订单分析」页的「📋 复制抓取脚本」按钮获取），脚本会自动 POST 到 /api/ingest-renrigou'
   });
-
-  const send = (data) => {
-    res.write('data: ' + JSON.stringify(data) + '\n\n');
-  };
-
-  req.setTimeout(120000);
-  req.on('timeout', () => {
-    send({ phase: 'error', message: '抓取超时（超过 2 分钟）' });
-    res.end();
-  });
-
-  try {
-    const H = {
-      'accept': 'application/json',
-      'authorization': 'Bearer ' + jwt,
-      'token': '0fe0f7d6f0fc2c1f79fe53992a189c2d032a0cfd6c3560a4402f4ac715e376a1',
-      'uid': '2016001'
-    };
-    const BASE = 'https://rl.rngmoe.com/order/order/';
-
-    // Step 1: fetch 7 pages
-    const orders = [];
-    for (let p = 1; p <= 7; p++) {
-      send({ phase: 'list', current: p, total: 7 });
-      try {
-        const r = await fetchJson(BASE + 'getLists?page=' + p + '&page_last_id=0&service=finish_ownerPackage&is_show_page=1', { headers: H, timeout: 15000 });
-        if (r.data && r.data.result) orders.push(...r.data.result);
-      } catch(e) {}
-    }
-
-    if (orders.length === 0) {
-      send({ phase: 'error', message: '未获取到订单数据，可能 JWT 已过期' });
-      return res.end();
-    }
-
-    // Step 2: extract IDs
-    const itemIds = [];
-    const orderIds = [];
-    const seenItems = new Set();
-    for (const ord of orders) {
-      orderIds.push(ord.id);
-      for (const it of (ord.body || [])) {
-        if (!seenItems.has(it.item_id)) {
-          seenItems.add(it.item_id);
-          itemIds.push(it.item_id);
-        }
-      }
-    }
-
-    // Step 3: fetch item fees (低并发 + 延时避免限流)
-    const { results: itemFees, ok: itemOk, fail: itemFail } = await batchFetch(
-      itemIds, 5,
-      async (id) => {
-        const r = await fetchJson(BASE + 'getDetails?service=item&itemId=' + id, { headers: H, timeout: 15000 });
-        if (r.code !== 0 || !r.data) throw new Error('bad response');
-        const di = r.data.detailedInfo || [];
-        const feeBlock = di.find(b => b.sign === 'feeInfo');
-        const fees = { pf: 0, pfRmb: 0, sf: 0, sfRmb: 0, ds: 0, dsRmb: 0, coupon: 0, itemPriceRmb: 0 };
-        if (feeBlock && feeBlock.data) {
-          for (const f of feeBlock.data) {
-            if (f.title === '付款手续费') { var pr = parseFee(f.titleValue); fees.pf = pr[0]; fees.pfRmb = pr[1]; }
-            else if (f.title === '代购手续费') { var pr = parseFee(f.titleValue); fees.sf = pr[0]; fees.sfRmb = pr[1]; }
-            else if (f.title === '日本国内运费') { var pr = parseFee(f.titleValue); fees.ds = pr[0]; fees.dsRmb = pr[1]; }
-            else if (f.title === '商品费用') { var pr = parseFee(f.titleValue); fees.itemPriceRmb = pr[1]; }
-            else if (f.title === '优惠券抵扣') {
-              var cparts = (f.titleValue || '').split('元');
-              fees.coupon = parseInt(cparts[0].replace(/[^0-9\-]/g, ''), 10) || 0;
-            }
-          }
-        }
-        return fees;
-      },
-      (p) => send({ phase: 'items', ...p })
-    );
-
-    // Step 4: fetch package data (低并发 + 延时避免限流)
-    const { results: packages, ok: pkgOk, fail: pkgFail } = await batchFetch(
-      orderIds, 5,
-      async (oid) => {
-        const r = await fetchJson(BASE + 'getDetails?service=package&itemId=' + oid, { headers: H, timeout: 15000 });
-        if (r.code !== 0 || !r.data) throw new Error('bad response');
-        const pkg = { is: 0, isRmb: 0, pf: 0, pfRmb: 0, en: '', eno: '', wt: 0, itemPrices: {} };
-
-        const prods = r.data.product || [];
-        for (const p of prods) {
-          if (p.itemId && p.unitPriceRmb) pkg.itemPrices[p.itemId] = p.unitPriceRmb;
-        }
-
-        const di = r.data.detailedInfo || [];
-        const feeBlock = di.find(b => b.sign === 'feeInfo');
-        if (feeBlock && feeBlock.data) {
-          for (const f of feeBlock.data) {
-            if (f.title === '国际运费') { var pr = parseFee(f.titleValue); pkg.is = pr[0]; pkg.isRmb = pr[1]; }
-            else if (f.title === '包装手续费') { var pr = parseFee(f.titleValue); pkg.pf = pr[0]; pkg.pfRmb = pr[1]; }
-          }
-        }
-
-        const ei = r.data.expressInfo;
-        if (ei) {
-          pkg.en = ei.express_name || '';
-          pkg.eno = ei.express_no || '';
-          pkg.wt = ei.ship_real_weight || 0;
-        }
-
-        return pkg;
-      },
-      (p) => send({ phase: 'packages', ...p })
-    );
-
-    // Step 5: merge
-    let merged = 0, priceMerged = 0, pkgMerged = 0;
-    for (const ord of orders) {
-      const pkgItemPrices = (packages[ord.id] || {}).itemPrices || {};
-      for (const it of (ord.body || [])) {
-        const f = itemFees[it.item_id];
-        if (f) {
-          it._paymentFee = f.pf;
-          it._paymentFeeRmb = f.pfRmb;
-          it._serviceFee = f.sf;
-          it._serviceFeeRmb = f.sfRmb;
-          it._domesticShipping = f.ds;
-          it._domesticShippingRmb = f.dsRmb;
-          it._coupon = f.coupon;
-          merged++;
-          // 用 item 详情里的商品费用（购买时真实付款 RMB），比 package 的 unitPriceRmb（当前汇率）更准
-          if (f.itemPriceRmb > 0) {
-            it._priceRmb = f.itemPriceRmb;
-          }
-        }
-        if (!it._priceRmb && pkgItemPrices[it.item_id]) {
-          it._priceRmb = pkgItemPrices[it.item_id];
-          priceMerged++;
-        } else if (!it._priceRmb) {
-          it._priceRmb = 0;
-        }
-      }
-      const p = packages[ord.id];
-      if (p) {
-        ord._package = {
-          internationalShipping: p.is,
-          internationalShippingRmb: p.isRmb,
-          packagingFee: p.pf,
-          packagingFeeRmb: p.pfRmb,
-          expressName: p.en,
-          expressNo: p.eno,
-          weight: p.wt
-        };
-        pkgMerged++;
-      }
-    }
-
-    // Step 6: save
-    ensureDir();
-    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const filename = 'orders-' + ts + '.json';
-    fs.writeFileSync(path.join(DATA_DIR, filename), JSON.stringify(orders));
-
-    send({
-      phase: 'done',
-      orderCount: orders.length,
-      itemCount: itemIds.length,
-      itemOk, itemFail,
-      pkgOk, pkgFail,
-      merged, priceMerged, pkgMerged,
-      savedFile: filename,
-      data: orders
-    });
-
-  } catch(e) {
-    send({ phase: 'error', message: e.message || '未知错误' });
-  }
-  res.end();
 });
 
 module.exports = router;

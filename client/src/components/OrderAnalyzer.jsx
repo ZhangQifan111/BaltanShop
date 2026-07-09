@@ -36,11 +36,15 @@ function mapItemToToy(it, ord) {
     name_zh: '',
     image_url: it.product_main_img || '',
     source: '海淘-任你购',
-    status: 'procurement',
-    procurement_stage: 'stage3',
+    // 任你购订单都是「已完成」状态（货已到手），直接入在库，跳过采购流程
+    status: 'stock',
+    procurement_stage: 'stocked',
     category: guessCategory(it.title || ''),
     purchase_date: ts2date(ord.header.show_time),
     stage1_date: ts2date(ord.header.show_time),
+    stage1_completed_date: ts2date(ord.header.show_time),
+    stage2_completed_date: ts2date(ord.header.show_time),
+    stage3_completed_date: ts2date(ord.header.show_time),
     japan_price_jpy: jpy,
     japan_price_cny: it.priceRmb || 0,
     handling_fee: sf,
@@ -102,9 +106,6 @@ export default function OrderAnalyzer() {
   const [savedFiles, setSavedFiles] = useState([]);
   const [saveMsg, setSaveMsg] = useState('');
   const [parsedData, setParsedData] = useState(null);
-  const [jwt, setJwt] = useState(() => {
-    try { return localStorage.getItem('rng_jwt') || 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJGUXdjd3RySHRtZHhRMGFDS2xRb3hOTXk5Z2xFcjRaZCIsImlhdCI6MTc4MTQzMTc1OC41NDcsImV4cCI6MTc4MTQzMTc4OC41NDd9.RghiWRqVq1I5tKNpPy7GlQpRQi2EXOgiHQ9fQEBFsNU'; } catch { return ''; }
-  });
   const [fetching, setFetching] = useState(false);
   const [fetchProgress, setFetchProgress] = useState(null);
   const [importing, setImporting] = useState(false);
@@ -113,6 +114,7 @@ export default function OrderAnalyzer() {
   const [undoing, setUndoing] = useState(false);
   const [translating, setTranslating] = useState({ done: 0, total: 0 });
   const [preview, setPreview] = useState(null); // { items, pkg, orderDate, orderId }
+  const bulkImport = useStore(s => s.bulkImport);
 
   const _fetchFiles = () => {
     return fetch('/api/order-data?t=' + Date.now()).then(r => r.json());
@@ -130,6 +132,7 @@ export default function OrderAnalyzer() {
           const data = await r.json();
           setRaw(JSON.stringify(data));
           runAnalysis(data);
+          lastLoadedFile.current = latest.name;
         } catch(e) {} finally {
           autoLoading.current = false;
         }
@@ -137,8 +140,96 @@ export default function OrderAnalyzer() {
     }).catch(() => {});
   }, []);
 
+  // 切回 tab 时如果发现新的 saved file，自动加载最新
+  const lastLoadedFile = useRef(null);
+  useEffect(() => {
+    const onFocus = () => {
+      if (document.hidden) return;
+      _fetchFiles().then(async (files) => {
+        setSavedFiles(files);
+        const latest = files[files.length - 1];
+        if (latest && latest.name !== lastLoadedFile.current) {
+          try {
+            const r = await fetch('/api/order-data/' + latest.name);
+            const data = await r.json();
+            setRaw(JSON.stringify(data));
+            runAnalysis(data);
+            autoSave(data);
+            lastLoadedFile.current = latest.name;
+            setSaveMsg('自动加载最新抓取: ' + latest.name);
+          } catch(e) {}
+        }
+      }).catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onFocus);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', onFocus);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
+
   const refreshFiles = () => {
     _fetchFiles().then(setSavedFiles).catch(() => {});
+  };
+
+  const copyFetcherScript = async () => {
+    try {
+      const res = await fetch('/fetch_all_details.js');
+      const text = await res.text();
+      try { await navigator.clipboard.writeText(text); } catch(_) {}
+
+      // 弹一个可关闭的预览浮层：含 textarea + 关闭按钮
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;padding:12px';
+      const box = document.createElement('div');
+      box.style.cssText = 'background:#1e1e1e;border:2px solid #007acc;border-radius:8px;width:100%;max-width:600px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden';
+      box.innerHTML = [
+        '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#2a2a2a;border-bottom:1px solid #444;flex-shrink:0">',
+        '  <div style="color:#fff;font-size:14px;font-weight:bold">📋 抓取脚本预览</div>',
+        '  <button id="rng-fp-close" style="background:transparent;color:#fff;border:1px solid #666;width:34px;height:34px;border-radius:6px;font-size:18px;cursor:pointer;line-height:1">✕</button>',
+        '</div>',
+        '<div style="padding:10px 14px;font-size:11px;color:#999;background:#1e1e1e;flex-shrink:0;border-bottom:1px solid #333">长按下面文本框可全选 · 或点「📋 复制」按钮</div>',
+        '<textarea id="rng-fp-ta" readonly style="flex:1;min-height:300px;background:#000;color:#0f0;font:11px/1.4 monospace;padding:12px;border:0;resize:none;outline:none;white-space:pre;overflow:auto;user-select:text;-webkit-user-select:text"></textarea>',
+        '<div style="display:flex;gap:8px;padding:10px 14px;background:#2a2a2a;border-top:1px solid #444;flex-shrink:0">',
+        '  <button id="rng-fp-copy" style="background:#06f;color:#fff;border:0;padding:10px 16px;border-radius:6px;font-size:14px;font-weight:bold;cursor:pointer;flex:1">📋 复制</button>',
+        '  <button id="rng-fp-close2" style="background:#444;color:#fff;border:0;padding:10px 16px;border-radius:6px;font-size:14px;font-weight:bold;cursor:pointer">关闭</button>',
+        '</div>',
+      ].join('');
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+      document.body.style.overflow = 'hidden';
+
+      const ta = box.querySelector('#rng-fp-ta');
+      ta.value = text;
+
+      function closeOverlay() {
+        overlay.remove();
+        document.body.style.overflow = '';
+        document.removeEventListener('keydown', onEsc);
+      }
+      function onEsc(e) { if (e.key === 'Escape') closeOverlay(); }
+      function tryCopy() {
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+              setSaveMsg('✅ 已复制');
+            });
+          } else {
+            ta.select(); document.execCommand('copy'); setSaveMsg('✅ 已复制（旧 API）');
+          }
+        } catch(_) { ta.select(); document.execCommand('copy'); setSaveMsg('✅ 已复制'); }
+      }
+      box.querySelector('#rng-fp-close').onclick = closeOverlay;
+      box.querySelector('#rng-fp-close2').onclick = closeOverlay;
+      box.querySelector('#rng-fp-copy').onclick = tryCopy;
+      overlay.onclick = (e) => { if (e.target === overlay) closeOverlay(); };
+      document.addEventListener('keydown', onEsc);
+
+      setSaveMsg('✅ 抓取脚本已复制到剪贴板');
+    } catch (e) {
+      setSaveMsg('复制失败: ' + e.message);
+    }
   };
 
   const saveData = async () => {
@@ -390,16 +481,16 @@ export default function OrderAnalyzer() {
   };
 
   const handleFetch = async () => {
-    if (!jwt.trim()) { setError('请先输入 JWT'); return; }
     setFetching(true);
     setFetchProgress(null);
     setError('');
 
     try {
+      // 不传 jwt：让后端用 settings 里存的账号密码自动登录
       const res = await fetch('/api/fetch-renrigou', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jwt: jwt.trim() })
+        body: JSON.stringify({})
       });
 
       if (!res.ok) {
@@ -430,12 +521,11 @@ export default function OrderAnalyzer() {
                 setFetchProgress(event);
 
                 if (event.phase === 'done') {
-                  try { localStorage.setItem('rng_jwt', jwt.trim()); } catch {}
                   setRaw(JSON.stringify(event.data));
                   runAnalysis(event.data);
                   autoSave(event.data);
                   if (event.itemFail > event.itemCount * 0.3) {
-                    setError('⚠ 商品详情获取失败 ' + event.itemFail + '/' + event.itemCount + ' 件，JWT 可能已过期，请重新获取');
+                    setError('⚠ 商品详情获取失败 ' + event.itemFail + '/' + event.itemCount + ' 件，可能登录态已过期，请在「设置」重新保存凭据');
                   }
                   setFetching(false);
                   return;
@@ -542,29 +632,17 @@ export default function OrderAnalyzer() {
       {/* 一键抓取 */}
       <div className="mb-3 p-3 bg-bg rounded-lg">
         <div className="text-xs text-[#6b7085] mb-2">
-          输入任你购 JWT，一键抓取全部历史订单（约 30-60 秒）
-          <a href="/fetch_all_details.js" target="_blank" className="text-accent underline ml-1">JWT 获取方法</a>
+          抓取方式：登录任你购后随便粘贴一段脚本即可（不用手动贴 JWT）
         </div>
-        <div className="flex gap-2">
-          <input
-            className="input text-xs flex-1 font-mono"
-            type="password"
-            placeholder="粘贴 JWT token..."
-            value={jwt}
-            onChange={e => setJwt(e.target.value)}
-            disabled={fetching}
-            autoComplete="off"
-            lang="zh-CN"
-            spellCheck={false}
-          />
-          <button
-            className="btn-primary text-xs whitespace-nowrap"
-            onClick={handleFetch}
-            disabled={fetching}
-          >
-            {fetching ? '抓取中...' : '一键抓取'}
-          </button>
-        </div>
+        <button
+          className="btn-primary text-xs whitespace-nowrap"
+          onClick={copyFetcherScript}
+        >
+          📋 复制抓取脚本
+        </button>
+        <span className="text-[10px] text-[#6b7085] ml-2">
+          点按钮 → 脚本自动进剪贴板 → 打开任你购（已登录）→ F12 Console 粘贴回车 → 等 30~60 秒 → 自动跳回本页
+        </span>
       </div>
 
       {/* 进度条 */}
@@ -576,6 +654,7 @@ export default function OrderAnalyzer() {
               {fetchProgress.phase === 'list' && `正在获取订单列表 ${fetchProgress.current}/${fetchProgress.total} 页...`}
               {fetchProgress.phase === 'items' && `正在获取商品费用（成功 ${fetchProgress.ok}，共 ${fetchProgress.done}/${fetchProgress.total}）`}
               {fetchProgress.phase === 'packages' && `正在获取包裹信息（成功 ${fetchProgress.ok}，共 ${fetchProgress.done}/${fetchProgress.total}）`}
+              {!['list','items','packages'].includes(fetchProgress.phase) && '后台准备中（启动浏览器 + 登录任你购）...'}
             </span>
           </div>
           <div className="w-full h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
@@ -595,11 +674,30 @@ export default function OrderAnalyzer() {
         </div>
       )}
 
-      <div className="flex items-center gap-3 mb-3">
-        <p className="text-xs text-[#6b7085] flex-1">
-          也可以手动在 Console 运行抓取脚本，将 JSON 粘贴到下方分析。
+      <div className="flex items-center gap-3 mb-3 flex-wrap">
+        <p className="text-xs text-[#6b7085] flex-1 min-w-0">
+          或将 JSON 粘贴到下方分析框（旧流程）。
         </p>
-        <a href="/fetch_all_details.js" target="_blank" className="btn-ghost text-xs whitespace-nowrap">打开脚本</a>
+        <label className="btn-ghost text-xs cursor-pointer whitespace-nowrap">
+          📂 上传 .json 文件
+          <input
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              try {
+                const text = await f.text();
+                setRaw(text);
+                setToast('已加载文件: ' + f.name);
+              } catch (err) {
+                setToast('读取失败: ' + err.message);
+              }
+              e.target.value = '';
+            }}
+          />
+        </label>
       </div>
       <textarea
         className="input text-xs w-full h-32 resize-y mb-3 font-mono"
@@ -873,36 +971,25 @@ export default function OrderAnalyzer() {
               <button
                 className="btn-primary text-sm w-full py-2.5"
                 onClick={async () => {
-                  setImporting(true);
                   setError('');
-                  try {
-                    const allItems = [];
-                    result.allBatches.forEach(batch => {
-                      const pkg = batch.pkg || {};
-                      batch.items.forEach(it => {
-                        allItems.push({
-                          toy: mapItemToToy(it, { header: { show_time: batch.orderTs }, _package: pkg, itemCount: batch.items.length }),
-                          item: it,
-                          batchId: batch.orderId
-                        });
+                  // 收集所有 item
+                  const allItems = [];
+                  result.allBatches.forEach(batch => {
+                    const pkg = batch.pkg || {};
+                    batch.items.forEach(it => {
+                      allItems.push({
+                        toy: mapItemToToy(it, { header: { show_time: batch.orderTs }, _package: pkg, itemCount: batch.items.length }),
+                        item: it,
+                        batchId: batch.orderId
                       });
                     });
-                    const names = allItems.map(p => p.toy.name);
-                    setTranslating({ done: 0, total: names.length });
-                    const translations = await batchTranslateJpToCn(names, (done, total) => {
-                      setTranslating({ done, total });
-                    });
-                    setTranslating({ done: 0, total: 0 });
-                    allItems.forEach((p, i) => { p.toy.name_zh = translations[i] || ''; });
-                    setPreview({ items: allItems, pkg: null, orderDate: '全部批次', orderId: '一键导入' });
-                  } catch(e) {
-                    setError('导入预览失败: ' + (e.message || e));
-                  }
-                  setImporting(false);
+                  });
+                  // 调 store 的全局 action（切页不丢失，进度浮层在顶部常驻）
+                  await useStore.getState().startBulkImport(allItems);
                 }}
-                disabled={importing}
+                disabled={bulkImport.active}
               >
-                {importing ? (translating.total > 0 ? '翻译中 ' + translating.done + '/' + translating.total + '...' : '翻译中...') : '⚡ 一键全部导入（共 ' + result.allBatches.length + ' 批次）'}
+                {bulkImport.active ? '导入中…' : '⚡ 一键全部导入（共 ' + result.allBatches.length + ' 批次）'}
               </button>
             </div>
           )}

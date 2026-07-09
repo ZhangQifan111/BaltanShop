@@ -735,8 +735,84 @@ function AddForm({ item, onClose, onAdded, addToy, initialAmount = '' }) {
   );
 }
 
+/* ─── 客户端图片压缩 + EXIF 矫正（iOS 拍照用） ─── */
+const MAX_DIMENSION = 1600;        // 最大边长（商品展示足够，肉眼难辨差异）
+const JPEG_QUALITY = 0.85;          // 压缩质量（视觉无损）
+const TARGET_BYTES = 1.5 * 1024 * 1024; // 目标压缩后 ≤1.5MB（避开 10MB JSON limit）
+const ACCEPT_BYTES = 20 * 1024 * 1024;  // 接受原始 ≤20MB 的图
+
+/**
+ * 压缩图片：EXIF 自动旋转 + resize + JPEG 压缩。
+ * @param {File} file - 原始 File 对象
+ * @returns {Promise<{blob: Blob, width: number, height: number, srcWidth: number, srcHeight: number, srcBytes: number}>}
+ */
+async function compressImage(file) {
+  // 1. 解码（createImageBitmap 自动应用 EXIF orientation，iOS 16.4+）
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    // 回退：老 iOS 用 <img> 加载（但拿不到 EXIF rotation，方向可能还是错的）
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = () => reject(new Error('图片解码失败'));
+        i.src = url;
+      });
+      bitmap = await createImageBitmap(img);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  const srcW = bitmap.width;
+  const srcH = bitmap.height;
+
+  // 2. 计算 resize 后尺寸（等比缩放，最大边 ≤ MAX_DIMENSION）
+  let dstW = srcW;
+  let dstH = srcH;
+  if (Math.max(srcW, srcH) > MAX_DIMENSION) {
+    const k = MAX_DIMENSION / Math.max(srcW, srcH);
+    dstW = Math.round(srcW * k);
+    dstH = Math.round(srcH * k);
+  }
+
+  // 3. canvas 重绘（EXIF 旋转在 createImageBitmap 步骤已应用，这里画出来方向是对的）
+  const canvas = document.createElement('canvas');
+  canvas.width = dstW;
+  canvas.height = dstH;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bitmap, 0, 0, dstW, dstH);
+  bitmap.close?.();
+
+  // 4. 转 Blob（JPEG）
+  let blob = await new Promise((resolve, reject) => {
+    canvas.toBlob(b => b ? resolve(b) : reject(new Error('canvas.toBlob 失败')), 'image/jpeg', JPEG_QUALITY);
+  });
+
+  // 5. 如果还超 TARGET_BYTES，再降一档（缩到 1280px）
+  if (blob.size > TARGET_BYTES && Math.max(dstW, dstH) > 1280) {
+    const k2 = 1280 / Math.max(dstW, dstH);
+    const w2 = Math.round(dstW * k2);
+    const h2 = Math.round(dstH * k2);
+    canvas.width = w2;
+    canvas.height = h2;
+    ctx.drawImage(canvas, 0, 0, w2, h2); // 注意：这里是从小canvas画到小canvas会有锯齿，但能接受
+    blob = await new Promise((resolve, reject) => {
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error('canvas.toBlob 失败')), 'image/jpeg', JPEG_QUALITY);
+    });
+    dstW = w2;
+    dstH = h2;
+  }
+
+  return { blob, width: dstW, height: dstH, srcWidth: srcW, srcHeight: srcH, srcBytes: file.size };
+}
+
 function ImageUploader({ value, onChange, characterSlug, setToast }) {
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(null); // {src, dst, w, h}
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
@@ -746,35 +822,47 @@ function ImageUploader({ value, onChange, characterSlug, setToast }) {
       setToast('请先填角色 slug 再上传图');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setToast('图片超过 5MB，请压缩后再传');
+    if (file.size > ACCEPT_BYTES) {
+      setToast(`原图太大 (${(file.size/1024/1024).toFixed(1)}MB)，请先在相册里压缩到 20MB 以下`);
       return;
     }
     setUploading(true);
+    setProgress({ src: file.size, dst: 0, w: 0, h: 0 });
     try {
+      // 1. 客户端压缩（EXIF 矫正 + resize + JPEG 压缩）
+      const { blob, width, height, srcWidth, srcHeight, srcBytes } = await compressImage(file);
+      setProgress({ src: srcBytes, dst: blob.size, w: width, h: height, srcW: srcWidth, srcH: srcHeight });
+
+      // 2. 转 base64
       const b64 = await new Promise((resolve, reject) => {
         const r = new FileReader();
         r.onload = () => resolve(r.result);
         r.onerror = () => reject(new Error('读取文件失败'));
-        r.readAsDataURL(file);
+        r.readAsDataURL(blob);
       });
+
+      // 3. 上传
       const r = await api.post('/monster/upload-image', {
         character_slug: characterSlug.trim(),
         data: b64,
       });
       onChange(r.image_url);
-      setToast('已上传到 ' + r.image_url.split('/').pop());
+      const srcKB = (srcBytes/1024).toFixed(0);
+      const dstKB = (blob.size/1024).toFixed(0);
+      const ratio = srcBytes > 0 ? ((1 - blob.size/srcBytes) * 100).toFixed(0) : 0;
+      setToast(`已上传 ${srcKB}KB→${dstKB}KB (-${ratio}%) ${width}×${height}`);
     } catch (err) {
       setToast('上传失败: ' + err.message);
     } finally {
       setUploading(false);
+      setProgress(null);
     }
   };
 
   return (
     <div className="space-y-1.5">
       <input type="text" value={value || ''} onChange={e => onChange(e.target.value)}
-        placeholder="https://… 或点下方按钮传本地"
+        placeholder="https://… 或点下方按钮拍照/选图"
         className="input text-xs w-full" />
       <div className="flex items-center gap-2">
         <label className={
@@ -783,13 +871,21 @@ function ImageUploader({ value, onChange, characterSlug, setToast }) {
             ? 'bg-white/5 text-[#6b7085] border-white/10 cursor-wait'
             : 'bg-white/5 text-[#a0a4b8] hover:bg-white/10 border-white/10')
         }>
-          {uploading ? '↑ 上传中…' : '📁 上传本地文件'}
-          <input type="file" accept="image/*" onChange={handleFile} disabled={uploading} className="hidden" />
+          {uploading ? '↑ 处理中…' : '📷 拍照 / 选图'}
+          <input type="file" accept="image/*" capture="environment" onChange={handleFile} disabled={uploading} className="hidden" />
         </label>
         {value && (
           <img src={value} alt="" className="h-10 w-10 object-cover rounded border border-white/10 bg-black/30" />
         )}
       </div>
+      {uploading && progress && (
+        <div className="text-[10px] text-[#6b7085] space-y-0.5">
+          <div>原图: {(progress.src/1024).toFixed(0)}KB {progress.srcW && progress.srcH ? `(${progress.srcW}×${progress.srcH})` : '解码中…'}</div>
+          {progress.dst > 0 && (
+            <div>压缩后: {(progress.dst/1024).toFixed(0)}KB ({progress.w}×{progress.h}) · 节省 {((1 - progress.dst/progress.src) * 100).toFixed(0)}%</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
