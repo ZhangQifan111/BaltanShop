@@ -12,16 +12,16 @@ import Monster from './pages/Monster';
 import Renrigou from './pages/Renrigou';
 import Login from './pages/Login';
 import BackgroundDecoration from './components/BackgroundDecoration';
+import { LayoutGrid, Heart, ShoppingCart, Coins, User as UserIcon, Rocket, Lock, LogOut, X as XIcon } from 'lucide-react';
 
+// v2 · 5-tab 底部导航（设计稿：总览 / 收藏 / 采购 / 资产 / 我的）
+// icon 用 lucide-react 替代 emoji（修复 Linux Chrome 裂图问题）
 const NAV = [
-  { path: '/', label: '总览', icon: '🏠' },
-  { path: '/procurement', label: '采购', icon: '🛒' },
-  { path: '/warehouse', label: '仓库', icon: '📦' },
-  { path: '/estimate', label: '估算', icon: '💰' },
-  { path: '/monster', label: '怪兽', icon: '👹' },
-  { path: '/analytics', label: '分析', icon: '📊' },
-  { path: '/settings', label: '设置', icon: '⚙️' },
-  { path: '/renrigou', label: '任你购', icon: '📋' },
+  { path: '/',           label: '总览', icon: LayoutGrid },
+  { path: '/monster',    label: '收藏', icon: Heart },
+  { path: '/procurement',label: '采购', icon: ShoppingCart },
+  { path: '/warehouse',  label: '资产', icon: Coins },
+  { path: '/settings',   label: '我的', icon: UserIcon },
 ];
 
 function ChangePasswordModal({ onClose, onDone }) {
@@ -49,7 +49,10 @@ function ChangePasswordModal({ onClose, onDone }) {
   return (
     <div className="fixed inset-0 z-[200] bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
       <div className="card w-full max-w-sm" onClick={e => e.stopPropagation()}>
-        <div className="text-sm font-bold mb-3">🔒 修改密码</div>
+        <div className="text-sm font-bold mb-3 flex items-center gap-1.5">
+          <Lock className="w-4 h-4 text-accent" />
+          <span>修改密码</span>
+        </div>
         <div className="space-y-2">
           <input className="input w-full text-sm" type="password" placeholder="旧密码" value={oldPassword} onChange={e => setOldPassword(e.target.value)} autoFocus />
           <input className="input w-full text-sm" type="password" placeholder="新密码（至少 6 位）" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
@@ -73,7 +76,7 @@ function UserMenu({ username, onChangePassword }) {
         onClick={() => setOpen(o => !o)}
         className="flex items-center gap-1.5 text-xs text-[#9ba0b5] hover:text-accent px-2 py-1 rounded transition-colors"
       >
-        <span>👤</span>
+        <UserIcon className="w-4 h-4" />
         <span>{username}</span>
         <span className="text-[10px]">▼</span>
       </button>
@@ -84,11 +87,11 @@ function UserMenu({ username, onChangePassword }) {
             <button
               className="w-full text-left px-3 py-2 text-xs hover:bg-white/[0.06] text-[#d0d4e8]"
               onClick={() => { setOpen(false); onChangePassword(); }}
-            >🔒 修改密码</button>
+            ><Lock className="w-3.5 h-3.5" /> 修改密码</button>
             <button
               className="w-full text-left px-3 py-2 text-xs hover:bg-white/[0.06] text-red-400"
               onClick={() => { setOpen(false); auth.logout(); }}
-            >🚪 退出登录</button>
+            ><LogOut className="w-3.5 h-3.5" /> 退出登录</button>
           </div>
         </>
       )}
@@ -113,7 +116,10 @@ function Layout({ children }) {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-bg/95 backdrop-blur border-b border-white/[0.06] px-4 py-3">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <h1 className="text-lg font-bold text-accent">🛸 秘密基地</h1>
+          <h1 className="text-lg font-bold text-accent flex items-center gap-1.5">
+            <Rocket className="w-5 h-5" />
+            <span>秘密基地</span>
+          </h1>
           <div className="flex items-center gap-3">
             {me && <UserMenu username={me.username} onChangePassword={() => setShowChangePw(true)} />}
           </div>
@@ -125,10 +131,10 @@ function Layout({ children }) {
         {children}
       </main>
 
-      {/* Bottom Nav */}
+      {/* Bottom Nav (v2 · 5 tab + lucide icon) */}
       <nav className="fixed bottom-0 left-0 right-0 bg-bg/95 backdrop-blur border-t border-white/[0.06] safe-bottom z-50">
         <div className="max-w-6xl mx-auto flex">
-          {NAV.map(({ path, label, icon }) => (
+          {NAV.map(({ path, label, icon: Icon }) => (
             <NavLink
               key={path}
               to={path}
@@ -138,7 +144,7 @@ function Layout({ children }) {
                 }`
               }
             >
-              <span className="text-base">{icon}</span>
+              <Icon className="w-5 h-5" strokeWidth={1.75} />
               <span>{label}</span>
             </NavLink>
           ))}
@@ -163,7 +169,7 @@ function Layout({ children }) {
                 onClick={dismissBulkImport}
                 className="text-[#8b90a5] hover:text-white text-base leading-none px-1"
                 title="隐藏（不影响后台执行）"
-              >✕</button>
+              ><XIcon className="w-3.5 h-3.5" /></button>
             </div>
             {bulkImport.total > 0 && (
               <div className="w-full h-1 bg-white/[0.08] rounded-full overflow-hidden">
@@ -243,6 +249,12 @@ export default function App() {
                 <Route path="/analytics" element={<Analytics />} />
                 <Route path="/renrigou" element={<Renrigou />} />
                 <Route path="/settings" element={<Settings />} />
+                {/* v2 · 老路由 alias（保留书签/分享链接可用） */}
+                <Route path="/collection" element={<Navigate to="/monster" replace />} />
+                <Route path="/collection/analytics" element={<Navigate to="/analytics" replace />} />
+                <Route path="/collection/renrigou" element={<Navigate to="/renrigou" replace />} />
+                <Route path="/assets" element={<Navigate to="/warehouse" replace />} />
+                <Route path="/me" element={<Navigate to="/settings" replace />} />
               </Routes>
             </Layout>
           </RequireAuth>

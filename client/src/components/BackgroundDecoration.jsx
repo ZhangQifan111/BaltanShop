@@ -45,7 +45,7 @@ export default function BackgroundDecoration() {
       <img
         src={leftSrc}
         alt=""
-        className="hidden md:block absolute left-0 top-[45%] -translate-y-1/2 w-[420px] h-auto opacity-100 pointer-events-none"
+        className="hidden md:block absolute left-0 top-[45%] -translate-y-1/2 w-[420px] h-auto opacity-[0.15] pointer-events-none"
         style={{
           WebkitMaskImage: `url(${leftSrc})`,
           maskImage: `url(${leftSrc})`,
@@ -82,7 +82,7 @@ export default function BackgroundDecoration() {
       <img
         src={rightSrc}
         alt=""
-        className="hidden md:block absolute right-0 top-[45%] -translate-y-1/2 w-[420px] h-auto opacity-100 -scale-x-100 pointer-events-none"
+        className="hidden md:block absolute right-0 top-[45%] -translate-y-1/2 w-[420px] h-auto opacity-[0.15] -scale-x-100 pointer-events-none"
         style={{
           WebkitMaskImage: `url(${rightSrc})`,
           maskImage: `url(${rightSrc})`,

@@ -24,6 +24,46 @@ body {
     @apply bg-surface rounded-xl border border-white/[0.06] p-4 backdrop-blur;
   }
 
+  /* v2 · 主指标卡（左侧 4px accent 色条） */
+  .kpi-primary {
+    @apply bg-surface border border-white/[0.06] rounded-xl p-5 relative overflow-hidden;
+  }
+  .kpi-primary::before {
+    content: '';
+    @apply absolute top-0 left-0 w-1 h-full bg-accent/60;
+  }
+  .kpi-primary.emerald::before { @apply bg-emerald-500/60; }
+  .kpi-primary.cyan::before    { @apply bg-cyan-400/60; }
+
+  /* v2 · 次指标卡（更紧凑） */
+  .kpi-secondary {
+    @apply bg-surface border border-white/[0.06] rounded-xl p-3;
+  }
+
+  /* v2 · 横向 bar 进度条 */
+  .bar-track {
+    @apply h-2 bg-white/[0.05] rounded-full overflow-hidden;
+  }
+  .bar-fill-cyan    { @apply h-full bg-cyan-400/70 rounded-full; }
+  .bar-fill-accent  { @apply h-full bg-accent rounded-full; }
+  .bar-fill-emerald { @apply h-full bg-emerald-400/80 rounded-full; }
+  .bar-fill-pink    { @apply h-full bg-pink-300/40 rounded-full; }
+
+  /* v2 · 缩略图占位（无图时显示怪兽剪影 + 渐变） */
+  .thumb-placeholder {
+    @apply w-14 h-14 rounded-lg bg-gradient-to-br from-emerald-500/20 to-cyan-500/10 border border-white/5 flex items-center justify-center shrink-0;
+  }
+
+  /* v2 · 列表行 hover 高亮 */
+  .row-hover {
+    @apply hover:bg-white/[0.03] transition-colors cursor-pointer;
+  }
+
+  /* 状态标签（v2 文案映射） */
+  .status-tag {
+    @apply inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium;
+  }
+
   .btn-primary {
     @apply bg-accent text-[#0f1117] font-semibold rounded-lg px-4 py-2 text-sm hover:opacity-90 transition-opacity;
   }
