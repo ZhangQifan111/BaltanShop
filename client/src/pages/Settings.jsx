@@ -315,42 +315,100 @@ export default function Settings() {
         <p className="text-[10px] text-[#6b7085] mt-3">点击分类可删除</p>
       </div>
 
-      {/* 池商品管理 */}
+      {/* 池商品管理（与仓库页池卡片样式保持一致） */}
       <div className="card">
-        <div className="text-xs text-[#6b7085] uppercase tracking-widest mb-4">池商品管理</div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-xs text-[#6b7085] uppercase tracking-widest">池商品管理</div>
+          <div className="text-[10px] text-[#6b7085]">{products.length} 款 · 点击卡片可编辑</div>
+        </div>
         {products.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {products.map(p => {
+              const avgCost = (p.total_qty || 0) > 0 ? (p.total_cost || 0) / p.total_qty : 0;
+              const unrecovered = p.unrecovered_cost ?? Math.max(0, (p.total_cost || 0) - (p.total_revenue || 0));
+              const isBreakeven = (p.total_cost || 0) > 0 && unrecovered <= 0;
+              const cardBorder = isBreakeven
+                ? 'border border-green-500/30'
+                : 'border border-orange-500/30';
+              const cardBg = isBreakeven
+                ? 'bg-gradient-to-b from-green-500/5 to-transparent'
+                : 'bg-gradient-to-b from-orange-500/5 to-transparent';
               return (
-                <div key={p.id} className="rounded-lg p-3 border border-white/[0.08] bg-white/[0.02] cursor-pointer"
+                <div key={p.id} className={`rounded-xl p-3 ${cardBorder} ${cardBg} cursor-pointer transition-all hover:border-orange-500/50`}
                   onClick={() => setEditingProduct(p.id)}>
                   {editingProduct === p.id ? (
-                    <div className="space-y-1.5" onClick={e => e.stopPropagation()}>
-                      <input className="input text-xs w-full" placeholder="名称" defaultValue={p.name_zh || p.name}
+                    <div className="space-y-2" onClick={e => e.stopPropagation()}>
+                      <div className="text-[10px] text-[#6b7085]">编辑名称</div>
+                      <input className="input text-xs w-full" autoFocus placeholder="名称" defaultValue={p.name_zh || p.name}
+                        lang="zh" spellCheck={false} autoComplete="off"
                         onBlur={e => handleUpdateProduct(p.id, { name: e.target.value, name_zh: e.target.value, category: p.category })} />
+                      <div className="text-[10px] text-[#6b7085]">所属分类</div>
                       <select className="input text-xs w-full" defaultValue={p.category}
                         onChange={e => handleUpdateProduct(p.id, { name: p.name, name_zh: p.name_zh, category: e.target.value })}>
                         {categories.map(c => <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>)}
                       </select>
-                      <button className="text-[10px] text-[#6b7085]"
+                      <button className="btn-primary w-full text-xs py-1.5"
                         onClick={() => setEditingProduct(null)}>完成编辑</button>
                     </div>
                   ) : (
                     <>
-                      <div className="flex items-start gap-2 mb-2">
+                      <div className="flex items-start gap-3 mb-2">
+                        {p.image && <img src={p.image} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 bg-white/5" loading="lazy" onError={e => e.target.style.display='none'} />}
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-bold truncate text-white">{p.name_zh || p.name || '未命名'}</div>
-                          <div className="text-[10px] text-[#8b90a5]">{p.category || ''} · {p.batch_count || 0} 批次</div>
+                          <div className="text-base font-bold truncate text-white">{p.name_zh || p.name || '未命名'}</div>
+                          <div className="text-[11px] text-[#8b90a5]">{p.category || '未分类'} · {p.batch_count || 0} 批次</div>
                         </div>
-                        <span className="text-base font-bold text-accent shrink-0">{p.total_remaining}</span>
+                        <span className="text-lg font-bold text-accent shrink-0 ml-2">{p.total_remaining || 0}</span>
                       </div>
-                      <div className="text-[10px] text-[#9ba0b5]">
-                        {p.total_qty} 件 · 在库 {p.total_remaining} 件
+
+                      <div className="flex justify-between text-[11px] text-[#9ba0b5] mb-0.5">
+                        <span className="font-semibold text-white/80">总成本 ¥{(p.total_cost || 0).toFixed(0)}</span>
+                        <span>{p.total_qty || 0} 件 · 在库 <span className="text-accent font-semibold">{p.total_remaining || 0}</span> 件</span>
                       </div>
-                      <button className="btn-ghost text-[10px] text-red-400 mt-2"
-                        onClick={e => { e.stopPropagation(); setPendingDelete({ type: 'product', id: p.id, name: p.name_zh || p.name }); }}>
-                        删除
-                      </button>
+
+                      <div className="space-y-1 mt-2 p-2.5 rounded-lg bg-gradient-to-br from-orange-500/10 to-green-500/5 border border-orange-500/15">
+                        <div className="flex justify-between text-[12px]">
+                          <span className="text-white font-medium">📦 成本均价</span>
+                          <span className="text-white font-bold">¥{avgCost.toFixed(0)}<span className="text-[10px] font-normal text-[#6b7085]">/件</span></span>
+                        </div>
+                        {(p.total_remaining || 0) > 0 && (() => {
+                          const breakeven = p.total_remaining > 0 ? unrecovered / p.total_remaining : 0;
+                          const profit10 = breakeven * 1.1;
+                          const profit20 = breakeven * 1.2;
+                          if (isBreakeven) {
+                            return (
+                              <div className="flex justify-between text-[12px]">
+                                <span className="text-green-300 font-medium">🎯 回本价</span>
+                                <span className="text-green-300 font-bold">已回本 ✓</span>
+                              </div>
+                            );
+                          }
+                          return (
+                            <>
+                              <div className="flex justify-between text-[12px]">
+                                <span className="text-orange-300 font-medium">🎯 回本价</span>
+                                <span className="text-orange-300 font-bold">¥{breakeven.toFixed(0)}<span className="text-[10px] font-normal">/件</span></span>
+                              </div>
+                              <div className="flex justify-between text-[12px]">
+                                <span className="text-green-300 font-medium">💰 +10%利润</span>
+                                <span className="text-green-300 font-bold">¥{profit10.toFixed(0)}<span className="text-[10px] font-normal">/件</span></span>
+                              </div>
+                              <div className="flex justify-between text-[12px]">
+                                <span className="text-emerald-300 font-medium">💰 +20%利润</span>
+                                <span className="text-emerald-300 font-bold">¥{profit20.toFixed(0)}<span className="text-[10px] font-normal">/件</span></span>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-[10px] text-[#6b7085]">点击卡片编辑</span>
+                        <button className="btn-danger text-[10px] py-1 px-2 ml-auto"
+                          onClick={e => { e.stopPropagation(); setPendingDelete({ type: 'product', id: p.id, name: p.name_zh || p.name }); }}>
+                          删除
+                        </button>
+                      </div>
                     </>
                   )}
                 </div>

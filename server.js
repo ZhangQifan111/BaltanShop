@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -30,6 +31,22 @@ app.use('/uploads', express.static(uploadsPath, {
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
   },
 }));
+
+// 鉴权路由（必须最先挂：login 免认证，其他路径走 requireAuth）
+const authRouter = require('./routes/auth');
+const { requireAuth } = authRouter;
+app.use('/api/auth', authRouter);
+
+// 全局鉴权中间件：所有 /api/*（除白名单）都要 Bearer token
+// 注意：app.use('/api', ...) 下 req.path 是相对 /api 的部分
+const AUTH_WHITELIST = [
+  '/auth/login',
+  '/ingest-renrigou',     // 任你购抓取脚本用（rennigou.jp 跨域 fetch，本地 token 拿不到）
+];
+app.use('/api', (req, res, next) => {
+  if (AUTH_WHITELIST.includes(req.path)) return next();
+  return requireAuth(req, res, next);
+});
 
 // API Routes
 app.use('/api/toys', require('./routes/toys'));
@@ -106,6 +123,20 @@ const { createBackup } = require('./routes/backup');
 async function start() {
   await db.getDb(); // 确保 DB 初始化
   console.log('DB initialized');
+  // 首次启动自动创建默认账号（仅在 users 表为空时）
+  const userCount = await db.get('SELECT COUNT(*) as c FROM users');
+  if (!userCount || userCount.c === 0) {
+    const defaultUser = 'Baltan';
+    const defaultPass = 'Zqf51126428jik!';
+    const hash = await bcrypt.hash(defaultPass, 10);
+    await db.insert('INSERT INTO users (username, password_hash) VALUES (?, ?)', [defaultUser, hash]);
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('🔐 默认管理员账号已创建');
+    console.log(`   用户名: ${defaultUser}`);
+    console.log(`   密  码: ${defaultPass}`);
+    console.log('   ⚠️  登录后请立即在「设置」修改密码！');
+    console.log('═══════════════════════════════════════════════════════════');
+  }
   createBackup(); // 启动时备份
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);

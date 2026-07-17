@@ -33,6 +33,14 @@ function migrate() {
     (db.exec("SELECT name FROM sqlite_master WHERE type='table'")[0]?.values || []).map(r => r[0])
   );
   const changes = [];
+  if (!tableNames.has('users')) {
+    changes.push(`CREATE TABLE users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`);
+  }
   if (colNames.has('tax') && !colNames.has('import_duty')) {
     changes.push("ALTER TABLE toys RENAME COLUMN tax TO import_duty");
     colNames.delete('tax');

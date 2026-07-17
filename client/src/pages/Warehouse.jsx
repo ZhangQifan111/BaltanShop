@@ -408,6 +408,12 @@ function PoolifyModal({ toy, products, onConfirm, onCancel }) {
       setSubmitError('请先选择商品并填写数量');
       return;
     }
+    // 新建池必须填名字（否则会被后端 fallback 到商品原名）
+    const missingName = validLines.find(l => l.product_id === '__new__' && !l.custom_name.trim());
+    if (missingName) {
+      setSubmitError('请给新建的池起个名字（不要留空）');
+      return;
+    }
     setSubmitError('');
     onConfirm({
       lines: validLines.map(l => ({
@@ -459,7 +465,7 @@ function PoolifyModal({ toy, products, onConfirm, onCancel }) {
                     ) : isNew ? (
                       <div className="flex items-center gap-1">
                         <input className="input text-xs flex-1"
-                          placeholder={toy.name_zh || toy.name || '输入池号名称'}
+                          placeholder="请输入新池名（必填）"
                           value={line.custom_name || ''}
                           onChange={e => updateLine(idx, 'custom_name', e.target.value)}
                           lang="zh" spellCheck={false} autoComplete="off" />
@@ -1555,6 +1561,7 @@ export default function Warehouse() {
   const [page, setPage] = useState(1);
   const [sortNewest, setSortNewest] = useState(true);
   const [previewImage, setPreviewImage] = useState(null);
+  const [view, setView] = useState('pool'); // 'pool' | 'single'
   const PAGE_SIZE = 12;
 
   const filtered = toys.filter(t => {
@@ -1900,7 +1907,11 @@ export default function Warehouse() {
       <div className="flex items-center justify-between gap-2">
         <div className="order-2 md:order-1">
           <h2 className="text-lg font-bold">仓库</h2>
-          <p className="text-xs text-[#6b7085]">{sorted.length} 件单品{totalPages > 1 ? ` · 第${page}/${totalPages}页` : ''}</p>
+          <p className="text-xs text-[#6b7085]">
+            {view === 'pool'
+              ? `${poolGrouped.length} 款 · ${poolsByCategory.length} 个系列 · 库存 ${poolGrouped.reduce((s,g) => s+g.totalRemaining,0)} 件`
+              : `${sorted.length} 件单品${totalPages > 1 ? ` · 第${page}/${totalPages}页` : ''}`}
+          </p>
         </div>
         <button
           className="btn-primary text-sm order-1 md:order-2 shrink-0"
@@ -1910,8 +1921,62 @@ export default function Warehouse() {
         </button>
       </div>
 
+      {/* Tab 切换：池 / 单品（分段控件） */}
+      <div className="relative p-1 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+        <div className="grid grid-cols-2 gap-1 relative">
+          {/* 滑动指示器 */}
+          <div
+            className="absolute top-1 bottom-1 w-[calc(50%-0.25rem)] rounded-lg transition-all duration-300 ease-out"
+            style={{
+              left: view === 'pool' ? '0.25rem' : 'calc(50% + 0.125rem)',
+              background: view === 'pool'
+                ? 'linear-gradient(135deg, rgba(249,115,22,0.25), rgba(249,115,22,0.1))'
+                : 'linear-gradient(135deg, rgba(255,184,77,0.25), rgba(255,184,77,0.1))',
+              border: view === 'pool'
+                ? '1px solid rgba(249,115,22,0.4)'
+                : '1px solid rgba(255,184,77,0.4)',
+              boxShadow: view === 'pool'
+                ? '0 4px 12px -2px rgba(249,115,22,0.3)'
+                : '0 4px 12px -2px rgba(255,184,77,0.3)',
+            }}
+          />
+          <button
+            className={`relative z-10 px-4 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 ${
+              view === 'pool' ? 'text-orange-300' : 'text-[#9ba0b5] hover:text-white'
+            }`}
+            onClick={() => setView('pool')}
+          >
+            <span className="text-base">🟠</span>
+            <span className="text-sm font-bold tracking-wide">池商品</span>
+            <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold flex items-center justify-center ${
+              view === 'pool'
+                ? 'bg-orange-500 text-white shadow-sm'
+                : 'bg-white/10 text-[#6b7085]'
+            }`}>
+              {poolGrouped.length}
+            </span>
+          </button>
+          <button
+            className={`relative z-10 px-4 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 ${
+              view === 'single' ? 'text-accent' : 'text-[#9ba0b5] hover:text-white'
+            }`}
+            onClick={() => { setView('single'); setPage(1); }}
+          >
+            <span className="text-base">📦</span>
+            <span className="text-sm font-bold tracking-wide">单品</span>
+            <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold flex items-center justify-center ${
+              view === 'single'
+                ? 'bg-accent text-bg shadow-sm'
+                : 'bg-white/10 text-[#6b7085]'
+            }`}>
+              {sorted.length}
+            </span>
+          </button>
+        </div>
+      </div>
+
       {/* ─── 池商品区域 ─── */}
-      {poolGrouped.length > 0 && (
+      {view === 'pool' && poolGrouped.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-4 rounded-full bg-orange-500" />
@@ -1920,12 +1985,14 @@ export default function Warehouse() {
           </div>
           {poolsByCategory.map(([cat, pools]) => (
             <div key={cat} className="space-y-2">
-              <div className="flex items-center gap-1.5">
-                <div className="w-1 h-3 rounded-full bg-orange-500/60" />
-                <h4 className="text-[11px] font-bold text-[#9ba0b5]">系列：{cat}</h4>
-                <span className="text-[10px] text-[#6b7085]">{pools.length} 款 · {pools.reduce((s,p) => s+p.totalRemaining, 0)} 件</span>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-5 rounded-full bg-orange-500" />
+                <h4 className="text-base font-bold text-white">系列：{cat}</h4>
+                <span className="px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/30 text-[11px] font-bold text-orange-300">
+                  {pools.length} 款 · {pools.reduce((s,p) => s+p.totalRemaining, 0)} 件
+                </span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {pools.map(g => {
               const prod = g.product;
               const poolImage = prod?.image || g.fallbackImage;
@@ -2008,6 +2075,8 @@ export default function Warehouse() {
       )}
 
       {/* ─── 单品区域 ─── */}
+      {view === 'single' && (
+      <>
       <div className="flex items-center gap-2">
         <div className="w-1.5 h-4 rounded-full bg-white/20" />
         <h3 className="text-sm font-bold">单品</h3>
@@ -2097,6 +2166,8 @@ export default function Warehouse() {
 
       {filtered.length === 0 && (
         <div className="text-center py-16 text-[#6b7085] text-sm">没有匹配的商品</div>
+      )}
+      </>
       )}
 
       {selling && (

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db/database');
+const { calcTotalCost } = require('../utils/calcCost');
 
 // GET /api/products — 列表，含汇总数据
 router.get('/', async (req, res) => {
@@ -20,18 +21,32 @@ router.get('/', async (req, res) => {
     const products = await db.all(sql, params);
 
     // 对每个 product 算汇总
+    // 注意：用 calcTotalCost 重算每个 toy 的成本再 SUM，
+    //       防御 DB 里 toys.total_cost 字段是旧脏数据（早期写入未走 calcTotalCost）导致聚合失真
     const enriched = [];
     for (const p of products) {
-      // 总成本 + 总数量 + 剩余 + 剩余加权成本 + 批次数 (from toys)
-      const batchStats = await db.get(
-        `SELECT COALESCE(SUM(total_cost),0) as total_cost,
-                COALESCE(SUM(quantity),0) as total_qty,
-                COALESCE(SUM(remaining),0) as total_remaining,
-                COALESCE(SUM(unit_cost * remaining), 0) as total_remaining_cost,
-                COUNT(*) as batch_count
-         FROM toys WHERE product_id = ? AND status = 'stock'`,
+      // 拉所有池内玩具（含 status='stock' 用于库存汇总、status='sold'/'done' 用于已售出汇总）
+      const allToys = await db.all(
+        `SELECT * FROM toys WHERE product_id = ?`,
         [p.id]
       );
+      // 用 calcTotalCost 重算每条成本（替代直接读 toys.total_cost 字段）
+      let totalCost = 0;          // 全部批次（含已售出）成本合计
+      let totalRemainingCost = 0; // 仅剩余库存加权成本
+      let totalQty = 0;
+      let totalRemaining = 0;
+      let stockBatchCount = 0;
+      for (const t of allToys) {
+        const cost = calcTotalCost(t);
+        totalCost += cost;
+        totalQty += (t.quantity || 0);
+        if (t.status === 'stock') {
+          totalRemaining += (t.remaining != null ? t.remaining : (t.quantity || 0));
+          totalRemainingCost += cost * (t.remaining != null ? t.remaining : (t.quantity || 0));
+          stockBatchCount++;
+        }
+      }
+
       // 总销售收入
       const salesStats = await db.get(
         `SELECT COALESCE(SUM(total_revenue),0) as total_revenue,
@@ -39,10 +54,6 @@ router.get('/', async (req, res) => {
          FROM sales WHERE product_id = ?`,
         [p.id]
       );
-      const totalCost = batchStats.total_cost || 0;
-      const totalQty = batchStats.total_qty || 0;
-      const totalRemaining = batchStats.total_remaining || 0;
-      const totalRemainingCost = batchStats.total_remaining_cost || 0;
       const totalRevenue = salesStats.total_revenue || 0;
       const soldQty = salesStats.sold_qty || 0;
       // 按实际库存加权均价（精确到分）
@@ -50,21 +61,19 @@ router.get('/', async (req, res) => {
         ? Math.round((totalRemainingCost / totalRemaining) * 100) / 100
         : 0;
 
-      const batchCount = batchStats.batch_count || 0;
-
       enriched.push({
         ...p,
-        total_cost: totalCost,
+        total_cost: Math.round(totalCost * 100) / 100,
         total_qty: totalQty,
         total_remaining: totalRemaining,
-        batch_count: batchCount,
+        batch_count: stockBatchCount,
         sold_qty: soldQty,
         avg_unit_cost: avgUnitCost,
         total_revenue: totalRevenue,
         breakeven: totalCost > 0 ? (totalRevenue / totalCost >= 1 ? '回本' : '未回本') : '无成本',
         breakeven_rate: totalCost > 0 ? ((totalRevenue / totalCost) * 100) : 0,
-        // 库存待覆盖成本 = 剩余成本(总成本-已回收)
-        unrecovered_cost: Math.max(0, totalCost - totalRevenue),
+        // 库存待覆盖成本 = 总成本 - 已回收收入（最低 0）
+        unrecovered_cost: Math.max(0, Math.round((totalCost - totalRevenue) * 100) / 100),
         inventory_value_at_cost: Math.round(totalRemainingCost * 100) / 100,
       });
     }
@@ -108,7 +117,8 @@ router.get('/:id', async (req, res) => {
     );
 
     const allBatches = [...batches, ...soldBatches];
-    const totalCost = allBatches.reduce((s, b) => s + (b.total_cost || 0), 0);
+    // 同样用 calcTotalCost 重算，避免 toys.total_cost 脏数据导致聚合失真
+    const totalCost = allBatches.reduce((s, b) => s + calcTotalCost(b), 0);
     const totalQty = allBatches.reduce((s, b) => s + (b.quantity || 0), 0);
     const totalRemaining = batches.reduce((s, b) => s + (b.remaining || 0), 0);
 
