@@ -8,7 +8,8 @@ dist.before-estimate/
 
 # Database & runtime data
 data.db
-backups/
+backups/*
+!backups/data-dump-*.sql
 data/
 
 # User-uploaded / scraped media
