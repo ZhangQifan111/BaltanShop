@@ -12,16 +12,24 @@ import Monster from './pages/Monster';
 import Renrigou from './pages/Renrigou';
 import Login from './pages/Login';
 import BackgroundDecoration from './components/BackgroundDecoration';
-import { LayoutGrid, Heart, ShoppingCart, Coins, User as UserIcon, Rocket, Lock, LogOut, X as XIcon } from 'lucide-react';
+import ErrorBoundary from './components/ErrorBoundary';
+import {
+  LayoutGrid, ShoppingCart, Package, Calculator, Heart,
+  BarChart3, ClipboardList, Settings as SettingsIcon,
+  User, Rocket, Lock, LogOut, X as XIcon
+} from 'lucide-react';
 
-// v2 · 5-tab 底部导航（设计稿：总览 / 收藏 / 采购 / 资产 / 我的）
+// 8-tab 完整导航：总览 / 采购 / 仓库 / 估价 / 收藏 / 分析 / 任你购 / 设置
 // icon 用 lucide-react 替代 emoji（修复 Linux Chrome 裂图问题）
 const NAV = [
-  { path: '/',           label: '总览', icon: LayoutGrid },
-  { path: '/monster',    label: '收藏', icon: Heart },
-  { path: '/procurement',label: '采购', icon: ShoppingCart },
-  { path: '/warehouse',  label: '资产', icon: Coins },
-  { path: '/settings',   label: '我的', icon: UserIcon },
+  { path: '/',           label: '总览',   icon: LayoutGrid },
+  { path: '/procurement',label: '采购',   icon: ShoppingCart },
+  { path: '/warehouse',  label: '仓库',   icon: Package },
+  { path: '/estimate',   label: '估价',   icon: Calculator },
+  { path: '/monster',    label: '怪兽',   icon: Heart },
+  { path: '/analytics',  label: '分析',   icon: BarChart3 },
+  { path: '/renrigou',   label: '任你购', icon: ClipboardList },
+  { path: '/settings',   label: '设置',   icon: SettingsIcon },
 ];
 
 function ChangePasswordModal({ onClose, onDone }) {
@@ -76,7 +84,7 @@ function UserMenu({ username, onChangePassword }) {
         onClick={() => setOpen(o => !o)}
         className="flex items-center gap-1.5 text-xs text-[#9ba0b5] hover:text-accent px-2 py-1 rounded transition-colors"
       >
-        <UserIcon className="w-4 h-4" />
+        <User className="w-4 h-4" />
         <span>{username}</span>
         <span className="text-[10px]">▼</span>
       </button>
@@ -131,21 +139,22 @@ function Layout({ children }) {
         {children}
       </main>
 
-      {/* Bottom Nav (v2 · 5 tab + lucide icon) */}
+      {/* Bottom Nav (8 tab + lucide icon) */}
       <nav className="fixed bottom-0 left-0 right-0 bg-bg/95 backdrop-blur border-t border-white/[0.06] safe-bottom z-50">
         <div className="max-w-6xl mx-auto flex">
           {NAV.map(({ path, label, icon: Icon }) => (
             <NavLink
               key={path}
               to={path}
+              title={label}
               className={({ isActive }) =>
-                `flex-1 flex flex-col items-center py-2 gap-1 text-[10px] transition-colors ${
+                `flex-1 flex flex-col items-center py-2 gap-0.5 text-[10px] transition-colors min-w-0 ${
                   isActive ? 'text-accent' : 'text-[#6b7085]'
                 }`
               }
             >
-              <Icon className="w-5 h-5" strokeWidth={1.75} />
-              <span>{label}</span>
+              <Icon className="w-5 h-5 shrink-0" strokeWidth={1.75} />
+              <span className="truncate w-full text-center px-0.5">{label}</span>
             </NavLink>
           ))}
         </div>
@@ -235,31 +244,33 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="*" element={
-          <RequireAuth>
-            <Layout>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/procurement" element={<Procurement />} />
-                <Route path="/warehouse" element={<Warehouse />} />
-                <Route path="/estimate" element={<Estimate />} />
-                <Route path="/monster" element={<Monster />} />
-                <Route path="/analytics" element={<Analytics />} />
-                <Route path="/renrigou" element={<Renrigou />} />
-                <Route path="/settings" element={<Settings />} />
-                {/* v2 · 老路由 alias（保留书签/分享链接可用） */}
-                <Route path="/collection" element={<Navigate to="/monster" replace />} />
-                <Route path="/collection/analytics" element={<Navigate to="/analytics" replace />} />
-                <Route path="/collection/renrigou" element={<Navigate to="/renrigou" replace />} />
-                <Route path="/assets" element={<Navigate to="/warehouse" replace />} />
-                <Route path="/me" element={<Navigate to="/settings" replace />} />
-              </Routes>
-            </Layout>
-          </RequireAuth>
-        } />
-      </Routes>
+      <ErrorBoundary>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="*" element={
+            <RequireAuth>
+              <Layout>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/procurement" element={<Procurement />} />
+                  <Route path="/warehouse" element={<Warehouse />} />
+                  <Route path="/estimate" element={<Estimate />} />
+                  <Route path="/monster" element={<Monster />} />
+                  <Route path="/analytics" element={<Analytics />} />
+                  <Route path="/renrigou" element={<Renrigou />} />
+                  <Route path="/settings" element={<Settings />} />
+                  {/* v2 · 老路由 alias（保留书签/分享链接可用） */}
+                  <Route path="/collection" element={<Navigate to="/monster" replace />} />
+                  <Route path="/collection/analytics" element={<Navigate to="/analytics" replace />} />
+                  <Route path="/collection/renrigou" element={<Navigate to="/renrigou" replace />} />
+                  <Route path="/assets" element={<Navigate to="/warehouse" replace />} />
+                  <Route path="/me" element={<Navigate to="/settings" replace />} />
+                </Routes>
+              </Layout>
+            </RequireAuth>
+          } />
+        </Routes>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }

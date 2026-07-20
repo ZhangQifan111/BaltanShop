@@ -3,6 +3,27 @@ const router = express.Router();
 const db = require('../db/database');
 const { enrichToy, calcBaseFromTarget, calcTotalCost } = require('../utils/calcCost');
 
+/**
+ * 一致性保险：category 不在 categories 表里就自动补登顶级分类。
+ * 防止 toys/products 写新 category 但分类表里没登记。
+ */
+async function ensureCategoryExists(name) {
+  if (!name || typeof name !== 'string') return;
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  try {
+    const exist = await db.get('SELECT id FROM categories WHERE name = ?', [trimmed]);
+    if (exist) return;
+    await db.insert(
+      'INSERT INTO categories (name, color, parent_id) VALUES (?, ?, ?)',
+      [trimmed, '#6b7085', null]
+    );
+    console.log('[ensureCategory] 自动补登分类:', trimmed);
+  } catch (e) {
+    console.warn('[ensureCategory] 补登失败（已忽略）:', trimmed, e.message);
+  }
+}
+
 // GET /api/toys
 router.get('/', async (req, res) => {
   try {
@@ -133,6 +154,8 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const t = req.body;
+    // 一致性保险：category 补登
+    if (t.category) await ensureCategoryExists(t.category);
     // 合并阶段金额到总成本 (与 calcTotalCost 同源)
     const totalCost = calcTotalCost(t);
 
@@ -183,6 +206,10 @@ router.put('/:id', async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Not found' });
 
     const t = req.body;
+    // 一致性保险：category 改了补登
+    if (t.category !== undefined && t.category !== existing.category) {
+      await ensureCategoryExists(t.category);
+    }
     const merged = { ...existing, ...t };
 
     // 如果请求体明确传了 total_cost（如入池分摊），尊重前端计算值

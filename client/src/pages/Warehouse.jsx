@@ -4,6 +4,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import useStore from '../stores/useStore';
 import { api } from '../lib/api';
 import { sourceLabel, sourceGroup, SOURCES } from '../lib/sources';
+import { findMatchesByPinyin } from '../lib/pinyin';
 
 const FILTERS = [
   { key: 'stock', label: '在库' },
@@ -143,7 +144,7 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
 });
 
 /* ─── 池详情弹窗 ─── */
-function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify, categories, onPreviewImage }) {
+function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify, onBatchTransferPool, onTransferPool, categories, onPreviewImage }) {
   const prod = group.product;
   const avgCost = group.totalQty > 0 ? group.totalCost / group.totalQty : 0;
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -184,6 +185,12 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
     const batches = group.batches.filter(b => selectedIds.has(b.id));
     if (batches.length === 0) return;
     onBatchUnpoolify(batches);
+  };
+
+  const handleBatchTransferPool = () => {
+    const batches = group.batches.filter(b => selectedIds.has(b.id));
+    if (batches.length === 0) return;
+    onBatchTransferPool(batches);
   };
 
   return (
@@ -285,10 +292,16 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
               <span className="text-[#9ca3af]">{allSelected ? '取消全选' : '全选批次'}</span>
             </label>
             {someSelected && (
-              <button className="text-[11px] px-3 py-1 rounded border border-yellow-500/40 bg-yellow-500/10 text-yellow-300 hover:bg-yellow-500/20 font-medium"
-                onClick={handleBatchUnpoolify}>
-                批量退池 ({selectedIds.size})
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button className="text-[11px] px-3 py-1 rounded border border-purple-500/40 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 font-medium"
+                  onClick={handleBatchTransferPool}>
+                  批量转池 ({selectedIds.size})
+                </button>
+                <button className="text-[11px] px-3 py-1 rounded border border-yellow-500/40 bg-yellow-500/10 text-yellow-300 hover:bg-yellow-500/20 font-medium"
+                  onClick={handleBatchUnpoolify}>
+                  批量退池 ({selectedIds.size})
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -321,6 +334,10 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
                   <button className="text-[10px] px-2 py-0.5 rounded border border-accent/40 bg-accent/10 text-accent hover:bg-accent/20"
                     onClick={() => onSell(group, b.id)}>
                     出售
+                  </button>
+                  <button className="text-[10px] px-2 py-0.5 rounded border border-purple-500/40 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20"
+                    onClick={() => onTransferPool(b)}>
+                    转池
                   </button>
                   <button className="text-[10px] px-2 py-0.5 rounded border border-yellow-500/40 bg-yellow-500/10 text-yellow-300 hover:bg-yellow-500/20"
                     onClick={() => onUnpoolify(b)}>
@@ -370,9 +387,303 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
   );
 }
 
+/* ─── 转池弹窗 ─── */
+function TransferPoolModal({ batch, batches, products, categories, onConfirm, onCancel, onPoolCreated }) {
+  // 单 batch 模式：quantity 可调，可部分转
+  // 多 batch 模式（批量转池）：每个 batch 整批转走，隐藏 quantity 输入
+  const batchList = (batches && batches.length) ? batches : (batch ? [batch] : []);
+  const isMulti = batchList.length > 1;
+  const firstBatch = batchList[0] || {};
+  const srcRemaining = firstBatch.remaining || 0;
+  const srcQty = firstBatch.quantity || 0;
+  const unitCost = firstBatch.unit_cost || 0;
+  const totalRemaining = batchList.reduce((s, b) => s + (b.remaining || 0), 0);
+  const totalQty = batchList.reduce((s, b) => s + (b.quantity || 0), 0);
+
+  const [quantity, setQuantity] = useState(srcRemaining);
+  const [targetProductId, setTargetProductId] = useState('');
+  const [search, setSearch] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [note, setNote] = useState('');
+  const [submitError, setSubmitError] = useState('');
+
+  // 新建目标池
+  const [showNewPoolInput, setShowNewPoolInput] = useState(false);
+  const [newPoolName, setNewPoolName] = useState('');
+  const [newPoolCategory, setNewPoolCategory] = useState('');
+  const [creatingPool, setCreatingPool] = useState(false);
+
+  const handleCreatePool = async () => {
+    if (!newPoolName.trim()) return;
+    setCreatingPool(true);
+    try {
+      const created = await api.post('/products', {
+        name: newPoolName.trim(),
+        name_zh: newPoolName.trim(),
+        category: newPoolCategory || '其他',
+      });
+      // 把新池选为目标池（用 callback 把新池加到 products 列表里，让下拉可选）
+      onPoolCreated && onPoolCreated(created);
+      setTargetProductId(String(created.id));
+      setShowNewPoolInput(false);
+      setShowDropdown(false);
+      setNewPoolName('');
+      setNewPoolCategory('');
+    } catch (e) {
+      setSubmitError('建池失败：' + (e.message || JSON.stringify(e)));
+    }
+    setCreatingPool(false);
+  };
+
+  // 候选目标池：排除当前池（多 batch 时排除所有涉及的 product_id）
+  const excludedIds = new Set(batchList.map(b => b.product_id));
+  const candidates = products.filter(p =>
+    !excludedIds.has(p.id) &&
+    (search.trim() === '' ||
+      (p.name_zh || p.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (p.category || '').toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const targetProd = products.find(p => String(p.id) === String(targetProductId));
+
+  const submit = (e) => {
+    e.preventDefault();
+    setSubmitError('');
+    if (!targetProductId) {
+      setSubmitError('请选择目标池');
+      return;
+    }
+    const targetId = Number(targetProductId);
+    if (excludedIds.has(targetId)) {
+      setSubmitError('目标池不能是当前池');
+      return;
+    }
+    if (isMulti) {
+      // 多 batch 模式：每个 batch 整批转，quantity 固定为 remaining
+      onConfirm({
+        batches: batchList,
+        targetProductId: targetId,
+        quantity: null, // 标记：整批转所有 batch
+        note: note.trim(),
+      });
+    } else {
+      const q = Number(quantity);
+      if (!q || q <= 0) {
+        setSubmitError('请输入转出数量');
+        return;
+      }
+      if (q > srcRemaining) {
+        setSubmitError(`最多只能转 ${srcRemaining} 件（剩余库存）`);
+        return;
+      }
+      onConfirm({
+        sourceBatch: firstBatch,
+        targetProductId: targetId,
+        quantity: q,
+        note: note.trim(),
+      });
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4" onClick={onCancel}>
+      <div className="bg-[#1a1d27] rounded-xl border border-purple-500/30 w-full max-w-sm space-y-4 p-5 max-h-[90vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}>
+        <h3 className="text-base font-bold text-purple-300 flex items-center gap-1.5">
+          <span>↔</span><span>{isMulti ? `批量转池（${batchList.length} 个批次）` : '转池'}</span>
+        </h3>
+
+        {/* 当前批次信息 */}
+        <div className="bg-white/[0.03] rounded-lg p-3 space-y-1 text-xs">
+          {isMulti ? (
+            <>
+              <div className="text-[10px] text-[#6b7085]">待转批次（每个整批转出）</div>
+              <div className="max-h-32 overflow-y-auto space-y-0.5 mt-1">
+                {batchList.map(b => (
+                  <div key={b.id} className="flex justify-between text-[11px]">
+                    <span className="truncate flex-1 mr-2 text-[#9ba0b5]">{b.name_zh || b.name}</span>
+                    <span className="text-white font-medium shrink-0">{b.remaining}/{b.quantity} 件</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between text-[11px] text-[#9ba0b5] pt-1.5 mt-1.5 border-t border-white/5">
+                <span>合计 <b className="text-white">{totalRemaining}</b> 件 · {batchList.length} 批</span>
+                <span>· 整批转出</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-[10px] text-[#6b7085]">当前批次</div>
+              <div className="font-medium truncate">{firstBatch.name_zh || firstBatch.name}</div>
+              <div className="flex justify-between text-[11px] text-[#9ba0b5] mt-1">
+                <span>剩余 <b className="text-white">{srcRemaining}</b> / {srcQty} 件</span>
+                <span>单价 ¥{unitCost.toFixed(0)}/件</span>
+              </div>
+            </>
+          )}
+        </div>
+
+        <form className="space-y-3" onSubmit={submit}>
+          {/* 转出数量（单 batch 才显示） */}
+          {!isMulti && (
+          <div>
+            <label className="text-[10px] text-[#6b7085] block mb-1">
+              转出数量（最多 {srcRemaining} 件）
+              {Number(quantity) === srcRemaining && srcRemaining === srcQty && (
+                <span className="ml-1 text-purple-300">· 整批转</span>
+              )}
+              {Number(quantity) > 0 && Number(quantity) < srcRemaining && (
+                <span className="ml-1 text-purple-300">· 部分转</span>
+              )}
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                className="input text-sm w-20 text-center"
+                type="text" inputMode="decimal"
+                value={quantity}
+                onChange={e => setQuantity(e.target.value)}
+                lang="zh" spellCheck={false} autoComplete="off"
+                autoFocus
+              />
+              <span className="text-[11px] text-[#6b7085] flex-1">
+                / {srcRemaining} 件可转
+              </span>
+              <button type="button"
+                className="text-[10px] px-2 py-0.5 rounded border border-white/10 text-[#9ba0b5] hover:bg-white/5"
+                onClick={() => setQuantity(srcRemaining)}>
+                全部
+              </button>
+              <button type="button"
+                className="text-[10px] px-2 py-0.5 rounded border border-white/10 text-[#9ba0b5] hover:bg-white/5"
+                onClick={() => setQuantity(1)}>
+                1 件
+              </button>
+            </div>
+            {Number(quantity) > 0 && Number(quantity) <= srcRemaining && (
+              <div className="text-[10px] text-[#6b7085] mt-1">
+                转出 ¥{(unitCost * Number(quantity)).toFixed(0)} 成本 · 原池剩 <b className="text-white">{srcRemaining - Number(quantity)}</b> 件
+              </div>
+            )}
+          </div>
+          )}
+
+          {/* 目标池选择 */}
+          <div>
+            <label className="text-[10px] text-[#6b7085] block mb-1">目标池（搜索名称或分类）</label>
+            {targetProd ? (
+              <div className="flex items-center gap-1.5 bg-purple-500/10 border border-purple-500/40 rounded-lg px-3 py-2">
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium truncate">{targetProd.name_zh || targetProd.name}</div>
+                  <div className="text-[10px] text-[#9ba0b5]">系列：{targetProd.category}　|　库存 {targetProd.total_remaining}/{targetProd.total_qty}</div>
+                </div>
+                <button type="button"
+                  className="text-[#6b7085] hover:text-white text-sm shrink-0"
+                  onClick={() => { setTargetProductId(''); setSearch(''); }}>✕</button>
+              </div>
+            ) : (
+              <div className="relative">
+                <input
+                  className="input text-xs w-full"
+                  placeholder="搜索池名或分类…"
+                  value={search}
+                  onFocus={() => setShowDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                  onChange={e => { setSearch(e.target.value); setShowDropdown(true); }}
+                  lang="zh" spellCheck={false} autoComplete="off"
+                />
+                {showDropdown && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-[#1a1d27] border border-gray-600 rounded-lg max-h-60 overflow-y-auto z-50 shadow-xl">
+                    {candidates.length === 0 && !showNewPoolInput && (
+                      <div className="px-3 py-2 text-xs text-[#6b7085]">无匹配池</div>
+                    )}
+                    {candidates.map(p => (
+                      <button type="button" key={p.id}
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-purple-500/10 border-b border-gray-700/50 last:border-b-0"
+                        onPointerDown={() => { setTargetProductId(String(p.id)); setSearch(''); setShowDropdown(false); }}>
+                        <div className="font-medium truncate">{p.name_zh || p.name}</div>
+                        <div className="text-[10px] text-[#6b7085]">系列：{p.category}　|　库存 {p.total_remaining}/{p.total_qty}</div>
+                      </button>
+                    ))}
+                    {/* 新建目标池按钮 */}
+                    {!showNewPoolInput && (
+                      <button type="button"
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-purple-500/10 text-purple-300 border-t border-gray-600 font-medium"
+                        onPointerDown={(e) => { e.preventDefault(); setShowNewPoolInput(true); setShowDropdown(false); }}>
+                        ＋ 新建目标池…
+                      </button>
+                    )}
+                    {/* 新建目标池表单 */}
+                    {showNewPoolInput && (
+                      <div className="px-3 py-2 space-y-1.5 border-t border-gray-600 bg-purple-500/[0.05]" onPointerDown={e => e.stopPropagation()}>
+                        <div className="text-[10px] text-purple-300 font-medium">新建目标池</div>
+                        <input className="input text-xs w-full" placeholder="池名（必填）"
+                          value={newPoolName}
+                          onChange={e => setNewPoolName(e.target.value)}
+                          lang="zh" spellCheck={false} autoComplete="off" autoFocus />
+                        <select className="input text-xs w-full"
+                          value={newPoolCategory}
+                          onChange={e => setNewPoolCategory(e.target.value)}>
+                          <option value="">— 选分类 —</option>
+                          {categories && categories.map(c => (
+                            <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>
+                          ))}
+                        </select>
+                        <div className="flex gap-1.5">
+                          <button type="button"
+                            className="text-[10px] px-2 py-0.5 rounded border border-white/10 text-[#9ba0b5] hover:bg-white/5 flex-1"
+                            onClick={() => { setShowNewPoolInput(false); setNewPoolName(''); setNewPoolCategory(''); }}>
+                            取消
+                          </button>
+                          <button type="button"
+                            className="text-[10px] px-2 py-0.5 rounded bg-purple-500 text-white font-medium hover:bg-purple-600 flex-1 disabled:opacity-50"
+                            disabled={!newPoolName.trim() || creatingPool}
+                            onClick={handleCreatePool}>
+                            {creatingPool ? '建池中…' : '建池并选中'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* 备注 */}
+          <div>
+            <label className="text-[10px] text-[#6b7085] block mb-1">备注（可选）</label>
+            <input
+              className="input text-xs w-full"
+              placeholder="比如：跟 A 套装合并"
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              lang="zh" spellCheck={false} autoComplete="off"
+            />
+          </div>
+
+          {submitError && (
+            <div className="text-xs text-red-400 bg-red-500/10 rounded-lg px-3 py-2">{submitError}</div>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button type="button" className="btn-ghost flex-1 text-xs" onClick={onCancel}>取消</button>
+            <button type="submit"
+              className="flex-1 text-xs px-3 py-2 rounded-lg bg-purple-500 text-white font-medium hover:bg-purple-600 disabled:opacity-50"
+              disabled={!targetProductId || (!isMulti && (!quantity || Number(quantity) <= 0 || Number(quantity) > srcRemaining))}>
+              确认转池
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 /* ─── 入池弹窗 ─── */
-function PoolifyModal({ toy, products, onConfirm, onCancel }) {
-  const [poolLines, setPoolLines] = useState([{ product_id: '', quantity: '', search: '', showDropdown: false, custom_name: '', manual_price: '' }]);
+function PoolifyModal({ toy, products, categories, onConfirm, onCancel }) {
+  const [poolLines, setPoolLines] = useState([{ product_id: '', quantity: '', search: '', showDropdown: false, custom_name: '', custom_category: '', manual_price: '' }]);
+  const [newCategory, setNewCategory] = useState('');
+  const [showNewCatInput, setShowNewCatInput] = useState(false);
   const totalCost = toy.total_cost || 0;
   const toyQty = toy.quantity || 1;
 
@@ -396,8 +707,24 @@ function PoolifyModal({ toy, products, onConfirm, onCancel }) {
   const ratio = totalRefCost > 0 ? totalCost / totalRefCost : 0;
 
   const updateLine = (idx, field, value) => setPoolLines(prev => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l));
-  const addLine = () => setPoolLines(prev => [...prev, { product_id: '', quantity: '', search: '', showDropdown: false, custom_name: '', manual_price: '' }]);
+  const addLine = () => setPoolLines(prev => [...prev, { product_id: '', quantity: '', search: '', showDropdown: false, custom_name: '', custom_category: '', manual_price: '' }]);
   const removeLine = (idx) => { if (poolLines.length <= 1) return; setPoolLines(prev => prev.filter((_, i) => i !== idx)); };
+
+  // 一键新增顶级分类
+  const handleCreateCategory = async () => {
+    if (!newCategory.trim()) return;
+    try {
+      const created = await api.post('/settings/categories', { name: newCategory.trim(), parent_id: null });
+      onCategoryCreated(created);
+      // 自动选上新分类
+      const idx = poolLines.findIndex(l => l.product_id === '__new__' && !l.custom_category);
+      if (idx >= 0) updateLine(idx, 'custom_category', created.name);
+      setNewCategory('');
+      setShowNewCatInput(false);
+    } catch (e) {
+      alert('新增分类失败: ' + e.message);
+    }
+  };
 
   const [submitError, setSubmitError] = useState('');
 
@@ -414,12 +741,19 @@ function PoolifyModal({ toy, products, onConfirm, onCancel }) {
       setSubmitError('请给新建的池起个名字（不要留空）');
       return;
     }
+    // 新建池也必须指定分类（不指定就会落到「其他」孤儿桶）
+    const missingCat = validLines.find(l => l.product_id === '__new__' && !l.custom_category);
+    if (missingCat) {
+      setSubmitError('请给新建的池指定一个分类（不然会落到「其他」桶）');
+      return;
+    }
     setSubmitError('');
     onConfirm({
       lines: validLines.map(l => ({
         product_id: l.product_id === '__new__' ? null : Number(l.product_id),
         quantity: Number(l.quantity),
         custom_name: l.custom_name || '',
+        custom_category: l.custom_category || '',
       })),
       totalCost,
       totalRefCost,
@@ -441,10 +775,17 @@ function PoolifyModal({ toy, products, onConfirm, onCancel }) {
             const { prod: selectedProd, isNew } = ref;
             const filtered = line.search?.trim()
               ? products.filter(p => {
-                  const s = line.search.toLowerCase();
-                  return (p.name_zh || '').toLowerCase().includes(s)
+                  const s = line.search.toLowerCase().trim();
+                  // 直接包含匹配
+                  if ((p.name_zh || '').toLowerCase().includes(s)
                     || (p.name || '').toLowerCase().includes(s)
-                    || (p.category || '').toLowerCase().includes(s);
+                    || (p.category || '').toLowerCase().includes(s)) return true;
+                  // 拼音匹配（输入纯字母时：gongniu/gns 都能找到「公牛社」）
+                  if (/^[a-z]+$/.test(s)) {
+                    const fields = [p.name_zh, p.name, p.category].filter(Boolean);
+                    return findMatchesByPinyin(s, fields).length > 0;
+                  }
+                  return false;
                 })
               : products;
 
@@ -463,14 +804,52 @@ function PoolifyModal({ toy, products, onConfirm, onCancel }) {
                           onClick={() => updateLine(idx, 'product_id', '')}>✕</button>
                       </div>
                     ) : isNew ? (
-                      <div className="flex items-center gap-1">
-                        <input className="input text-xs flex-1"
-                          placeholder="请输入新池名（必填）"
-                          value={line.custom_name || ''}
-                          onChange={e => updateLine(idx, 'custom_name', e.target.value)}
-                          lang="zh" spellCheck={false} autoComplete="off" />
-                        <button type="button" className="text-[10px] text-[#6b7085] hover:text-white px-1 shrink-0"
-                          onClick={() => updateLine(idx, 'product_id', '')}>✕</button>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1">
+                          <input className="input text-xs flex-1"
+                            placeholder="请输入新池名（必填）"
+                            value={line.custom_name || ''}
+                            onChange={e => updateLine(idx, 'custom_name', e.target.value)}
+                            lang="zh" spellCheck={false} autoComplete="off" />
+                          <button type="button" className="text-[10px] text-[#6b7085] hover:text-white px-1 shrink-0"
+                            onClick={() => updateLine(idx, 'product_id', '')}>✕</button>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-[#6b7085] shrink-0">分类：</span>
+                          <select className="input text-[11px] flex-1 py-1"
+                            value={line.custom_category || ''}
+                            onChange={e => {
+                              if (e.target.value === '__new__') {
+                                setShowNewCatInput(true);
+                              } else {
+                                updateLine(idx, 'custom_category', e.target.value);
+                              }
+                            }}>
+                            <option value="">未指定</option>
+                            {categories.filter(c => !c.parent_id).map(c => (
+                              <option key={c.id} value={c.name}>{c.name}</option>
+                            ))}
+                            <option value="__new__">+ 新建分类…</option>
+                          </select>
+                        </div>
+                        {showNewCatInput && (
+                          <div className="flex items-center gap-1 pl-1">
+                            <input className="input text-[11px] flex-1 py-1"
+                              placeholder="新分类名"
+                              value={newCategory}
+                              onChange={e => setNewCategory(e.target.value)}
+                              lang="zh" spellCheck={false} autoComplete="off"
+                              autoFocus
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') { e.preventDefault(); handleCreateCategory(); }
+                                if (e.key === 'Escape') { setShowNewCatInput(false); setNewCategory(''); }
+                              }} />
+                            <button type="button" className="btn-primary text-[10px] px-2 py-1 shrink-0"
+                              onClick={handleCreateCategory}>建</button>
+                            <button type="button" className="text-[10px] text-[#6b7085] hover:text-white px-1"
+                              onClick={() => { setShowNewCatInput(false); setNewCategory(''); }}>✕</button>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <>
@@ -1552,6 +1931,7 @@ export default function Warehouse() {
   const [unpoolifying, setUnpoolifying] = useState(null);
   const [batchUnpoolifying, setBatchUnpoolifying] = useState(null);
   const [viewingPool, setViewingPool] = useState(null);
+  const [transferPool, setTransferPool] = useState(null); // { batch, sourceProduct }
 
   useEffect(() => {
     api.get('/settings/categories').then(data => setCategories(data.flat || data)).catch(() => {});
@@ -1562,14 +1942,50 @@ export default function Warehouse() {
   const [sortNewest, setSortNewest] = useState(true);
   const [previewImage, setPreviewImage] = useState(null);
   const [view, setView] = useState('pool'); // 'pool' | 'single'
+  const [collapsedCats, setCollapsedCats] = useState(() => {
+    // 默认折叠空 / 库存为 0 的分类，活跃的展开
+    try {
+      const saved = JSON.parse(localStorage.getItem('wh_collapsed_cats') || '[]');
+      return new Set(Array.isArray(saved) ? saved : []);
+    } catch { return new Set(); }
+  }); // 用户手动折叠过的顶级分类名
   const PAGE_SIZE = 12;
+
+  const toggleCat = (cat) => {
+    setCollapsedCats(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat); else next.add(cat);
+      try { localStorage.setItem('wh_collapsed_cats', JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  };
+  const expandAll = () => {
+    setCollapsedCats(new Set());
+    try { localStorage.setItem('wh_collapsed_cats', '[]'); } catch {}
+  };
+  const collapseAll = () => {
+    const all = new Set(poolsByCategory.map(([cat]) => cat));
+    setCollapsedCats(all);
+    try { localStorage.setItem('wh_collapsed_cats', JSON.stringify([...all])); } catch {}
+  };
 
   const filtered = toys.filter(t => {
     if (t.status !== filter) return false;
     if (sourceFilter && t.source !== sourceFilter) return false;
     if (search) {
       const q = search.toLowerCase();
-      if (!t.name?.toLowerCase().includes(q) && !t.name_zh?.toLowerCase().includes(q) && !t.category?.toLowerCase().includes(q)) return false;
+      const directHit = t.name?.toLowerCase().includes(q)
+        || t.name_zh?.toLowerCase().includes(q)
+        || t.category?.toLowerCase().includes(q);
+      if (!directHit) {
+        // 拼音匹配（输入纯字母时）
+        if (/^[a-z]+$/.test(q)) {
+          const fields = [t.name, t.name_zh, t.category].filter(Boolean);
+          if (findMatchesByPinyin(q, fields).length === 0) return false;
+        } else {
+          return false;
+        }
+      }
     }
     if (t.status === 'procurement' || t.status === 'transit' || t.status === 'preorder') return false;
     if (t.product_id != null && t.status === 'stock') return false;
@@ -1676,7 +2092,7 @@ export default function Warehouse() {
         const created = await api.post('/products', {
           name: first.custom_name || poolifying.name,
           name_zh: first.custom_name || poolifying.name_zh || '',
-          category: poolifying.category,
+          category: first.custom_category || poolifying.category,
           source: poolifying.source,
         });
         productId = created.id;
@@ -1717,7 +2133,7 @@ export default function Warehouse() {
           const created = await api.post('/products', {
             name: line.custom_name || poolifying.name,
             name_zh: line.custom_name || poolifying.name_zh || '',
-            category: poolifying.category,
+            category: line.custom_category || poolifying.category,
             source: poolifying.source,
           });
           pid = created.id;
@@ -1842,6 +2258,145 @@ export default function Warehouse() {
     setBatchUnpoolifying(null);
     setToast(`批量退池完成：${done} 件成功${fail > 0 ? `，${fail} 件失败` : ''}`);
     api.get('/products').then(prods => setProducts(prods)).catch(() => {});
+  };
+
+  // 转池操作：把批次(可指定数量)从当前池挪到目标池
+  // 整批转：直接 PUT product_id
+  // 部分转：原批次减 N + 新建一个批次到目标池
+  const handleTransferPool = async (transferData) => {
+    const { sourceBatch, batches, targetProductId, quantity, note } = transferData;
+    // 批量模式：每个批次整批转
+    if (batches && batches.length > 0) {
+      try {
+        if (!targetProductId) {
+          setToast('请选择目标池');
+          return;
+        }
+        const targetProd = products.find(p => String(p.id) === String(targetProductId));
+        const targetName = targetProd ? (targetProd.name_zh || targetProd.name) : `Pool#${targetProductId}`;
+        let done = 0, fail = 0;
+        for (const b of batches) {
+          try {
+            await updateToy(b.id, { product_id: Number(targetProductId) });
+            // 转出日志
+            const srcProd = products.find(p => String(p.id) === String(b.product_id));
+            const srcName = srcProd ? (srcProd.name_zh || srcProd.name) : `Pool#${b.product_id}`;
+            await api.post('/toys/pool-logs', {
+              product_id: b.product_id,
+              toy_id: b.id,
+              action: '转出',
+              toy_name: b.name_zh || b.name,
+              quantity: b.remaining,
+              unit_cost: b.unit_cost,
+              total_cost: (b.unit_cost || 0) * (b.remaining || 0),
+              notes: `→ ${targetName}${note ? ' · ' + note : ''}`,
+            }).catch(() => {});
+            // 转入日志
+            await api.post('/toys/pool-logs', {
+              product_id: Number(targetProductId),
+              toy_id: b.id,
+              action: '转入',
+              toy_name: b.name_zh || b.name,
+              quantity: b.remaining,
+              unit_cost: b.unit_cost,
+              total_cost: (b.unit_cost || 0) * (b.remaining || 0),
+              notes: `← ${srcName}${note ? ' · ' + note : ''}`,
+            }).catch(() => {});
+            done++;
+          } catch (e) {
+            fail++;
+          }
+        }
+        setTransferPool(null);
+        setToast(fail > 0 ? `批量转池完成：${done} 成功 / ${fail} 失败` : `批量转池完成：${done} 个批次 → ${targetName}`);
+        api.get('/products').then(prods => setProducts(prods)).catch(() => {});
+        const { loadAll } = useStore.getState();
+        loadAll();
+      } catch (e) {
+        setToast('批量转池失败: ' + (e.message || JSON.stringify(e)));
+      }
+      return;
+    }
+
+    // 单 batch 模式
+    try {
+      const srcRemaining = sourceBatch.remaining || 0;
+      const srcQty = sourceBatch.quantity || 0;
+      if (!targetProductId) {
+        setToast('请选择目标池');
+        return;
+      }
+      if (Number(sourceBatch.product_id) === Number(targetProductId)) {
+        setToast('目标池不能是当前池');
+        return;
+      }
+      if (!quantity || quantity <= 0 || quantity > srcRemaining) {
+        setToast(`转出数量必须在 1 ~ ${srcRemaining} 之间`);
+        return;
+      }
+      const unitCost = sourceBatch.unit_cost || 0;
+
+      if (quantity === srcRemaining && quantity === srcQty) {
+        // 整批转：直接改 product_id
+        await updateToy(sourceBatch.id, { product_id: Number(targetProductId) });
+      } else {
+        // 部分转：原批次减 N
+        await updateToy(sourceBatch.id, {
+          quantity: srcQty - quantity,
+          remaining: srcRemaining - quantity,
+        });
+        // 新建批次到目标池（复制源字段，去掉 id/created_at/profit/status/sell_*）
+        const { id, created_at, profit, status, sell_price, sell_date, ...copyFields } = sourceBatch;
+        await api.post('/toys', {
+          ...copyFields,
+          product_id: Number(targetProductId),
+          quantity,
+          remaining: quantity,
+          unit_cost: unitCost,
+          total_cost: unitCost * quantity,
+          status: 'stock',
+          sell_price: null,
+          sell_date: null,
+          profit: null,
+        });
+      }
+
+      // 源池日志（转出）
+      const targetProd = products.find(p => String(p.id) === String(targetProductId));
+      const targetName = targetProd ? (targetProd.name_zh || targetProd.name) : `Pool#${targetProductId}`;
+      await api.post('/toys/pool-logs', {
+        product_id: sourceBatch.product_id,
+        toy_id: sourceBatch.id,
+        action: '转出',
+        toy_name: sourceBatch.name_zh || sourceBatch.name,
+        quantity,
+        unit_cost: unitCost,
+        total_cost: unitCost * quantity,
+        notes: `→ ${targetName}${note ? ' · ' + note : ''}`,
+      }).catch(() => {});
+
+      // 目标池日志（转入）
+      const sourceProd = products.find(p => String(p.id) === String(sourceBatch.product_id));
+      const sourceName = sourceProd ? (sourceProd.name_zh || sourceProd.name) : `Pool#${sourceBatch.product_id}`;
+      await api.post('/toys/pool-logs', {
+        product_id: Number(targetProductId),
+        toy_id: sourceBatch.id,
+        action: '转入',
+        toy_name: sourceBatch.name_zh || sourceBatch.name,
+        quantity,
+        unit_cost: unitCost,
+        total_cost: unitCost * quantity,
+        notes: `← ${sourceName}${note ? ' · ' + note : ''}`,
+      }).catch(() => {});
+
+      setTransferPool(null);
+      setToast(`已转池 ${quantity} 件 → ${targetName}`);
+      api.get('/products').then(prods => setProducts(prods)).catch(() => {});
+      const { loadAll } = useStore.getState();
+      loadAll();
+    } catch (e) {
+      setToast('转池失败: ' + (e.message || JSON.stringify(e)));
+    }
   };
 
   // 分离池商品和传统商品（仅看 stock 状态）
@@ -1982,16 +2537,35 @@ export default function Warehouse() {
             <div className="w-1.5 h-4 rounded-full bg-orange-500" />
             <h3 className="text-sm font-bold">池商品</h3>
             <span className="text-[10px] text-[#6b7085]">{poolGrouped.length} 款 · {poolsByCategory.length} 个系列 · 库存 {poolGrouped.reduce((s,g) => s+g.totalRemaining,0)} 件</span>
+            <div className="flex-1" />
+            <button
+              onClick={collapsedCats.size === poolsByCategory.length ? expandAll : collapseAll}
+              className="text-[10px] px-2 py-0.5 rounded border border-white/10 text-[#9ba0b5] hover:bg-white/5"
+              title={collapsedCats.size === poolsByCategory.length ? '全部展开' : '全部折叠'}
+            >
+              {collapsedCats.size === poolsByCategory.length ? '全部展开' : '全部折叠'}
+            </button>
           </div>
-          {poolsByCategory.map(([cat, pools]) => (
+          {poolsByCategory.map(([cat, pools]) => {
+            const isCollapsed = collapsedCats.has(cat);
+            return (
             <div key={cat} className="space-y-2">
-              <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => toggleCat(cat)}
+                className="w-full flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer text-left"
+              >
+                <span
+                  className="inline-block w-3 text-orange-300 text-xs transition-transform shrink-0"
+                  style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}
+                >▶</span>
                 <div className="w-1.5 h-5 rounded-full bg-orange-500" />
                 <h4 className="text-base font-bold text-white">系列：{cat}</h4>
                 <span className="px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/30 text-[11px] font-bold text-orange-300">
                   {pools.length} 款 · {pools.reduce((s,p) => s+p.totalRemaining, 0)} 件
                 </span>
-              </div>
+              </button>
+              {!isCollapsed && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {pools.map(g => {
               const prod = g.product;
@@ -2069,8 +2643,10 @@ export default function Warehouse() {
               );
             })}
               </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -2280,8 +2856,15 @@ export default function Warehouse() {
         <PoolifyModal
           toy={poolifying}
           products={products}
+          categories={categories}
           onConfirm={handlePoolify}
           onCancel={() => setPoolifying(null)}
+          onCategoryCreated={(cat) => {
+            setCategories(prev => prev.some(c => c.id === cat.id) ? prev : [...prev, cat]);
+            // 也刷一下 useStore 的全局 categories
+            const { loadAll } = useStore.getState();
+            loadAll();
+          }}
         />
       )}
 
@@ -2293,7 +2876,22 @@ export default function Warehouse() {
           onSell={(g, batchId) => { setViewingPool(null); setPoolSelling({ ...g, preselectedBatchId: batchId }); }}
           onUnpoolify={(b) => { setViewingPool(null); setUnpoolifying(b); }}
           onBatchUnpoolify={(batches) => { setViewingPool(null); setBatchUnpoolifying(batches); }}
+          onBatchTransferPool={(batches) => { setViewingPool(null); setTransferPool({ batches }); }}
+          onTransferPool={(b) => { setTransferPool({ batch: b, sourceProduct: viewingPool }); }}
           onPreviewImage={setPreviewImage}
+        />
+      )}
+
+      {/* 转池弹窗（单 batch 或 批量） */}
+      {transferPool && (
+        <TransferPoolModal
+          batch={transferPool.batch}
+          batches={transferPool.batches}
+          products={products}
+          categories={categories}
+          onPoolCreated={(created) => setProducts(prev => prev.some(p => p.id === created.id) ? prev : [...prev, created])}
+          onConfirm={handleTransferPool}
+          onCancel={() => setTransferPool(null)}
         />
       )}
 

@@ -3,6 +3,28 @@ const router = express.Router();
 const db = require('../db/database');
 const { calcTotalCost } = require('../utils/calcCost');
 
+/**
+ * 一致性保险：category 字符串如果不在 categories 表里，自动补登顶级分类。
+ * 防止"产品/玩具身上写的 category 在分类表里找不到"的孤儿数据。
+ * 失败静默（不抛错影响主流程），仅在 console 留日志。
+ */
+async function ensureCategoryExists(name) {
+  if (!name || typeof name !== 'string') return;
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  try {
+    const exist = await db.get('SELECT id FROM categories WHERE name = ?', [trimmed]);
+    if (exist) return;
+    await db.insert(
+      'INSERT INTO categories (name, color, parent_id) VALUES (?, ?, ?)',
+      [trimmed, '#6b7085', null]
+    );
+    console.log('[ensureCategory] 自动补登分类:', trimmed);
+  } catch (e) {
+    console.warn('[ensureCategory] 补登失败（已忽略）:', trimmed, e.message);
+  }
+}
+
 // GET /api/products — 列表，含汇总数据
 router.get('/', async (req, res) => {
   try {
@@ -142,6 +164,8 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const t = req.body;
+    // 一致性保险：category 补登
+    if (t.category) await ensureCategoryExists(t.category);
     const cols = ['name', 'name_zh', 'category', 'source', 'image', 'notes'];
     const vals = [
       t.name || '',
@@ -167,6 +191,10 @@ router.put('/:id', async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Not found' });
 
     const t = req.body;
+    // 一致性保险：category 改了就补登
+    if (t.category !== undefined && t.category !== existing.category) {
+      await ensureCategoryExists(t.category);
+    }
     const merged = { ...existing, ...t };
     const skip = ['id', 'created_at'];
     const cols = Object.keys(merged).filter(k => !skip.includes(k));

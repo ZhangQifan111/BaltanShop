@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import useStore from '../stores/useStore';
 import { api } from '../lib/api';
 import ConfirmModal from '../components/ConfirmModal';
@@ -6,6 +6,22 @@ import ConfirmModal from '../components/ConfirmModal';
 
 export default function Settings() {
   const { suppliers, feeRules, addSupplier, addFeeRule, deleteFeeRule, setToast } = useStore();
+  // 编辑池商品：所有改动暂存本地，只有用户点「保存」才发请求
+  // 放在 Settings() 顶层（不能在 .map 回调里用 hook）
+  const pendingUpdatesRef = useRef({});
+  const stageProductUpdate = (id, updates) => {
+    pendingUpdatesRef.current[id] = { ...pendingUpdatesRef.current[id], ...updates };
+  };
+  const commitProductUpdate = (id) => {
+    const pending = pendingUpdatesRef.current[id];
+    if (pending && Object.keys(pending).length > 0) {
+      handleUpdateProduct(id, pending);
+    }
+    delete pendingUpdatesRef.current[id];
+  };
+  const discardProductUpdate = (id) => {
+    delete pendingUpdatesRef.current[id];
+  };
   const [newSupplier, setNewSupplier] = useState({ name: '', source: '', contact: '' });
   const [newRule, setNewRule] = useState({ name: '', fee_type: 'xianyu', rate: '1.6', flat_fee: '0' });
   const [categories, setCategories] = useState([]);
@@ -19,6 +35,7 @@ export default function Settings() {
   const [bgRight, setBgRight] = useState('');
   const [processing, setProcessing] = useState(false);
   const [monsterImages, setMonsterImages] = useState([]);
+  const [movingCat, setMovingCat] = useState(null); // { id, name, currentParentId } | null
 
   const saveBg = async (key, value) => {
     let finalUrl = value;
@@ -114,7 +131,7 @@ export default function Settings() {
     });
   };
 
-  const renderTree = (nodes, depth, onDelete, onAddChild) => {
+  const renderTree = (nodes, depth, onDelete, onAddChild, onMove) => {
     if (!nodes || nodes.length === 0) return null;
     return nodes.map(node => {
       const hasChildren = node.children?.length > 0;
@@ -137,12 +154,17 @@ export default function Settings() {
             title="添加子分类"
           >+</button>
           <button
+            className="text-yellow-400 opacity-0 group-hover:opacity-100 text-[10px] px-1 transition-opacity"
+            onClick={(e) => { e.stopPropagation(); onMove(node); }}
+            title="移动 / 改名"
+          >↗</button>
+          <button
             className="text-red-400 opacity-0 group-hover:opacity-100 text-[10px] transition-opacity"
             onClick={(e) => { e.stopPropagation(); onDelete(node); }}
             title="删除"
           >×</button>
         </div>
-        {hasChildren && isOpen && renderTree(node.children, depth + 1, onDelete, onAddChild)}
+        {hasChildren && isOpen && renderTree(node.children, depth + 1, onDelete, onAddChild, onMove)}
       </div>
       );
     });
@@ -154,9 +176,16 @@ export default function Settings() {
       setCategories(prev => prev.filter(c => c.id !== id));
       setCatTree(prev => removeFromTree(prev, id));
       setPendingDelete(null);
+      setToast?.('已删除');
     } catch (e) {
-      setToast?.('删除失败: ' + (e.message || ''));
+      // 引用错误时弹更清楚的提示
       setPendingDelete(null);
+      const msg = e.message || '';
+      if (msg.includes('被引用')) {
+        setToast?.('⚠️ 该分类正在被使用：' + msg);
+      } else {
+        setToast?.('删除失败: ' + msg);
+      }
     }
   };
 
@@ -177,6 +206,80 @@ export default function Settings() {
     }));
   };
 
+  // 把指定分类从旧父下挪到新父下（newParentId === null 则提到顶级）
+  const moveInTree = (nodes, id, newParentId) => {
+    let extracted = null;
+    const extract = (arr) => {
+      const out = [];
+      for (const n of arr) {
+        if (n.id === id) { extracted = { ...n, parent_id: newParentId }; continue; }
+        out.push({ ...n, children: extract(n.children || []) });
+      }
+      return out;
+    };
+    const stripped = extract(nodes);
+    if (!extracted) return nodes;
+    if (newParentId === null) {
+      return [...stripped, { ...extracted, children: [] }];
+    }
+    const insert = (arr) => arr.map(n => {
+      if (n.id === newParentId) {
+        return { ...n, children: [...(n.children || []), { ...extracted, children: [] }] };
+      }
+      return { ...n, children: insert(n.children || []) };
+    });
+    return insert(stripped);
+  };
+
+  // 收集某节点的所有子孙 id（防止把分类移到自己的子节点下形成环）
+  const collectDescendantIds = (nodes, targetId) => {
+    const out = new Set();
+    const dfs = (arr) => {
+      for (const n of arr) {
+        if (n.id === targetId) {
+          const collectSub = (subArr) => {
+            for (const s of subArr) {
+              out.add(s.id);
+              collectSub(s.children || []);
+            }
+          };
+          collectSub(n.children || []);
+          return true;
+        }
+        if (dfs(n.children || [])) return true;
+      }
+      return false;
+    };
+    dfs(nodes);
+    return out;
+  };
+
+  const handleMoveCategory = async (id, newParentId, newName) => {
+    try {
+      const updated = await api.put(`/settings/categories/${id}`, {
+        parent_id: newParentId,
+        name: newName,
+      });
+      setCategories(prev => prev.map(c => c.id === id ? { ...c, ...updated } : c));
+      setCatTree(prev => moveInTree(prev, id, newParentId));
+      setMovingCat(null);
+      // 改名同步提示
+      const sync = updated._sync;
+      if (sync && (sync.toys > 0 || sync.products > 0)) {
+        setToast(`已改名并同步 ${sync.toys} 个玩具 / ${sync.products} 个池`);
+      } else {
+        setToast('已移动');
+      }
+      // 强制刷新 products/toys 让前端 store 同步
+      if (sync && (sync.toys > 0 || sync.products > 0)) {
+        const { loadAll } = useStore.getState();
+        loadAll();
+      }
+    } catch (e) {
+      setToast('移动失败: ' + (e.message || ''));
+    }
+  };
+
   const handleAddSupplier = async (e) => {
     e.preventDefault();
     if (!newSupplier.name) return;
@@ -190,6 +293,15 @@ export default function Settings() {
     await addFeeRule({ ...newRule, rate: +newRule.rate, flat_fee: +newRule.flat_fee });
     setNewRule({ name: '', fee_type: 'xianyu', rate: '1.6', flat_fee: '0' });
   };
+
+  // 收集所有可用作「父分类」的候选（排除自身 + 自身的后代，否则会成环）
+  const movingDescendants = movingCat ? collectDescendantIds(catTree, movingCat.id) : new Set();
+  const parentCandidates = categories.filter(c => {
+    if (!movingCat) return false;
+    if (c.id === movingCat.id) return false;
+    if (movingDescendants.has(c.id)) return false;
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -308,11 +420,12 @@ export default function Settings() {
           {renderTree(
             catTree, 0,
             cat => setPendingDelete({ type: 'category', id: cat.id, name: cat.name }),
-            cat => { setNewCatParent(String(cat.id)); document.querySelector('input[placeholder=\"新分类名称\"]')?.focus(); }
+            cat => { setNewCatParent(String(cat.id)); document.querySelector('input[placeholder=\"新分类名称\"]')?.focus(); },
+            cat => setMovingCat({ id: cat.id, name: cat.name, parentId: cat.parent_id || null })
           )}
         </div>
         {categories.length === 0 && <div className="text-xs text-[#6b7085] mt-2">暂无分类</div>}
-        <p className="text-[10px] text-[#6b7085] mt-3">点击分类可删除</p>
+        <p className="text-[10px] text-[#6b7085] mt-3">点击分类可删除 · 悬停出现操作按钮</p>
       </div>
 
       {/* 池商品管理（与仓库页池卡片样式保持一致） */}
@@ -341,14 +454,18 @@ export default function Settings() {
                       <div className="text-[10px] text-[#6b7085]">编辑名称</div>
                       <input className="input text-xs w-full" autoFocus placeholder="名称" defaultValue={p.name_zh || p.name}
                         lang="zh" spellCheck={false} autoComplete="off"
-                        onBlur={e => handleUpdateProduct(p.id, { name: e.target.value, name_zh: e.target.value, category: p.category })} />
+                        onChange={e => stageProductUpdate(p.id, { name: e.target.value, name_zh: e.target.value })} />
                       <div className="text-[10px] text-[#6b7085]">所属分类</div>
                       <select className="input text-xs w-full" defaultValue={p.category}
-                        onChange={e => handleUpdateProduct(p.id, { name: p.name, name_zh: p.name_zh, category: e.target.value })}>
+                        onChange={e => stageProductUpdate(p.id, { name: p.name, name_zh: p.name_zh, category: e.target.value })}>
                         {categories.map(c => <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>)}
                       </select>
-                      <button className="btn-primary w-full text-xs py-1.5"
-                        onClick={() => setEditingProduct(null)}>完成编辑</button>
+                      <div className="flex gap-2 pt-1">
+                        <button className="btn-ghost flex-1 text-xs py-1.5"
+                          onClick={() => { discardProductUpdate(p.id); setEditingProduct(null); }}>取消</button>
+                        <button className="btn-primary flex-1 text-xs py-1.5"
+                          onClick={() => { commitProductUpdate(p.id); setEditingProduct(null); }}>保存</button>
+                      </div>
                     </div>
                   ) : (
                     <>
@@ -463,6 +580,86 @@ export default function Settings() {
         />
       )}
 
+      {/* 移动 / 改分类名 */}
+      {movingCat && (
+        <MoveCategoryModal
+          cat={movingCat}
+          parentCandidates={parentCandidates}
+          onConfirm={(newParentId, newName) => handleMoveCategory(movingCat.id, newParentId, newName)}
+          onCancel={() => setMovingCat(null)}
+        />
+      )}
+
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────
+// 移动 / 改分类名 弹窗
+// ────────────────────────────────────────────
+function MoveCategoryModal({ cat, parentCandidates, onConfirm, onCancel }) {
+  const [newParentId, setNewParentId] = useState(cat.parentId == null ? '__top__' : String(cat.parentId));
+  const [newName, setNewName] = useState(cat.name);
+  // 按层级顺序排列候选名
+  const candidateById = new Map(parentCandidates.map(c => [c.id, c]));
+  const orderedNames = (() => {
+    const out = [];
+    const roots = parentCandidates.filter(c => !c.parent_id);
+    const visit = (n, depth) => {
+      out.push({ id: n.id, label: (depth > 0 ? '└ '.repeat(depth) : '') + n.name });
+      // 简单按名字顺序排儿子，不严格按树形
+      const kids = parentCandidates.filter(c => c.parent_id === n.id).sort((a, b) => a.name.localeCompare(b.name));
+      kids.forEach(k => visit(k, depth + 1));
+    };
+    roots.sort((a, b) => a.name.localeCompare(b.name)).forEach(r => visit(r, 0));
+    return out;
+  })();
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-black/70 flex items-center justify-center p-4" onClick={onCancel}>
+      <div className="card w-full max-w-sm" onClick={e => e.stopPropagation()}>
+        <div className="text-sm font-bold mb-3">↗ 移动 / 改名「{cat.name}」</div>
+        <div className="space-y-3">
+          <div>
+            <label className="text-[10px] text-[#6b7085] block mb-1">新名称（不改保持原样）</label>
+            <input
+              className="input text-xs w-full"
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              lang="zh" spellCheck={false} autoComplete="off"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-[#6b7085] block mb-1">移动到（顶级 = 不属于任何分类）</label>
+            <select
+              className="input text-xs w-full"
+              value={newParentId}
+              onChange={e => setNewParentId(e.target.value)}
+            >
+              <option value="__top__">— 顶级（无父分类）</option>
+              {orderedNames.map(n => (
+                <option key={n.id} value={String(n.id)}>{n.label}</option>
+              ))}
+            </select>
+            {parentCandidates.length === 0 && (
+              <p className="text-[10px] text-[#6b7085] mt-1">无其他可选父分类（只能移至顶级）</p>
+            )}
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button className="btn-ghost flex-1 text-xs" onClick={onCancel}>取消</button>
+            <button
+              className="btn-primary flex-1 text-xs"
+              onClick={() => {
+                const parentId = newParentId === '__top__' ? null : Number(newParentId);
+                const trimmed = newName.trim();
+                if (!trimmed) { alert('分类名不能为空'); return; }
+                onConfirm(parentId, trimmed);
+              }}
+            >保存</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
