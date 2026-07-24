@@ -85,6 +85,13 @@ function migrate() {
   if (!colNames.has('unit_cost')) {
     changes.push("ALTER TABLE toys ADD COLUMN unit_cost REAL");
   }
+  // 任你购图片：原始远程 URL + 最近成功下载时间（用于补抓丢失的图片）
+  if (!colNames.has('image_url')) {
+    changes.push("ALTER TABLE toys ADD COLUMN image_url TEXT");
+  }
+  if (!colNames.has('image_fetched_at')) {
+    changes.push("ALTER TABLE toys ADD COLUMN image_fetched_at TEXT");
+  }
   // categories 层级
   if (tableNames.has('categories')) {
     const catCols = new Set(

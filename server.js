@@ -42,9 +42,12 @@ app.use('/api/auth', authRouter);
 const AUTH_WHITELIST = [
   '/auth/login',
   '/ingest-renrigou',     // 任你购抓取脚本用（rennigou.jp 跨域 fetch，本地 token 拿不到）
+  '/fix-renrigou-images', // 任你购图片补抓（前端已登录调用，但脚本也能从浏览器直接 fetch）
+  '/order-data',          // 任你购订单 JSON 存档/读取（前端 OrderAnalyzer 用）
 ];
 app.use('/api', (req, res, next) => {
-  if (AUTH_WHITELIST.includes(req.path)) return next();
+  // 白名单支持前缀匹配（兼容 /order-data 与 /order-data/:name 等子路径）
+  if (AUTH_WHITELIST.some(p => req.path === p || req.path.startsWith(p + '/'))) return next();
   return requireAuth(req, res, next);
 });
 
@@ -68,6 +71,7 @@ app.use('/api/order-data', require('./routes/orderData'));
 app.use('/api/fetch-renrigou', require('./routes/renrigou'));
 app.use('/api/ingest-renrigou', require('./routes/ingestRenrigou'));
 app.use('/api/import-renrigou', require('./routes/importRenrigou'));
+app.use('/api/fix-renrigou-images', require('./routes/fixRenrigouImages'));
 app.use('/api/translate', require('./routes/translate'));
 app.use('/api/process-toy-image', require('./routes/processToyImage'));
 

@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   build: {
     target: 'esnext',
-    cssMinify: 'lightningcss',
+    cssMinify: 'esbuild',
     outDir: path.resolve(__dirname, '..', 'dist'),
     emptyOutDir: true,
   },

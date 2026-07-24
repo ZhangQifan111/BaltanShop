@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import useStore from '../stores/useStore';
 import { batchTranslateJpToCn } from '../lib/translator';
+import ImageFixPanel from './ImageFixPanel';
 
 function fmt(n, d) { return Number(n).toFixed(d||0); }
 function yne(n) { return '¥' + Number(n).toLocaleString('zh-CN'); }
@@ -582,6 +583,7 @@ export default function OrderAnalyzer() {
       const selected = preview.items.filter(p => !p.removed).map(p => p.toy);
       const allCreated = [];
       let totalSkipped = 0;
+      let totalImgOk = 0, totalImgFail = 0;
 
       for (let i = 0; i < selected.length; i += IMP_BATCH) {
         const batch = selected.slice(i, i + IMP_BATCH);
@@ -593,6 +595,7 @@ export default function OrderAnalyzer() {
         const j = await r.json();
         if (j.created) allCreated.push(...j.created);
         totalSkipped += j.skippedCount || 0;
+        if (j.images) { totalImgOk += j.images.ok || 0; totalImgFail += j.images.fail || 0; }
         setImportProgress({ done: Math.min(i + IMP_BATCH, selected.length), total: selected.length });
       }
 
@@ -600,7 +603,14 @@ export default function OrderAnalyzer() {
         useStore.setState(s => ({ toys: [...allCreated, ...s.toys] }));
         setLastImportedIds(allCreated.map(t => t.id));
       }
-      setImportMsg({ text: '创建 ' + allCreated.length + ' 件' + (totalSkipped > 0 ? '，跳过 ' + totalSkipped + ' 件（已存在）' : ''), ok: true });
+      const imgText = (totalImgOk + totalImgFail) > 0
+        ? ` · 🖼 图 ${totalImgOk} 成功${totalImgFail > 0 ? ` / ❌ ${totalImgFail} 失败` : ''}`
+        : '';
+      setImportMsg({
+        text: '创建 ' + allCreated.length + ' 件' + (totalSkipped > 0 ? '，跳过 ' + totalSkipped + ' 件（已存在）' : '') + imgText,
+        ok: true,
+        imgFail: totalImgFail
+      });
       setImportProgress({ done: 0, total: 0 });
       setPreview(null);
     } catch(e) {
@@ -644,6 +654,9 @@ export default function OrderAnalyzer() {
           点按钮 → 脚本自动进剪贴板 → 打开任你购（已登录）→ F12 Console 粘贴回车 → 等 30~60 秒 → 自动跳回本页
         </span>
       </div>
+
+      {/* 图片维护 */}
+      <ImageFixPanel />
 
       {/* 进度条 */}
       {fetching && fetchProgress && fetchProgress.phase !== 'done' && (
@@ -721,6 +734,13 @@ export default function OrderAnalyzer() {
                   disabled={undoing}
                   onClick={undoLastImport}
                 >{undoing ? '撤销中...' : '撤销导入'}</button>
+              )}
+              {importMsg.ok && importMsg.imgFail > 0 && (
+                <button
+                  className="btn-ghost text-[11px] py-1 px-2 text-accent"
+                  onClick={() => navigate('/renrigou')}
+                  title="去「图片维护」补抓失败的那几张"
+                >🔧 去补抓 {importMsg.imgFail} 张失败</button>
               )}
               {importMsg.ok && (
                 <button className="btn-primary text-[11px] py-1 px-2" onClick={() => navigate('/procurement')}>去采购页查看</button>

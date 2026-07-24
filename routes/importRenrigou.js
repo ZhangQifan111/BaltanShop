@@ -1,51 +1,8 @@
 const express = require('express');
-const https = require('https');
-const fs = require('fs');
-const path = require('path');
 const router = express.Router();
 const db = require('../db/database');
 const { calcTotalCost } = require('../utils/calcCost');
-
-function decodeRngImg(url) {
-  try {
-    const m = (url || '').match(/rl\.rng\.vip\/([A-Za-z0-9+/=]+)/);
-    if (!m) return null;
-    return Buffer.from(m[1], 'base64').toString('utf8');
-  } catch { return null; }
-}
-
-function downloadImage(imgUrl, destPath) {
-  return new Promise((resolve) => {
-    const file = fs.createWriteStream(destPath);
-    const url = new URL(imgUrl);
-    const opts = {
-      hostname: url.hostname,
-      path: url.pathname,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://rl.rngmoe.com/',
-        'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
-      },
-      timeout: 15000
-    };
-    https.get(opts, (res) => {
-      if (res.statusCode !== 200) { file.close(); fs.unlink(destPath, () => {}); return resolve(false); }
-      res.pipe(file);
-      file.on('finish', () => resolve(true));
-      file.on('error', () => { fs.unlink(destPath, () => {}); resolve(false); });
-    }).on('error', () => { fs.unlink(destPath, () => {}); resolve(false); });
-  });
-}
-
-async function fetchAndSaveImage(imageUrl, itemId) {
-  // 直接用 renrigou 代理 URL 下载，不解码到 Yahoo（浏览器也是这么加载的）
-  const ext = imageUrl.match(/\.(jpg|jpeg|png|webp)/i)?.[0] || '.jpg';
-  const fname = 'renrigou_' + itemId + ext;
-  const dest = path.join(__dirname, '..', 'uploads', fname);
-  if (fs.existsSync(dest)) return '/uploads/' + fname;
-  const ok = await downloadImage(imageUrl, dest);
-  return ok ? '/uploads/' + fname : null;
-}
+const { fetchAndSaveImage, runWithConcurrency, decodeRngImg } = require('../utils/downloadImage');
 
 router.post('/', async (req, res) => {
   const { items } = req.body || {};
@@ -55,9 +12,11 @@ router.post('/', async (req, res) => {
 
   const created = [];
   const skipped = [];
+  let imagesOk = 0, imagesFail = 0;
 
+  // 1) 先处理已存在的（顺序处理，避免和并发写冲突）
+  const toCreate = [];
   for (const it of items) {
-    // 去重：检查 notes 中是否已有 renrigou_item_id
     const match = (it.notes || '').match(/renrigou_item_id:(\d+)/);
     if (match) {
       const existing = await db.get(
@@ -65,13 +24,36 @@ router.post('/', async (req, res) => {
         ['%renrigou_item_id:' + match[1] + '%']
       );
       if (existing) {
-        skipped.push({ title: it.name, existingId: existing.id, itemId: match[1] });
+        let imageFixed = false;
+        if (it.image_url) {
+          const result = await fetchAndSaveImage(it.image_url, it.item_id || match[1]);
+          if (result.ok) {
+            db.update('UPDATE toys SET image = ?, image_url = ?, image_fetched_at = ? WHERE id = ?',
+              [result.localPath, it.image_url, new Date().toISOString(), existing.id]);
+            imageFixed = true;
+            imagesOk++;
+          } else {
+            db.update('UPDATE toys SET image = ?, image_url = ? WHERE id = ?',
+              [null, it.image_url, existing.id]);
+            imagesFail++;
+          }
+        }
+        skipped.push({ title: it.name, existingId: existing.id, itemId: match[1], imageFixed });
         continue;
       }
     }
+    toCreate.push(it);
+  }
 
+  // 2) 并发下载新商品的图片
+  const enriched = await runWithConcurrency(toCreate, 5, async (it) => {
+    if (!it.image_url) return { it, dl: { ok: false, reason: 'no_url', attempts: 0 } };
+    return { it, dl: await fetchAndSaveImage(it.image_url, it.item_id || 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2,7)) };
+  });
+
+  // 3) 顺序入库（sql.js 单文件锁，串行写）
+  for (const { it, dl } of enriched) {
     const totalCost = calcTotalCost(it);
-
     const cols = [
       'name','name_zh','category','source','status','supplier_id','supplier_name','purchase_date',
       'japan_price_jpy','japan_price_cny','japan_price_includes_tax','japan_consumption_tax',
@@ -87,45 +69,40 @@ router.post('/', async (req, res) => {
       'stage2_date','stage2_amount','stage2_note','stage2_handling','stage2_domestic_ship',
       'stage3_date','stage3_amount','stage3_note','stage3_intl_ship','stage3_tax','stage3_tax_mode',
       'expected_arrival_date',
-      'shipment_id','total_cost','profit','baltan_ref_id','notes','image'
+      'shipment_id','total_cost','profit','baltan_ref_id','notes','image','image_url','image_fetched_at'
     ];
 
+    const now = new Date().toISOString();
     const vals = cols.map(c => {
       if (c === 'total_cost') return totalCost;
       if (c === 'profit') return null;
       if (c === 'supplier_id') return null;
       if (c === 'stage3_tax_mode') return it.stage3_tax_mode || 'normal';
-      if (c === 'image') return null;
+      if (c === 'image') return dl.ok ? dl.localPath : null;
+      if (c === 'image_url') return it.image_url || null;
+      if (c === 'image_fetched_at') return dl.ok ? now : null;
       return it[c] ?? null;
     });
 
     const sql = 'INSERT INTO toys (' + cols.join(',') + ') VALUES (' + cols.map(() => '?').join(',') + ')';
     const id = await db.insert(sql, vals);
 
-    // 下载图片到本地，避免远程链接过期
-    if (it.image_url) {
-      try {
-        const localPath = await fetchAndSaveImage(it.image_url, it.item_id || id);
-        if (localPath) {
-          db.update('UPDATE toys SET image = ? WHERE id = ?', [localPath, id]);
-        } else {
-          // 下载失败时保留远程链接作为后备
-          db.update('UPDATE toys SET image = ? WHERE id = ?', [it.image_url, id]);
-        }
-      } catch (e) {
-        db.update('UPDATE toys SET image = ? WHERE id = ?', [it.image_url, id]);
-      }
-    }
+    if (dl.ok) imagesOk++; else if (it.image_url) imagesFail++;
 
     const toy = await db.get('SELECT * FROM toys WHERE id = ?', [id]);
     created.push(toy);
   }
 
-  res.json({ created, skipped, total: items.length, createdCount: created.length, skippedCount: skipped.length });
+  res.json({
+    created, skipped,
+    total: items.length,
+    createdCount: created.length,
+    skippedCount: skipped.length,
+    images: { ok: imagesOk, fail: imagesFail }
+  });
 });
 
 // 预检：哪些 item_id 已存在（dry-run，不入库）
-// 入参 { items: [...] } 或 { itemIds: [...] }；返回 { existing: [{ itemId, existingId, title }], missing: [...] }
 router.post('/check', async (req, res) => {
   try {
     const items = Array.isArray(req.body?.items) ? req.body.items : null;
@@ -136,13 +113,10 @@ router.post('/check', async (req, res) => {
     const seen = new Set();
 
     async function checkOne(it) {
-      // 从 notes 提取
       let id = null;
       const m = (it.notes || '').match(/renrigou_item_id:(\d+)/);
       if (m) id = m[1];
-      // 或者直接给 itemId
       if (!id && it.item_id) id = String(it.item_id);
-      // 或者顶层传 itemIds
       if (!id && typeof it === 'string') id = it;
       if (!id) return null;
       if (seen.has(id)) return null;
@@ -163,8 +137,8 @@ router.post('/check', async (req, res) => {
     }
 
     res.json({
-      existing: existing.filter(e => e.existingId),  // 已存在的
-      missing: existing.filter(e => !e.existingId).map(e => e.itemId)  // 未存在的 itemId
+      existing: existing.filter(e => e.existingId),
+      missing: existing.filter(e => !e.existingId).map(e => e.itemId)
     });
   } catch (e) {
     res.status(500).json({ error: e.message });

@@ -111,7 +111,9 @@ CREATE TABLE IF NOT EXISTS toys (
   unit_cost REAL,
 
   -- 元数据
-  image TEXT,
+  image TEXT,                       -- 本地相对路径 (/uploads/xxx) 或 null
+  image_url TEXT,                   -- 原始远程 URL（备份用，本地丢了能据此补抓）
+  image_fetched_at TEXT,            -- 图片最近一次成功下载到本地的时间（ISO）
   notes TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );

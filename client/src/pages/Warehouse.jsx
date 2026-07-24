@@ -1398,7 +1398,7 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
     stage2_handling: toy.stage2_handling ?? '',
     stage2_domestic_ship: toy.stage2_domestic_ship ?? '',
     stage3_intl_ship: toy.stage3_intl_ship ?? '',
-    stage3_tax: toy.stage3_tax ?? ((toy.stage3_amount || 0) - (toy.stage3_intl_ship || 0)) || '',
+    stage3_tax: (toy.stage3_tax ?? ((toy.stage3_amount || 0) - (toy.stage3_intl_ship || 0))) || '',
     stage3_tax_mode: toy.stage3_tax_mode || 'normal',
     sell_price: toy.sell_price ?? '',
     sell_date: toy.sell_date || '',

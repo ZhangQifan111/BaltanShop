@@ -13,7 +13,7 @@
  *      javascript:void(0)  （首次先复制脚本，粘贴到 Console 跑一遍即可）
  * 2. 打开 rennigou.jp，登录
  * 3. 按 F12 开 Console，粘贴脚本 + Enter
- * 4. 等 30~60 秒，看到页面自动跳到 localhost:3000/renrigou 即完成
+ * 4. 等 30~60 秒，看到页面自动跳到 localhost:10000/renrigou 即完成
  *
  * 任意一次需要再抓，重复步骤 2~4 即可
  * ============================================================================
@@ -74,7 +74,7 @@
   const BASE = "https://rl.rngmoe.com/order/order/";
   const BATAN = (location.hostname === "localhost" || location.hostname === "127.0.0.1")
     ? `http://${location.hostname}:3000`
-    : "http://localhost:3000";
+    : "http://localhost:10000";
 
   // Helper: parse JPY and RMB from titleValue like "750日元（约 34 元）"
   function parseFee(s) {
@@ -157,13 +157,16 @@
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
-  // Step 1: fetch list
+  // Step 1: fetch list —— 翻到没有订单为止（翻到空页自动停，最多 100 页保险）
+  // 之前写死只翻前 7 页，导致 7 页之后的老订单永远抓不到（图片也就补不回来）
   var orders = [];
-  for (var p = 1; p <= 7; p++) {
-    document.title = "list " + p + "/7";
+  for (var p = 1; p <= 100; p++) {
+    document.title = "list p" + p + "（已抓 " + orders.length + " 单）";
     var r1 = await fetch(BASE + "getLists?page=" + p + "&page_last_id=0&service=finish_ownerPackage&is_show_page=1", { headers: H });
     var d1 = await r1.json();
-    if (d1.data && d1.data.result) { var list = d1.data.result; for (var i = 0; i < list.length; i++) orders.push(list[i]); }
+    var list = (d1 && d1.data && d1.data.result) ? d1.data.result : [];
+    if (list.length === 0) break;   // 空页 = 已经翻到底
+    for (var i = 0; i < list.length; i++) orders.push(list[i]);
   }
 
   // Step 2: item ids + order ids
@@ -381,7 +384,7 @@
       '  <div style="display:flex;flex-wrap:wrap;gap:8px">',
       '    <button id="rng-copy-btn" style="background:#06f;color:#fff;border:0;padding:12px 18px;border-radius:6px;font-size:15px;font-weight:bold;cursor:pointer">📋 复制 JSON</button>',
       '    <button id="rng-download-btn" style="background:#2a8;color:#fff;border:0;padding:12px 18px;border-radius:6px;font-size:15px;font-weight:bold;cursor:pointer">⬇️ 下载 .json 文件</button>',
-      '    <a href="http://localhost:3000/renrigou" target="_blank" style="background:#444;color:#fff;border:0;padding:12px 18px;border-radius:6px;font-size:15px;font-weight:bold;cursor:pointer;text-decoration:none;display:inline-block">🪟 打开巴坦（新窗口）</a>',
+      '    <a href="http://localhost:10000/renrigou" target="_blank" style="background:#444;color:#fff;border:0;padding:12px 18px;border-radius:6px;font-size:15px;font-weight:bold;cursor:pointer;text-decoration:none;display:inline-block">🪟 打开巴坦（新窗口）</a>',
       '  </div>',
       '</div>',
       '<div style="background:#1e1e1e;padding:10px;border-radius:6px;flex-shrink:0;font-size:12px;color:#999">',

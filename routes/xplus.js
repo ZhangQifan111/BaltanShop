@@ -5,6 +5,7 @@ const http = require('http');
 const db = require('../db/database');
 const { refreshDatabase } = require('../utils/scrapeXplus');
 const { downloadAll, UPLOAD_ROOT } = require('../utils/downloadXplus');
+const { ensureBanners } = require('../utils/ensureXplusBanners');
 const path = require('path');
 const fs = require('fs');
 
@@ -98,6 +99,10 @@ router.get('/item/:ref_id', async (req, res) => {
 // POST /api/xplus/refresh - 触发爬虫刷新数据
 router.post('/refresh', async (req, res) => {
   try {
+    // 先确保页面 banner 都齐全（幂等：已存在就跳过）
+    const bannerResults = await ensureBanners();
+    const bannersFixed = bannerResults.filter(r => r.status === 'downloaded');
+    if (bannersFixed.length) console.log(`  [banners] 新下 ${bannersFixed.length} 张`);
     const onProgress = (info) => {
       if (info.type === 'progress') {
         process.stdout.write(`\r  爬取中... ${info.done}/${info.total} (${info.results} 成功, ${info.errors} 失败)`);
@@ -105,7 +110,7 @@ router.post('/refresh', async (req, res) => {
     };
     const { count, errors, total } = await refreshDatabase(db, { concurrency: 4, onProgress });
     process.stdout.write('\n');
-    res.json({ ok: true, count, errors: errors.length, total });
+    res.json({ ok: true, count, errors: errors.length, total, banners: bannersFixed.length });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
