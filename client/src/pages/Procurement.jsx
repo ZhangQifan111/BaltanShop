@@ -112,7 +112,11 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
   const shipFee = parseFloat(total_ship_fee) || 0;
 
   function calcShare(t) {
-    if (!isS3 || totalWeight <= 0 || shipFee <= 0) return 0;
+    if (!isS3 || shipFee <= 0) return 0;
+    // 没勾选同批次（即只有当前商品）→ shipFee 全给它，否则运费被整个丢掉
+    if (selectedIds.size === 0) return t.id === toy.id ? shipFee : 0;
+    // 有勾选同批次但都还没填重量 → 没法按比例分摊
+    if (totalWeight <= 0) return 0;
     return Math.round((t.logistics_weight || 0) / totalWeight * shipFee * 100) / 100;
   }
 
