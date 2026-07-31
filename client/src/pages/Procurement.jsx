@@ -372,7 +372,7 @@ function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
                   </div>
                   <div>
                     <label className="text-[10px] text-[#6b7085] block mb-1">国内物流费 (¥)</label>
-                    <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={form.stage2_domestic_ship ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage2_domestic_ship: e.target.value === '' : '' : +e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
+                    <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={form.stage2_domestic_ship ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage2_domestic_ship: e.target.value === '' ? '' : +e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
                   </div>
                 </div>
               </div>
