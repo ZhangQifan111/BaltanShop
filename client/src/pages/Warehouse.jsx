@@ -1932,6 +1932,7 @@ export default function Warehouse() {
   const [batchUnpoolifying, setBatchUnpoolifying] = useState(null);
   const [viewingPool, setViewingPool] = useState(null);
   const [transferPool, setTransferPool] = useState(null); // { batch, sourceProduct }
+  const [imageFilter, setImageFilter] = useState(null); // null | 'noImage' | 'hasImage'
 
   useEffect(() => {
     api.get('/settings/categories').then(data => setCategories(data.flat || data)).catch(() => {});
@@ -1969,6 +1970,12 @@ export default function Warehouse() {
     try { localStorage.setItem('wh_collapsed_cats', JSON.stringify([...all])); } catch {}
   };
 
+  // 在库商品图片覆盖统计（统计条用）
+  const stockToys = toys.filter(t => t.status === 'stock');
+  const stockWithImg = stockToys.filter(t => t.image && t.image.length > 0).length;
+  const stockNoImg = stockToys.length - stockWithImg;
+  const imgCoveragePct = stockToys.length > 0 ? (stockWithImg / stockToys.length * 100).toFixed(1) : '0.0';
+
   const filtered = toys.filter(t => {
     if (t.status !== filter) return false;
     if (sourceFilter && t.source !== sourceFilter) return false;
@@ -1989,6 +1996,9 @@ export default function Warehouse() {
     }
     if (t.status === 'procurement' || t.status === 'transit' || t.status === 'preorder') return false;
     if (t.product_id != null && t.status === 'stock') return false;
+    // 图片覆盖筛选（统计条点选）
+    if (imageFilter === 'noImage' && t.image) return false;
+    if (imageFilter === 'hasImage' && !t.image) return false;
     return true;
   });
 
@@ -2474,6 +2484,35 @@ export default function Warehouse() {
         >
           + 录入历史销售
         </button>
+      </div>
+
+      {/* 在库图片覆盖统计条 */}
+      <div className="card flex items-center gap-4 px-4 py-2.5 flex-wrap">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-2xl font-bold text-[#d0d4e8]">{stockToys.length}</span>
+          <span className="text-[10px] text-[#6b7085]">在库总数</span>
+        </div>
+        <div className="h-8 w-px bg-white/10" />
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-xl font-bold text-emerald-400">{stockWithImg}</span>
+          <span className="text-[10px] text-[#6b7085]">有图（{imgCoveragePct}%）</span>
+        </div>
+        {stockNoImg > 0 && <div className="h-8 w-px bg-white/10" />}
+        {stockNoImg > 0 && (
+          <button
+            className={`flex items-baseline gap-1.5 hover:opacity-80 transition-opacity ${imageFilter === 'noImage' ? 'px-2 py-1 rounded bg-red-500/15 border border-red-500/40' : ''}`}
+            onClick={() => {
+              if (imageFilter === 'noImage') { setImageFilter(null); return; }
+              setImageFilter('noImage');
+              setView('single'); // 无图筛选需要切到单品视图（池视图按 product 聚合会看不到单条无图）
+              setSearch('');
+            }}
+            title={imageFilter === 'noImage' ? '点此清除筛选' : '点此查看无图商品'}
+          >
+            <span className="text-xl font-bold text-red-400">{stockNoImg}</span>
+            <span className="text-[10px] text-red-400/70">无图待补充{imageFilter === 'noImage' ? ' ✕' : ' →'}</span>
+          </button>
+        )}
       </div>
 
       {/* Tab 切换：池 / 单品（分段控件） */}
