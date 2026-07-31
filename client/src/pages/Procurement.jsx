@@ -654,6 +654,7 @@ export default function Procurement() {
     stage1_date: new Date().toISOString().slice(0, 10),
     expected_arrival_date: '',
     product_id: null, quantity: '',
+    supplier_name: '',
   });
 
   const inProcurement = toys.filter(t =>
@@ -731,7 +732,7 @@ export default function Procurement() {
       setShowForm(false);
       setPoolMode(false);
       setPoolLines([{ product_id: null, quantity: '' }]);
-      setForm({ name: '', category: '其他', source: 'direct', status: 'procurement', procurement_stage: 'stage1', stage1_amount: '', stage2_amount: '', stage3_amount: '', stage1_date: new Date().toISOString().slice(0, 10), expected_arrival_date: '', product_id: null, quantity: '' });
+      setForm({ name: '', category: '其他', source: 'direct', status: 'procurement', procurement_stage: 'stage1', stage1_amount: '', stage2_amount: '', stage3_amount: '', stage1_date: new Date().toISOString().slice(0, 10), expected_arrival_date: '', product_id: null, quantity: '', supplier_name: '' });
     } catch (e) {
       setToast('添加失败');
     }
@@ -863,6 +864,17 @@ export default function Procurement() {
                   }
                   return null;
                 })()}
+                {form.source === 'vx好友' && (
+                  <input
+                    className="input text-xs"
+                    lang="zh-CN"
+                    spellCheck={false}
+                    autoComplete="off"
+                    placeholder="VX 好友称呼（如：张三/小李）"
+                    value={form.supplier_name}
+                    onChange={e => setForm({ ...form, supplier_name: e.target.value })}
+                  />
+                )}
               </div>
             </div>
             <div>
