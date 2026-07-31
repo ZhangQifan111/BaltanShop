@@ -300,6 +300,9 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
 function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
   const isTouch = useIsTouchDevice();
   const isPreorder = toy.status === 'preorder';
+  // 进入动画：先渲染隐藏样式，下一帧切到显示样式触发 CSS transition
+  const [shown, setShown] = useState(false);
+  useEffect(() => { const t = requestAnimationFrame(() => setShown(true)); return () => cancelAnimationFrame(t); }, []);
 
   const handleSave = async () => {
     const updates = { ...form };
@@ -314,8 +317,14 @@ function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[200] flex items-start sm:items-center justify-center p-4 overflow-y-auto" onClick={onCancel}>
-      <div className="bg-[#1a1d27] rounded-xl border border-white/10 w-full max-w-lg my-auto max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <div
+      className={`fixed inset-0 bg-black/60 z-[200] flex items-start sm:items-center justify-center p-4 overflow-y-auto transition-opacity duration-200 ${shown ? 'opacity-100' : 'opacity-0'}`}
+      onClick={onCancel}
+    >
+      <div
+        className={`bg-[#1a1d27] rounded-xl border border-white/10 w-full max-w-lg my-auto max-h-[90vh] flex flex-col transition-all duration-200 ease-out ${shown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+        onClick={e => e.stopPropagation()}
+      >
         {/* Header — 永远显示商品名 + 关闭 */}
         <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2 shrink-0">
           <h3 className="text-sm font-bold truncate flex-1 min-w-0">{toy.name_zh || toy.name}</h3>
