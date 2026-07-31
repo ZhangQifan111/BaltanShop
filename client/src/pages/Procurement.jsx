@@ -314,8 +314,8 @@ function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4" onClick={onCancel}>
-      <div className="bg-[#1a1d27] rounded-xl border border-white/10 w-full max-w-lg max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/60 z-[200] flex items-start sm:items-center justify-center p-4 overflow-y-auto" onClick={onCancel}>
+      <div className="bg-[#1a1d27] rounded-xl border border-white/10 w-full max-w-lg my-auto max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header — 永远显示商品名 + 关闭 */}
         <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2 shrink-0">
           <h3 className="text-sm font-bold truncate flex-1 min-w-0">{toy.name_zh || toy.name}</h3>
@@ -323,7 +323,7 @@ function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
         </div>
 
         {/* 中间可滚动表单区 */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
           {!isPreorder && (
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-black/20 rounded-lg p-3 border border-[#f0a030]/20">
