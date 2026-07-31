@@ -678,6 +678,8 @@ export default function Procurement() {
     e.preventDefault();
     if (!form.name) return setToast('请填写名称');
     try {
+      // 池模式 + 新建池号时，同步创建同名分类（本次会话内去重）
+      const newCategoryNames = new Set();
       const body = { ...form };
       if (body.status === 'preorder') {
         body.procurement_stage = null;
@@ -707,13 +709,28 @@ export default function Procurement() {
           const lineAmount = totalRefCost > 0
             ? Math.round(line.refCost * ratio * 100) / 100
             : totalQty > 0 ? Math.round(((Number(line.quantity) || 0) / totalQty) * totalStage1 * 100) / 100 : 0;
-          // 池模式 + 新建商品 → 自动创建 product
+          // 池模式 + 新建商品 → 先确保同名分类存在，再创建 product
           let pid = line.pid;
           if (!line.prod) {
+            const customName = (line.custom_name || '').trim();
+            let lineCategory = body.category;
+            if (customName) {
+              const exists = newCategoryNames.has(customName)
+                || categories.find(c => c.name === customName);
+              if (!exists) {
+                try {
+                  await api.post('/settings/categories', { name: customName, parent_id: null });
+                  newCategoryNames.add(customName);
+                } catch (e) {
+                  // 分类重名等异常忽略，用原 body.category 兜底
+                }
+              }
+              lineCategory = customName; // 新建池默认归到自己同名的分类下
+            }
             const created = await api.post('/products', {
-              name: line.custom_name || body.name,
-              name_zh: line.custom_name || body.name_zh || body.name || '',
-              category: body.category,
+              name: customName || body.name,
+              name_zh: customName || body.name_zh || body.name || '',
+              category: lineCategory,
               source: body.source,
             });
             pid = created.id;
