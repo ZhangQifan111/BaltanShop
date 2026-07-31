@@ -1975,6 +1975,11 @@ export default function Warehouse() {
   const stockWithImg = stockToys.filter(t => t.image && t.image.length > 0).length;
   const stockNoImg = stockToys.length - stockWithImg;
   const imgCoveragePct = stockToys.length > 0 ? (stockWithImg / stockToys.length * 100).toFixed(1) : '0.0';
+  // 池级视角（按 product 去重）：入池款数 / 池级无图款数
+  const productMap = new Map(products.map(p => [p.id, p]));
+  const stockPoolIds = [...new Set(stockToys.filter(t => t.product_id != null).map(t => t.product_id))];
+  const poolsWithImg = stockPoolIds.filter(id => productMap.get(id)?.image).length;
+  const poolsNoImg = stockPoolIds.length - poolsWithImg;
 
   const filtered = toys.filter(t => {
     if (t.status !== filter) return false;
@@ -2514,6 +2519,22 @@ export default function Warehouse() {
           </button>
         )}
       </div>
+
+      {/* 池级视角（按 product 去重） */}
+      {stockPoolIds.length > 0 && (
+        <div className="text-[10px] text-[#6b7085] -mt-2 px-1 flex items-center gap-3 flex-wrap">
+          <span>· 池视角：</span>
+          <span><b className="text-[#d0d4e8]">{stockPoolIds.length}</b> 款入池</span>
+          <span>·</span>
+          <span><b className={poolsWithImg > 0 ? 'text-emerald-400' : 'text-[#6b7085]'}>{poolsWithImg}</b> 款有图</span>
+          {poolsNoImg > 0 && (
+            <>
+              <span>·</span>
+              <span><b className="text-red-400">{poolsNoImg}</b> 款池级无图（去 Settings → 池商品里补）</span>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Tab 切换：池 / 单品（分段控件） */}
       <div className="relative p-1 rounded-xl bg-white/[0.03] border border-white/[0.06]">
