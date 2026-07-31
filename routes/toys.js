@@ -24,6 +24,49 @@ async function ensureCategoryExists(name) {
   }
 }
 
+/**
+ * 池封面自动补齐：若 product.image 为空，取该池下最早入池的有图 toy 的 image 当封面。
+ * 幂等：已有封面不动；该池下当前没有任何 toy 有图也不动（保持空等以后）。
+ * 排序键：COALESCE(purchase_date, created_at) ASC, id ASC（先 purchase_date 没就用 created_at）
+ */
+async function backfillPoolCover(productId) {
+  if (!productId) return;
+  try {
+    const product = await db.get('SELECT image FROM products WHERE id = ?', [productId]);
+    if (!product || product.image) return; // 已有封面或池不存在 → 不动
+    const earliest = await db.get(
+      `SELECT image FROM toys
+       WHERE product_id = ? AND image IS NOT NULL AND image != ''
+       ORDER BY COALESCE(purchase_date, created_at) ASC, id ASC
+       LIMIT 1`,
+      [productId]
+    );
+    if (earliest && earliest.image) {
+      db.update('UPDATE products SET image = ? WHERE id = ?', [earliest.image, productId]);
+      console.log('[backfillPoolCover] 池', productId, '封面 ← ', earliest.image);
+    }
+  } catch (e) {
+    console.warn('[backfillPoolCover] 失败（已忽略）:', productId, e.message);
+  }
+}
+
+/**
+ * 全量回填：扫所有 product 把封面补齐。一次性数据迁移用。
+ * 返回 { scanned, filled, skipped } 报告。
+ */
+async function backfillAllPoolCovers() {
+  const products = await db.all("SELECT id, name FROM products WHERE image IS NULL OR image = ''");
+  let filled = 0;
+  for (const p of products) {
+    const before = await db.get('SELECT image FROM products WHERE id = ?', [p.id]);
+    if (before && before.image) continue; // 已被并发补上了
+    await backfillPoolCover(p.id);
+    const after = await db.get('SELECT image FROM products WHERE id = ?', [p.id]);
+    if (after && after.image) filled++;
+  }
+  return { scanned: products.length, filled, skipped: products.length - filled };
+}
+
 // GET /api/toys
 router.get('/', async (req, res) => {
   try {
@@ -193,6 +236,8 @@ router.post('/', async (req, res) => {
     const sql = `INSERT INTO toys (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`;
     const id = await db.insert(sql, vals);
     const toy = await db.get('SELECT * FROM toys WHERE id = ?', [id]);
+    // 新 toy 入池时，尝试补齐 product 封面
+    if (toy.product_id) await backfillPoolCover(toy.product_id);
     res.json(enrichToy(toy));
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -229,6 +274,8 @@ router.put('/:id', async (req, res) => {
 
     db.update(sql, vals);
     const toy = await db.get('SELECT * FROM toys WHERE id = ?', [req.params.id]);
+    // 玩具更新后，若归属到某 product，尝试补齐该池封面
+    if (toy.product_id) await backfillPoolCover(toy.product_id);
     res.json(enrichToy(toy));
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -290,8 +337,20 @@ router.post('/batch-stockin', async (req, res) => {
           [totalCost, id]
         );
       }
+      // 刚入库到某池 → 尝试补齐该池封面
+      if (productId) await backfillPoolCover(productId);
     }
     res.json({ ok: true, stocked: ids.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/toys/backfill-pool-covers — 一次性扫所有 product 把封面补齐
+router.post('/backfill-pool-covers', async (req, res) => {
+  try {
+    const result = await backfillAllPoolCovers();
+    res.json({ ok: true, ...result });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
