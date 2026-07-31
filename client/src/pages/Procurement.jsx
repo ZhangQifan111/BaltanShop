@@ -314,100 +314,109 @@ function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[200] flex items-start justify-center p-4 overflow-y-auto" onClick={onCancel}>
-      <div className="bg-[#1a1d27] rounded-xl border border-white/10 p-4 w-full max-w-lg my-8" onClick={e => e.stopPropagation()}>
-        <h3 className="text-sm font-bold mb-4 truncate">{toy.name_zh || toy.name}</h3>
+    <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4" onClick={onCancel}>
+      <div className="bg-[#1a1d27] rounded-xl border border-white/10 w-full max-w-lg max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        {/* Header — 永远显示商品名 + 关闭 */}
+        <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2 shrink-0">
+          <h3 className="text-sm font-bold truncate flex-1 min-w-0">{toy.name_zh || toy.name}</h3>
+          <button className="text-[#6b7085] hover:text-white text-xl leading-none shrink-0" onClick={onCancel} aria-label="关闭">✕</button>
+        </div>
 
-        {!isPreorder && (
-          <div className="grid grid-cols-3 gap-3 mb-3">
-            <div className="bg-black/20 rounded-lg p-3 border border-[#f0a030]/20">
-              <div className="text-[10px] font-bold text-[#f0a030] mb-2">① 买货</div>
-              <div>
-                <label className="text-[10px] text-[#6b7085] block mb-1">买价 (¥)</label>
-                <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={form.stage1_amount ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage1_amount: e.target.value === '' ? '' : +e.target.value })} />
+        {/* 中间可滚动表单区 */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {!isPreorder && (
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-black/20 rounded-lg p-3 border border-[#f0a030]/20">
+                <div className="text-[10px] font-bold text-[#f0a030] mb-2">① 买货</div>
+                <div>
+                  <label className="text-[10px] text-[#6b7085] block mb-1">买价 (¥)</label>
+                  <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={form.stage1_amount ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage1_amount: e.target.value === '' ? '' : +e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
+                </div>
               </div>
-            </div>
-            <div className="bg-black/20 rounded-lg p-3 border border-[#60a5fa]/20">
-              <div className="text-[10px] font-bold text-[#60a5fa] mb-2">② 国内转运</div>
-              <div className="space-y-2">
-                {sourceGroup(toy.source) === 'direct' && (
+              <div className="bg-black/20 rounded-lg p-3 border border-[#60a5fa]/20">
+                <div className="text-[10px] font-bold text-[#60a5fa] mb-2">② 国内转运</div>
+                <div className="space-y-2">
+                  {sourceGroup(toy.source) === 'direct' && (
+                    <div>
+                      <label className="text-[10px] text-[#6b7085] block mb-1">重量 (kg)</label>
+                      <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" min="0" step="0.1" value={form.logistics_weight ?? ''} placeholder="0" onChange={e => setForm({ ...form, logistics_weight: e.target.value === '' ? '' : +e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
+                    </div>
+                  )}
                   <div>
-                    <label className="text-[10px] text-[#6b7085] block mb-1">重量 (kg)</label>
-                    <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" min="0" step="0.1" value={form.logistics_weight ?? ''} placeholder="0" onChange={e => setForm({ ...form, logistics_weight: e.target.value === '' ? '' : +e.target.value })} />
+                    <label className="text-[10px] text-[#6b7085] block mb-1">手续费 (¥)</label>
+                    <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={form.stage2_handling ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage2_handling: e.target.value === '' ? '' : +e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
                   </div>
-                )}
-                <div>
-                  <label className="text-[10px] text-[#6b7085] block mb-1">手续费 (¥)</label>
-                  <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={form.stage2_handling ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage2_handling: e.target.value === '' ? '' : +e.target.value })} />
+                  <div>
+                    <label className="text-[10px] text-[#6b7085] block mb-1">国内物流费 (¥)</label>
+                    <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={form.stage2_domestic_ship ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage2_domestic_ship: e.target.value === '' ? '' : +e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[10px] text-[#6b7085] block mb-1">国内物流费 (¥)</label>
-                  <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={form.stage2_domestic_ship ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage2_domestic_ship: e.target.value === '' ? '' : +e.target.value })} />
+              </div>
+              <div className="bg-black/20 rounded-lg p-3 border border-[#a78bfa]/20">
+                <div className="text-[10px] font-bold text-[#a78bfa] mb-2">③ 国际运输</div>
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[10px] text-[#6b7085] block mb-1">国际运费 (¥)</label>
+                    <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={form.stage3_intl_ship ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage3_intl_ship: e.target.value === '' ? '' : +e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-[#6b7085] block mb-1">税费 (¥，13%)</label>
+                    <input className="input text-xs bg-black/20 cursor-default" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={computeStage3Tax(form.stage1_amount, toy.source, form.stage3_tax_mode || toy.stage3_tax_mode).toFixed(2)} readOnly />
+                  </div>
+                  {sourceGroup(toy.source) !== 'proxy' && (
+                    <div className="flex gap-1 pt-1">
+                      <button
+                        type="button"
+                        className={`flex-1 text-[10px] py-1 rounded border ${(form.stage3_tax_mode || toy.stage3_tax_mode) === 'normal' ? 'bg-orange-500/20 border-orange-500 text-orange-300' : 'bg-black/20 border-white/10 text-[#6b7085]'}`}
+                        onClick={() => setForm({ ...form, stage3_tax_mode: 'normal' })}
+                      >
+                        正常运输
+                      </button>
+                      <button
+                        type="button"
+                        className={`flex-1 text-[10px] py-1 rounded border ${(form.stage3_tax_mode || toy.stage3_tax_mode) === 'tax_included' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300' : 'bg-black/20 border-white/10 text-[#6b7085]'}`}
+                        onClick={() => setForm({ ...form, stage3_tax_mode: 'tax_included' })}
+                      >
+                        包税线路
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-            <div className="bg-black/20 rounded-lg p-3 border border-[#a78bfa]/20">
-              <div className="text-[10px] font-bold text-[#a78bfa] mb-2">③ 国际运输</div>
-              <div className="space-y-2">
-                <div>
-                  <label className="text-[10px] text-[#6b7085] block mb-1">国际运费 (¥)</label>
-                  <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={form.stage3_intl_ship ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage3_intl_ship: e.target.value === '' ? '' : +e.target.value })} />
-                </div>
-                <div>
-                  <label className="text-[10px] text-[#6b7085] block mb-1">税费 (¥，13%)</label>
-                  <input className="input text-xs bg-black/20 cursor-default" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={computeStage3Tax(form.stage1_amount, toy.source, form.stage3_tax_mode || toy.stage3_tax_mode).toFixed(2)} readOnly />
-                </div>
-                {sourceGroup(toy.source) !== 'proxy' && (
-                  <div className="flex gap-1 pt-1">
-                    <button
-                      type="button"
-                      className={`flex-1 text-[10px] py-1 rounded border ${(form.stage3_tax_mode || toy.stage3_tax_mode) === 'normal' ? 'bg-orange-500/20 border-orange-500 text-orange-300' : 'bg-black/20 border-white/10 text-[#6b7085]'}`}
-                      onClick={() => setForm({ ...form, stage3_tax_mode: 'normal' })}
-                    >
-                      正常运输
-                    </button>
-                    <button
-                      type="button"
-                      className={`flex-1 text-[10px] py-1 rounded border ${(form.stage3_tax_mode || toy.stage3_tax_mode) === 'tax_included' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300' : 'bg-black/20 border-white/10 text-[#6b7085]'}`}
-                      onClick={() => setForm({ ...form, stage3_tax_mode: 'tax_included' })}
-                    >
-                      包税线路
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+          )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-          <div>
-            <label className="text-[10px] text-[#6b7085] block mb-1">商品名称</label>
-            <input className="input text-xs" lang="zh-CN" spellCheck={false} autoComplete="off" value={form.name || ''} onChange={e => setForm({ ...form, name: e.target.value })} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-[#6b7085] block mb-1">商品名称</label>
+              <input className="input text-xs" lang="zh-CN" spellCheck={false} autoComplete="off" value={form.name || ''} onChange={e => setForm({ ...form, name: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
+            </div>
+            <div>
+              <label className="text-[10px] text-[#6b7085] block mb-1">品类</label>
+              <select className="input text-xs" value={form.category || ''} onChange={e => setForm({ ...form, category: e.target.value })}>
+                <option value="">选择分类</option>
+                {categories.map(c => <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>)}
+              </select>
+            </div>
           </div>
+
+          {isPreorder && (
+            <div>
+              <label className="text-[10px] text-[#6b7085] block mb-1">上市/到货日 <span className="text-[#6b7085]">(可选)</span></label>
+              <input className="input text-xs" type="date" value={form.expected_arrival_date || ''} onChange={e => setForm({ ...form, expected_arrival_date: e.target.value })} />
+            </div>
+          )}
+
           <div>
-            <label className="text-[10px] text-[#6b7085] block mb-1">品类</label>
-            <select className="input text-xs" value={form.category || ''} onChange={e => setForm({ ...form, category: e.target.value })}>
-              <option value="">选择分类</option>
-              {categories.map(c => <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>)}
-            </select>
+            <label className="text-[10px] text-[#6b7085] block mb-1">备注</label>
+            <input className="input text-xs" value={form.notes || ''} onChange={e => setForm({ ...form, notes: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
           </div>
         </div>
 
-        {isPreorder && (
-          <div className="mb-3">
-            <label className="text-[10px] text-[#6b7085] block mb-1">上市/到货日 <span className="text-[#6b7085]">(可选)</span></label>
-            <input className="input text-xs" type="date" value={form.expected_arrival_date || ''} onChange={e => setForm({ ...form, expected_arrival_date: e.target.value })} />
-          </div>
-        )}
-
-        <div className="flex gap-3 items-end">
-          <div className="flex-1">
-            <label className="text-[10px] text-[#6b7085] block mb-1">备注</label>
-            <input className="input text-xs" value={form.notes || ''} onChange={e => setForm({ ...form, notes: e.target.value })} />
-          </div>
-          <button className="btn-primary text-xs" onClick={handleSave}>保存</button>
-          <button className="btn-ghost text-xs" onClick={onCancel}>取消</button>
+        {/* Footer — 永远显示取消/保存，无需滚动 */}
+        <div className="px-4 py-3 border-t border-white/10 flex gap-2 shrink-0">
+          <button className="btn-ghost text-xs flex-1" onClick={onCancel}>取消</button>
+          <button className="btn-primary text-xs flex-1" onClick={handleSave}>保存</button>
         </div>
       </div>
     </div>
