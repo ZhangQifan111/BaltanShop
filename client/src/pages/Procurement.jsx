@@ -334,6 +334,20 @@ function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
 
         {/* 中间可滚动表单区 */}
         <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-[#6b7085] block mb-1">商品名称</label>
+              <input className="input text-xs" lang="zh-CN" spellCheck={false} autoComplete="off" value={form.name || ''} onChange={e => setForm({ ...form, name: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
+            </div>
+            <div>
+              <label className="text-[10px] text-[#6b7085] block mb-1">品类</label>
+              <select className="input text-xs" value={form.category || ''} onChange={e => setForm({ ...form, category: e.target.value })}>
+                <option value="">选择分类</option>
+                {categories.map(c => <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>)}
+              </select>
+            </div>
+          </div>
+
           {!isPreorder && (
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-black/20 rounded-lg p-3 border border-[#f0a030]/20">
@@ -358,7 +372,7 @@ function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
                   </div>
                   <div>
                     <label className="text-[10px] text-[#6b7085] block mb-1">国内物流费 (¥)</label>
-                    <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={form.stage2_domestic_ship ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage2_domestic_ship: e.target.value === '' ? '' : +e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
+                    <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={form.stage2_domestic_ship ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage2_domestic_ship: e.target.value === '' : '' : +e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
                   </div>
                 </div>
               </div>
@@ -395,20 +409,6 @@ function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
               </div>
             </div>
           )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">商品名称</label>
-              <input className="input text-xs" lang="zh-CN" spellCheck={false} autoComplete="off" value={form.name || ''} onChange={e => setForm({ ...form, name: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
-            </div>
-            <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">品类</label>
-              <select className="input text-xs" value={form.category || ''} onChange={e => setForm({ ...form, category: e.target.value })}>
-                <option value="">选择分类</option>
-                {categories.map(c => <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>)}
-              </select>
-            </div>
-          </div>
 
           {isPreorder && (
             <div>
