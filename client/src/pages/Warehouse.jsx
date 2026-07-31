@@ -1995,8 +1995,8 @@ export default function Warehouse() {
       }
     }
     if (t.status === 'procurement' || t.status === 'transit' || t.status === 'preorder') return false;
-    if (t.product_id != null && t.status === 'stock') return false;
-    // 图片覆盖筛选（统计条点选）
+    if (!imageFilter && t.product_id != null && t.status === 'stock') return false;
+    // 图片覆盖筛选（统计条点选）— 临时放行被池化的 stock 商品
     if (imageFilter === 'noImage' && t.image) return false;
     if (imageFilter === 'hasImage' && !t.image) return false;
     return true;
