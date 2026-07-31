@@ -1,4 +1,5 @@
 import { useState, useEffect, memo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import useStore from '../stores/useStore';
 import { api } from '../lib/api';
 import { useIsTouchDevice } from '../lib/useIsTouchDevice';
@@ -316,7 +317,7 @@ function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
     await onSave(updates);
   };
 
-  return (
+  return createPortal(
     <div
       className={`fixed inset-0 bg-black/60 z-[200] flex items-start sm:items-center justify-center p-4 overflow-y-auto transition-opacity duration-200 ${shown ? 'opacity-100' : 'opacity-0'}`}
       onClick={onCancel}
@@ -428,7 +429,8 @@ function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
           <button className="btn-primary text-xs flex-1" onClick={handleSave}>保存</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
