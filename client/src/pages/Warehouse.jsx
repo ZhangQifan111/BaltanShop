@@ -13,7 +13,7 @@ const FILTERS = [
   { key: 'done', label: '已完成' },
 ];
 
-const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn, onDone, onUnsell, onPoolify, onPreviewImage }) {
+const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn, onDone, onUnsell, onPoolify, onPreviewImage, onUploadImage }) {
   const [doneLoading, setDoneLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -27,7 +27,26 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
   return (
     <div className="card cursor-pointer" onClick={() => setExpanded(!expanded)}>
       <div className="flex items-start gap-3 mb-3">
-        {toy.image && <img src={toy.image} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 bg-white/5 cursor-zoom-in hover:ring-2 hover:ring-accent/50 transition-all" loading="lazy" onError={e => e.target.style.display='none'} onClick={e => { e.stopPropagation(); onPreviewImage && onPreviewImage(toy.image); }} />}
+        <div className="relative group shrink-0">
+          {toy.image ? (
+            <>
+              <img src={toy.image} alt="" className="w-14 h-14 rounded-lg object-cover bg-white/5 cursor-zoom-in hover:ring-2 hover:ring-accent/50 transition-all" loading="lazy" onError={e => e.target.style.display='none'} onClick={e => { e.stopPropagation(); onPreviewImage && onPreviewImage(toy.image); }} />
+              <button
+                className="absolute inset-0 bg-black/70 rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-base transition-opacity"
+                onClick={e => { e.stopPropagation(); onUploadImage && onUploadImage(toy); }}
+                title="换图"
+              >📷</button>
+            </>
+          ) : (
+            <button
+              className="w-14 h-14 rounded-lg bg-white/5 border border-dashed border-white/20 flex items-center justify-center text-[#6b7085] hover:text-accent hover:border-accent/40 transition-colors"
+              onClick={e => { e.stopPropagation(); onUploadImage && onUploadImage(toy); }}
+              title="点此补图"
+            >
+              <span className="text-xl leading-none">+</span>
+            </button>
+          )}
+        </div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-bold truncate mb-1">{toy.name_zh || toy.name}</div>
           <span className="inline-block text-[10px] px-2 py-0.5 rounded-full" style={{ background: statusBadge.bg, color: statusBadge.color }}>
@@ -2814,6 +2833,13 @@ export default function Warehouse() {
             onDelete={id => setPendingDelete(id)}
             onPoolify={toy => setPoolifying(toy)}
             onPreviewImage={setPreviewImage}
+            onUploadImage={toy => setImageUploadTarget({
+              endpoint: '/api/toys',
+              id: toy.id,
+              label: '商品图',
+              currentImage: toy.image,
+              onDone: () => { useStore.getState().loadAll(); },
+            })}
           />
         ))}
       </div>
