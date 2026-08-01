@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db/database');
 const { calcTotalCost } = require('../utils/calcCost');
+const { fetchAndSaveImage } = require('../utils/downloadImage');
+const path = require('path');
+const fs = require('fs');
+const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 
 /**
  * 一致性保险：category 字符串如果不在 categories 表里，自动补登顶级分类。
@@ -217,6 +221,50 @@ router.delete('/:id', async (req, res) => {
     db.update('UPDATE toys SET product_id = NULL, quantity = NULL, remaining = NULL, unit_cost = NULL WHERE product_id = ?', [req.params.id]);
     db.update('DELETE FROM products WHERE id = ?', [req.params.id]);
     res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/products/:id/image-from-url — 粘贴远程 URL 补池封面
+router.post('/:id/image-from-url', async (req, res) => {
+  try {
+    const { url } = req.body || {};
+    if (!url) return res.status(400).json({ error: 'url required' });
+    const prod = await db.get('SELECT id, name FROM products WHERE id = ?', [req.params.id]);
+    if (!prod) return res.status(404).json({ error: 'product not found' });
+    const result = await fetchAndSaveImage(url, `pool_manual_${prod.id}_${Date.now()}`);
+    if (!result.ok) return res.status(500).json({ error: '下载失败：' + result.reason, attempts: result.attempts });
+    db.update('UPDATE products SET image = ? WHERE id = ?', [result.localPath, prod.id]);
+    res.json({ ok: true, image: result.localPath, attempts: result.attempts });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/products/:id/image-base64 — 前端本地上传补池封面
+router.post('/:id/image-base64', async (req, res) => {
+  try {
+    const { data, filename } = req.body || {};
+    if (!data || !data.startsWith('data:')) return res.status(400).json({ error: 'data 必须是 data: URL' });
+    const prod = await db.get('SELECT id FROM products WHERE id = ?', [req.params.id]);
+    if (!prod) return res.status(404).json({ error: 'product not found' });
+
+    const m = data.match(/^data:([^;]+);base64,(.+)$/);
+    if (!m) return res.status(400).json({ error: 'data 格式错误' });
+    const mime = m[1];
+    const buf = Buffer.from(m[2], 'base64');
+    const ext = mime.includes('png') ? '.png'
+              : mime.includes('webp') ? '.webp'
+              : mime.includes('gif') ? '.gif'
+              : '.jpg';
+    const safeName = filename ? filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-40) : '';
+    const fname = `pool_manual_${prod.id}_${Date.now()}${safeName ? '_' + safeName : ''}${ext}`;
+    fs.writeFileSync(path.join(UPLOADS_DIR, fname), buf);
+    const localPath = '/uploads/' + fname;
+
+    db.update('UPDATE products SET image = ? WHERE id = ?', [localPath, prod.id]);
+    res.json({ ok: true, image: localPath, size: buf.length });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

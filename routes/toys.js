@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db/database');
 const { enrichToy, calcBaseFromTarget, calcTotalCost } = require('../utils/calcCost');
+const { fetchAndSaveImage } = require('../utils/downloadImage');
+const path = require('path');
+const fs = require('fs');
+const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 
 /**
  * 一致性保险：category 不在 categories 表里就自动补登顶级分类。
@@ -351,6 +355,62 @@ router.post('/backfill-pool-covers', async (req, res) => {
   try {
     const result = await backfillAllPoolCovers();
     res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/toys/:id/image-from-url — 粘贴远程 URL，后端下载到 uploads/ 并写 toys.image
+router.post('/:id/image-from-url', async (req, res) => {
+  try {
+    const { url } = req.body || {};
+    if (!url) return res.status(400).json({ error: 'url required' });
+    const toy = await db.get('SELECT id, name, product_id FROM toys WHERE id = ?', [req.params.id]);
+    if (!toy) return res.status(404).json({ error: 'toy not found' });
+    // 用 toy.id 作为 itemId，文件名 renrigou_{id}.ext（与 import 保持一致便于管理）
+    const result = await fetchAndSaveImage(url, `manual_${toy.id}_${Date.now()}`);
+    if (!result.ok) return res.status(500).json({ error: '下载失败：' + result.reason, attempts: result.attempts });
+    db.update('UPDATE toys SET image = ?, image_fetched_at = ? WHERE id = ?',
+      [result.localPath, new Date().toISOString(), toy.id]);
+    // 入池商品同时回填池封面（幂等）
+    if (toy.product_id) await backfillPoolCover(toy.product_id);
+    res.json({ ok: true, image: result.localPath, attempts: result.attempts });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/toys/:id/image-base64 — 前端 FileReader 读本机图片 → base64 → 写 uploads/
+// body: { data: 'data:image/jpeg;base64,...', filename?: 'xxx.jpg' }
+router.post('/:id/image-base64', async (req, res) => {
+  try {
+    const { data, filename } = req.body || {};
+    if (!data || !data.startsWith('data:')) return res.status(400).json({ error: 'data 必须是 data: URL' });
+    const toy = await db.get('SELECT id, product_id FROM toys WHERE id = ?', [req.params.id]);
+    if (!toy) return res.status(404).json({ error: 'toy not found' });
+
+    // 解析 base64
+    const m = data.match(/^data:([^;]+);base64,(.+)$/);
+    if (!m) return res.status(400).json({ error: 'data 格式错误' });
+    const mime = m[1];
+    const buf = Buffer.from(m[2], 'base64');
+    const ext = mime.includes('png') ? '.png'
+              : mime.includes('webp') ? '.webp'
+              : mime.includes('gif') ? '.gif'
+              : '.jpg';
+
+    // 落到 uploads/toy_manual_{id}_{ts}{ext}（不复用 renrigou_ 前缀，避免与抓取图片混淆）
+    const safeName = filename ? filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-40) : '';
+    const fname = `toy_manual_${toy.id}_${Date.now()}${safeName ? '_' + safeName : ''}${ext}`;
+    const dest = path.join(UPLOADS_DIR, fname);
+    fs.writeFileSync(dest, buf);
+    const localPath = '/uploads/' + fname;
+
+    db.update('UPDATE toys SET image = ?, image_fetched_at = ? WHERE id = ?',
+      [localPath, new Date().toISOString(), toy.id]);
+    if (toy.product_id) await backfillPoolCover(toy.product_id);
+
+    res.json({ ok: true, image: localPath, size: buf.length });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

@@ -1,6 +1,7 @@
 import { useState, useEffect, memo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import ConfirmModal from '../components/ConfirmModal';
+import ImageUploadModal from '../components/ImageUploadModal';
 import useStore from '../stores/useStore';
 import { api } from '../lib/api';
 import { sourceLabel, sourceGroup, SOURCES } from '../lib/sources';
@@ -1933,6 +1934,7 @@ export default function Warehouse() {
   const [viewingPool, setViewingPool] = useState(null);
   const [transferPool, setTransferPool] = useState(null); // { batch, sourceProduct }
   const [imageFilter, setImageFilter] = useState(null); // null | 'noImage' | 'hasImage'
+  const [imageUploadTarget, setImageUploadTarget] = useState(null); // { endpoint, id, label, currentImage, onDone }
 
   useEffect(() => {
     api.get('/settings/categories').then(data => setCategories(data.flat || data)).catch(() => {});
@@ -2643,7 +2645,44 @@ export default function Warehouse() {
                 <div key={g.product_id} className={`card ${cardBorder} ${cardBg} cursor-pointer`}
                   onClick={() => setViewingPool(g)}>
                   <div className="flex items-start gap-3 mb-2">
-                    {poolImage && <img src={poolImage} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 bg-white/5 cursor-zoom-in hover:ring-2 hover:ring-accent/50 transition-all" loading="lazy" onError={e => e.target.style.display='none'} onClick={e => { e.stopPropagation(); setPreviewImage(poolImage); }} />}
+                    <div className="relative group shrink-0">
+                      {poolImage ? (
+                        <>
+                          <img src={poolImage} alt="" className="w-10 h-10 rounded-lg object-cover bg-white/5 cursor-zoom-in hover:ring-2 hover:ring-accent/50 transition-all" loading="lazy" onError={e => e.target.style.display='none'} onClick={e => { e.stopPropagation(); setPreviewImage(poolImage); }} />
+                          <button
+                            className="absolute inset-0 bg-black/70 rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-sm transition-opacity"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setImageUploadTarget({
+                                endpoint: '/api/products',
+                                id: g.product_id,
+                                label: '池封面',
+                                currentImage: poolImage,
+                                onDone: () => { api.get('/products').then(setProducts); },
+                              });
+                            }}
+                            title="换封面"
+                          >📷</button>
+                        </>
+                      ) : (
+                        <button
+                          className="w-10 h-10 rounded-lg bg-white/5 border border-dashed border-white/20 flex items-center justify-center text-[#6b7085] hover:text-accent hover:border-accent/40 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setImageUploadTarget({
+                              endpoint: '/api/products',
+                              id: g.product_id,
+                              label: '池封面',
+                              currentImage: null,
+                              onDone: () => { api.get('/products').then(setProducts); },
+                            });
+                          }}
+                          title="点此补图"
+                        >
+                          <span className="text-lg leading-none">+</span>
+                        </button>
+                      )}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-base font-bold truncate text-white">{prod?.name_zh || prod?.name || '未命名'}</div>
                       <div className="text-[11px] text-[#8b90a5]">{prod?.category || ''} · {g.batches.length} 批次</div>
@@ -2968,6 +3007,21 @@ export default function Warehouse() {
             onClick={e => e.stopPropagation()} />
         </div>,
         document.body
+      )}
+
+      {/* 补图弹窗（池卡片 + 单品卡片共用） */}
+      {imageUploadTarget && (
+        <ImageUploadModal
+          endpoint={imageUploadTarget.endpoint}
+          targetId={imageUploadTarget.id}
+          label={imageUploadTarget.label}
+          currentImage={imageUploadTarget.currentImage}
+          onDone={() => {
+            imageUploadTarget.onDone && imageUploadTarget.onDone();
+            setImageUploadTarget(null);
+          }}
+          onCancel={() => setImageUploadTarget(null)}
+        />
       )}
     </div>
   );
