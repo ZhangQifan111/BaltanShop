@@ -92,8 +92,8 @@ router.delete('/categories/:id', async (req, res) => {
     if (!existing) return res.status(404).json({ error: '分类不存在' });
 
     // 检测被引用数（防止删除后产生孤儿数据）
-    const toyRef = await db.get('SELECT COUNT(*) as n FROM toys WHERE category = ?', [existing.name]);
-    const prodRef = await db.get('SELECT COUNT(*) as n FROM products WHERE category = ?', [existing.name]);
+    const toyRef = await db.get('SELECT COUNT(*) as n FROM toys WHERE category_id = ?', [existing.id]);
+    const prodRef = await db.get('SELECT COUNT(*) as n FROM products WHERE category_id = ?', [existing.id]);
     if (toyRef.n > 0 || prodRef.n > 0) {
       return res.status(400).json({
         error: `该分类被引用：${toyRef.n} 个玩具、${prodRef.n} 个池。请先把它们的 category 改成别的，或用改名功能。`,
@@ -147,8 +147,10 @@ router.put('/categories/:id', async (req, res) => {
     let updatedToys = 0;
     let updatedProducts = 0;
     if (oldName !== newName) {
-      const toyCnt = await db.get('SELECT COUNT(*) as n FROM toys WHERE category = ?', [oldName]);
-      const prodCnt = await db.get('SELECT COUNT(*) as n FROM products WHERE category = ?', [oldName]);
+      // 现在通过 category_id 指向，改名后 id 不变所以 toys/products 自动跟随
+      // 仍统计引用数供前端提示
+      const toyCnt = await db.get('SELECT COUNT(*) as n FROM toys WHERE category_id = ?', [existing.id]);
+      const prodCnt = await db.get('SELECT COUNT(*) as n FROM products WHERE category_id = ?', [existing.id]);
       updatedToys = toyCnt.n;
       updatedProducts = prodCnt.n;
     }
@@ -157,8 +159,9 @@ router.put('/categories/:id', async (req, res) => {
       [newName, newParent, newColor, id]);
 
     if (updatedToys > 0 || updatedProducts > 0) {
-      db.update('UPDATE toys SET category = ? WHERE category = ?', [newName, oldName]);
-      db.update('UPDATE products SET category = ? WHERE category = ?', [newName, oldName]);
+      // 同步旧 category 字符串字段（保持兼容；Stage 4 移除后这段可删）
+      db.update('UPDATE toys SET category = ? WHERE category = ? AND category_id = ?', [newName, oldName, existing.id]);
+      db.update('UPDATE products SET category = ? WHERE category = ? AND category_id = ?', [newName, oldName, existing.id]);
       console.log(`[categories PUT] 同步改名: "${oldName}" → "${newName}"（${updatedToys} toys, ${updatedProducts} products）`);
     }
 

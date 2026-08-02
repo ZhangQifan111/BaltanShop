@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db/database');
 const { calcTotalCost } = require('../utils/calcCost');
 const { fetchAndSaveImage, runWithConcurrency, decodeRngImg } = require('../utils/downloadImage');
+const { ensureCategoryExists } = require('./toys');
 
 router.post('/', async (req, res) => {
   const { items } = req.body || {};
@@ -54,8 +55,15 @@ router.post('/', async (req, res) => {
   // 3) 顺序入库（sql.js 单文件锁，串行写）
   for (const { it, dl } of enriched) {
     const totalCost = calcTotalCost(it);
+    // 任你购导入：根据 it.category 字符串查/建 categories 表取 id
+    let categoryId = null;
+    if (it.category) {
+      await ensureCategoryExists(it.category);
+      const cat = await db.get('SELECT id FROM categories WHERE name = ?', [it.category.trim()]);
+      if (cat) categoryId = cat.id;
+    }
     const cols = [
-      'name','name_zh','category','source','status','supplier_id','supplier_name','purchase_date',
+      'name','name_zh','category','category_id','source','status','supplier_id','supplier_name','purchase_date',
       'japan_price_jpy','japan_price_cny','japan_price_includes_tax','japan_consumption_tax',
       'handling_fee','japan_domestic_shipping',
       'proxy_price','proxy_intl_shipping','proxy_domestic_shipping',
@@ -81,6 +89,7 @@ router.post('/', async (req, res) => {
       if (c === 'image') return dl.ok ? dl.localPath : null;
       if (c === 'image_url') return it.image_url || null;
       if (c === 'image_fetched_at') return dl.ok ? now : null;
+      if (c === 'category_id') return categoryId;
       return it[c] ?? null;
     });
 

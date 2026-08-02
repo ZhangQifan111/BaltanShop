@@ -71,20 +71,25 @@ async function backfillAllPoolCovers() {
   return { scanned: products.length, filled, skipped: products.length - filled };
 }
 
-// GET /api/toys
+// GET /api/toys — 支持 category_id 查询，JOIN categories 返回 category_name
 router.get('/', async (req, res) => {
   try {
-    const { status, category, search } = req.query;
+    const { status, category, category_id, search } = req.query;
     const where = [];
     const params = [];
-    if (status) { where.push('status = ?'); params.push(status); }
-    if (category) { where.push('category = ?'); params.push(category); }
+    if (status) { where.push('t.status = ?'); params.push(status); }
+    if (category_id) { where.push('t.category_id = ?'); params.push(Number(category_id)); }
+    if (category) { where.push('c.name = ?'); params.push(category); } // 兼容旧查询（按 name）
     if (search) {
       const q = `%${search.toLowerCase()}%`;
-      where.push('(LOWER(name) LIKE ? OR LOWER(name_zh) LIKE ? OR LOWER(category) LIKE ?)');
+      where.push('(LOWER(t.name) LIKE ? OR LOWER(t.name_zh) LIKE ? OR LOWER(c.name) LIKE ?)');
       params.push(q, q, q);
     }
-    const sql = `SELECT * FROM toys${where.length ? ' WHERE ' + where.join(' AND ') : ''} ORDER BY created_at DESC`;
+    const sql = `SELECT t.*, c.name AS category_name
+                 FROM toys t
+                 LEFT JOIN categories c ON c.id = t.category_id
+                 ${where.length ? ' WHERE ' + where.join(' AND ') : ''}
+                 ORDER BY t.created_at DESC`;
     const toys = (await db.all(sql, params)).map(enrichToy);
     res.json(toys);
   } catch (e) {
@@ -197,17 +202,21 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/toys
+// POST /api/toys — 优先用 category_id；只传 category 字符串时（兼容旧前端）自动补登分类
 router.post('/', async (req, res) => {
   try {
     const t = req.body;
-    // 一致性保险：category 补登
-    if (t.category) await ensureCategoryExists(t.category);
+    // 兼容：如果只传了 category 字符串（没传 category_id），自动补登 categories 表并取 id
+    if (t.category_id == null && t.category) {
+      await ensureCategoryExists(t.category);
+      const cat = await db.get('SELECT id FROM categories WHERE name = ?', [t.category.trim()]);
+      if (cat) t.category_id = cat.id;
+    }
     // 合并阶段金额到总成本 (与 calcTotalCost 同源)
     const totalCost = calcTotalCost(t);
 
     const cols = [
-      'name','name_zh','category','source','status','supplier_id','supplier_name','purchase_date',
+      'name','name_zh','category','category_id','source','status','supplier_id','supplier_name','purchase_date',
       'japan_price_jpy','japan_price_cny','japan_price_includes_tax','japan_consumption_tax',
       'handling_fee','japan_domestic_shipping',
       'proxy_price','proxy_intl_shipping','proxy_domestic_shipping',
@@ -239,12 +248,17 @@ router.post('/', async (req, res) => {
       if (c === 'product_id') return t.product_id ? Number(t.product_id) : null;
       if (c === 'remaining') return t.remaining != null ? Number(t.remaining) : (t.quantity != null ? Number(t.quantity) : null);
       if (c === 'unit_cost') return t.unit_cost != null ? Number(t.unit_cost) : null;
+      if (c === 'category_id') return t.category_id != null ? Number(t.category_id) : null;
       return t[c] ?? null;
     });
 
     const sql = `INSERT INTO toys (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`;
     const id = await db.insert(sql, vals);
-    const toy = await db.get('SELECT * FROM toys WHERE id = ?', [id]);
+    // JOIN 返回带 category_name
+    const toy = await db.get(
+      `SELECT t.*, c.name AS category_name FROM toys t LEFT JOIN categories c ON c.id = t.category_id WHERE t.id = ?`,
+      [id]
+    );
     // 新 toy 入池时，尝试补齐 product 封面
     if (toy.product_id) await backfillPoolCover(toy.product_id);
     res.json(enrichToy(toy));
@@ -253,16 +267,22 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT /api/toys/:id
+// PUT /api/toys/:id — 兼容 category_id（优先）和 category 字符串
 router.put('/:id', async (req, res) => {
   try {
     const existing = await db.get('SELECT * FROM toys WHERE id = ?', [req.params.id]);
     if (!existing) return res.status(404).json({ error: 'Not found' });
 
     const t = req.body;
-    // 一致性保险：category 改了补登
-    if (t.category !== undefined && t.category !== existing.category) {
+    // 兼容：只传 category 字符串时自动补登并填 category_id
+    if (t.category_id == null && t.category !== undefined && t.category !== existing.category) {
       await ensureCategoryExists(t.category);
+      const cat = await db.get('SELECT id FROM categories WHERE name = ?', [t.category.trim()]);
+      if (cat) t.category_id = cat.id;
+    } else if (t.category_id != null && t.category === undefined) {
+      // 只传 category_id 时，根据 id 反查 name 同步 category 字符串（兼容旧字段）
+      const cat = await db.get('SELECT name FROM categories WHERE id = ?', [t.category_id]);
+      if (cat) t.category = cat.name;
     }
     const merged = { ...existing, ...t };
 
@@ -275,14 +295,17 @@ router.put('/:id', async (req, res) => {
     }
     merged.profit = null; // recalculated by enrichToy
 
-    const skip = ['id', 'created_at'];
-    const cols = Object.keys(merged).filter(k => !skip.includes(k));
+    const skip = ['id', 'created_at', 'category_name']; // category_name 是 JOIN 字段，不是表列
+    const cols = Object.keys(merged).filter(k => !skip.includes(k) && k in merged && merged[k] !== undefined);
 
     const sql = `UPDATE toys SET ${cols.map(c => c + ' = ?').join(',')} WHERE id = ?`;
     const vals = [...cols.map(c => merged[c] ?? null), req.params.id];
 
     db.update(sql, vals);
-    const toy = await db.get('SELECT * FROM toys WHERE id = ?', [req.params.id]);
+    const toy = await db.get(
+      `SELECT t.*, c.name AS category_name FROM toys t LEFT JOIN categories c ON c.id = t.category_id WHERE t.id = ?`,
+      [req.params.id]
+    );
     // 玩具更新后，若归属到某 product，尝试补齐该池封面
     if (toy.product_id) await backfillPoolCover(toy.product_id);
     res.json(enrichToy(toy));
@@ -421,4 +444,6 @@ router.post('/:id/image-base64', async (req, res) => {
   }
 });
 
+// 导出 ensureCategoryExists 给其他路由复用（任你购导入需要）
 module.exports = router;
+module.exports.ensureCategoryExists = ensureCategoryExists;

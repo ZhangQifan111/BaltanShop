@@ -29,21 +29,22 @@ async function ensureCategoryExists(name) {
   }
 }
 
-// GET /api/products — 列表，含汇总数据
+// GET /api/products — 列表，含汇总数据，JOIN categories 返回 category_name
 router.get('/', async (req, res) => {
   try {
-    const { category, search } = req.query;
+    const { category, category_id, search } = req.query;
     const where = [];
     const params = [];
-    if (category) { where.push('p.category = ?'); params.push(category); }
+    if (category_id) { where.push('p.category_id = ?'); params.push(Number(category_id)); }
+    if (category) { where.push('c.name = ?'); params.push(category); } // 兼容旧查询（按 name）
     if (search) {
       const q = `%${search.toLowerCase()}%`;
-      where.push('(LOWER(p.name) LIKE ? OR LOWER(p.name_zh) LIKE ?)');
-      params.push(q, q);
+      where.push('(LOWER(p.name) LIKE ? OR LOWER(p.name_zh) LIKE ? OR LOWER(c.name) LIKE ?)');
+      params.push(q, q, q);
     }
     const whereClause = where.length ? 'WHERE ' + where.join(' AND ') : '';
 
-    const sql = `SELECT p.* FROM products p ${whereClause} ORDER BY p.created_at DESC`;
+    const sql = `SELECT p.*, c.name AS category_name FROM products p LEFT JOIN categories c ON c.id = p.category_id ${whereClause} ORDER BY p.created_at DESC`;
     const products = await db.all(sql, params);
 
     // 对每个 product 算汇总
@@ -164,50 +165,66 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/products
+// POST /api/products — 优先 category_id；只传 category 字符串时自动补登
 router.post('/', async (req, res) => {
   try {
     const t = req.body;
-    // 一致性保险：category 补登
-    if (t.category) await ensureCategoryExists(t.category);
-    const cols = ['name', 'name_zh', 'category', 'source', 'image', 'notes'];
+    if (t.category_id == null && t.category) {
+      await ensureCategoryExists(t.category);
+      const cat = await db.get('SELECT id FROM categories WHERE name = ?', [t.category.trim()]);
+      if (cat) t.category_id = cat.id;
+    }
+    const cols = ['name', 'name_zh', 'category', 'category_id', 'source', 'image', 'notes'];
     const vals = [
       t.name || '',
       t.name_zh || '',
-      t.category || '其他',
+      t.category || null,
+      t.category_id != null ? Number(t.category_id) : null,
       t.source || 'direct',
       t.image || null,
       t.notes || null,
     ];
     const sql = `INSERT INTO products (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`;
     const id = await db.insert(sql, vals);
-    const product = await db.get('SELECT * FROM products WHERE id = ?', [id]);
+    const product = await db.get(
+      `SELECT p.*, c.name AS category_name FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.id = ?`,
+      [id]
+    );
     res.json(product);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// PUT /api/products/:id
+// PUT /api/products/:id — 兼容 category_id（优先）和 category 字符串
 router.put('/:id', async (req, res) => {
   try {
     const existing = await db.get('SELECT * FROM products WHERE id = ?', [req.params.id]);
     if (!existing) return res.status(404).json({ error: 'Not found' });
 
     const t = req.body;
-    // 一致性保险：category 改了就补登
-    if (t.category !== undefined && t.category !== existing.category) {
+    // 兼容：只传 category 字符串时自动补登并填 category_id
+    if (t.category_id == null && t.category !== undefined && t.category !== existing.category) {
       await ensureCategoryExists(t.category);
+      const cat = await db.get('SELECT id FROM categories WHERE name = ?', [t.category.trim()]);
+      if (cat) t.category_id = cat.id;
+    } else if (t.category_id != null && t.category === undefined) {
+      // 只传 category_id 时反查 name 同步 category 字符串
+      const cat = await db.get('SELECT name FROM categories WHERE id = ?', [t.category_id]);
+      if (cat) t.category = cat.name;
     }
     const merged = { ...existing, ...t };
-    const skip = ['id', 'created_at'];
+    const skip = ['id', 'created_at', 'category_name']; // category_name 是 JOIN 字段
     const cols = Object.keys(merged).filter(k => !skip.includes(k));
 
     const sql = `UPDATE products SET ${cols.map(c => c + ' = ?').join(',')} WHERE id = ?`;
     const vals = [...cols.map(c => merged[c] ?? null), req.params.id];
     db.update(sql, vals);
 
-    const product = await db.get('SELECT * FROM products WHERE id = ?', [req.params.id]);
+    const product = await db.get(
+      `SELECT p.*, c.name AS category_name FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.id = ?`,
+      [req.params.id]
+    );
     res.json(product);
   } catch (e) {
     res.status(500).json({ error: e.message });
