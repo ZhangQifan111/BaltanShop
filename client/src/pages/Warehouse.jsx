@@ -874,7 +874,11 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
                   }
                   return false;
                 })
-              : products;
+              : rootFiltered;
+
+            // 选了顶级但该顶级下 0 个池 → 直接归顶级（不入具体池）
+            const rootHasNoPool = rootFilter[idx] && rootFiltered.length === 0;
+            const assignDirectToRoot = rootHasNoPool && !line.product_id && !line.custom_name;
 
             return (
               <div key={idx} className="bg-white/[0.03] rounded-lg p-3 space-y-2">
@@ -961,7 +965,22 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
                             onFocus={() => updateLine(idx, 'showDropdown', true)}
                             onBlur={() => setTimeout(() => updateLine(idx, 'showDropdown', false), 200)}
                             onChange={e => { updateLine(idx, 'search', e.target.value); updateLine(idx, 'showDropdown', true); }} />
-                          {line.showDropdown && (
+                          {rootHasNoPool && !line.product_id && !assignDirectToRoot ? (
+                            // 选了顶级但 0 个池 → 提示用户直接归顶级
+                            <button type="button"
+                              onClick={() => updateLine(idx, 'custom_category_id', rootFilter[idx])}
+                              className="w-full mt-1 px-3 py-2 text-xs text-left bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-emerald-300 flex items-center gap-2">
+                              <span>↳</span>
+                              <span className="flex-1">该顶级暂无池，点此直接归顶级（<b>{topLevelCategories.find(c => c.id === rootFilter[idx])?.name}</b>），不入具体池</span>
+                            </button>
+                          ) : assignDirectToRoot ? (
+                            <div className="mt-1 px-3 py-2 text-xs bg-emerald-500/15 border border-emerald-500/40 rounded-lg text-emerald-300 flex items-center gap-2">
+                              <span>✓</span>
+                              <span className="flex-1">已选：直接归顶级 <b>{topLevelCategories.find(c => c.id === rootFilter[idx])?.name}</b></span>
+                              <button type="button" className="text-[#6b7085] hover:text-red-400 text-xs"
+                                onClick={() => { updateLine(idx, 'custom_category_id', null); setRootFilter(prev => ({ ...prev, [idx]: null })); }}>✕</button>
+                            </div>
+                          ) : line.showDropdown && (
                             <div className="absolute left-0 right-0 top-full mt-1 bg-[#0f1117]/95 backdrop-blur-sm border border-white/10 rounded-xl max-h-64 overflow-y-auto z-50 shadow-2xl shadow-black/60">
                               {filtered.length === 0 ? (
                                 <div className="px-3 py-3 text-xs text-[#6b7085] text-center">
@@ -2214,7 +2233,19 @@ export default function Warehouse() {
       // 第一行：更新原始 toy
       const first = lines[0];
       let productId = first.product_id;
-      // 新建商品
+      // 模式 A：直接归顶级（product_id 空 + custom_category_id 有值）
+      //   → 不创建 product，只更新 toy.category_id = 顶级 id
+      if (!productId && first.custom_category_id) {
+        const catName = categories.find(c => c.id === first.custom_category_id)?.name;
+        await updateToy(poolifying.id, {
+          ...poolifying,
+          category_id: first.custom_category_id,
+          category: catName || poolifying.category,
+        });
+        setToast(`已归顶级「${catName}」（不入具体池）`);
+        return;
+      }
+      // 模式 B：入具体池（正常逻辑）
       const prod = products.find(p => String(p.id) === String(productId));
       if (!prod) {
         const created = await api.post('/products', {
