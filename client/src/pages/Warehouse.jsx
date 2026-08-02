@@ -936,47 +936,63 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
                       </div>
                     ) : (
                       <>
-                        {/* 顶级 chip 栏：先选顶级（这一步先收敛范围），再搜池 */}
-                        <div className="flex gap-1 mb-1.5 overflow-x-auto pb-1">
-                          <button type="button"
-                            className={`text-[10px] px-2 py-1 rounded shrink-0 ${rootFilter[idx] == null ? 'bg-accent/30 border border-accent text-accent' : 'bg-white/[0.05] border border-white/10 text-[#9ba0b5] hover:text-white'}`}
-                            onClick={() => { setRootFilter(prev => ({ ...prev, [idx]: null })); updateLine(idx, 'showDropdown', true); }}>
-                            全部
-                          </button>
-                          {topLevelCategories.map(c => (
-                            <button type="button" key={c.id}
-                              className={`text-[10px] px-2 py-1 rounded shrink-0 ${rootFilter[idx] === c.id ? 'bg-accent/30 border border-accent text-accent' : 'bg-white/[0.05] border border-white/10 text-[#9ba0b5] hover:text-white'}`}
-                              onClick={() => { setRootFilter(prev => ({ ...prev, [idx]: c.id })); updateLine(idx, 'showDropdown', true); }}>
-                              {c.name}
+                        {/* 顶级筛选：胶囊 segmented control */}
+                        <div className="mb-2">
+                          <div className="text-[10px] text-[#6b7085] mb-1">按分类筛选</div>
+                          <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-thin">
+                            <button type="button"
+                              onClick={() => { setRootFilter(prev => ({ ...prev, [idx]: null })); updateLine(idx, 'showDropdown', true); }}
+                              className={`shrink-0 px-3 py-1 text-[11px] font-medium rounded-full transition-all ${rootFilter[idx] == null ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/30' : 'bg-white/[0.04] text-[#8b90a5] hover:bg-white/[0.08] hover:text-white border border-white/[0.06]'}`}>
+                              全部
                             </button>
-                          ))}
-                        </div>
-                        <input className="input text-xs w-full" placeholder={rootFilter[idx] ? `搜 ${topLevelCategories.find(c => c.id === rootFilter[idx])?.name} 下的池` : '搜全部池（池名/分类）'}
-                          value={line.search || ''}
-                          onFocus={() => updateLine(idx, 'showDropdown', true)}
-                          onBlur={() => setTimeout(() => updateLine(idx, 'showDropdown', false), 200)}
-                          onChange={e => { updateLine(idx, 'search', e.target.value); updateLine(idx, 'showDropdown', true); }} />
-                        {line.showDropdown && (
-                          <div className="absolute left-0 right-0 top-full mt-1 bg-[#1a1d27] border border-gray-600 rounded-lg max-h-60 overflow-y-auto z-50 shadow-xl">
-                            {filtered.map(p => (
-                              <button type="button" key={p.id}
-                                className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/10 flex items-center gap-2 border-b border-gray-700/50 last:border-b-0"
-                                onPointerDown={() => { updateLine(idx, 'product_id', String(p.id)); updateLine(idx, 'search', ''); updateLine(idx, 'showDropdown', false); }}>
-                                <span className="truncate flex-1">{p.name_zh || p.name}</span>
-                                <span className="text-[10px] text-[#6b7085] shrink-0">[{p.category_name || p.category}]</span>
-                                <span className="text-[10px] text-[#6b7085] shrink-0">¥{p.avg_unit_cost?.toFixed(0) || '—'}</span>
+                            {topLevelCategories.map(c => (
+                              <button type="button" key={c.id}
+                                onClick={() => { setRootFilter(prev => ({ ...prev, [idx]: c.id })); updateLine(idx, 'showDropdown', true); }}
+                                className={`shrink-0 px-3 py-1 text-[11px] font-medium rounded-full transition-all ${rootFilter[idx] === c.id ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/30' : 'bg-white/[0.04] text-[#8b90a5] hover:bg-white/[0.08] hover:text-white border border-white/[0.06]'}`}>
+                                {c.name}
                               </button>
                             ))}
-                            <button type="button"
-                              className="w-full text-left px-3 py-1.5 text-xs hover:bg-orange-500/10 text-orange-400 border-t border-gray-600"
-                              onPointerDown={() => { updateLine(idx, 'product_id', '__new__'); updateLine(idx, 'search', ''); updateLine(idx, 'showDropdown', false); }}>
-                              + 新建商品
-                            </button>
-                            {filtered.length === 0 && (
-                              <div className="px-3 py-1.5 text-xs text-[#6b7085]">无匹配，可新建</div>
-                            )}
                           </div>
-                        )}
+                        </div>
+                        {/* 搜索框 + 下拉 */}
+                        <div className="relative">
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#6b7085] text-xs">🔍</span>
+                            <input className="input text-xs w-full pl-7 pr-3"
+                              placeholder={rootFilter[idx] ? `搜 ${topLevelCategories.find(c => c.id === rootFilter[idx])?.name} 下的池` : '搜全部池（池名/分类）'}
+                              value={line.search || ''}
+                              onFocus={() => updateLine(idx, 'showDropdown', true)}
+                              onBlur={() => setTimeout(() => updateLine(idx, 'showDropdown', false), 200)}
+                              onChange={e => { updateLine(idx, 'search', e.target.value); updateLine(idx, 'showDropdown', true); }} />
+                          </div>
+                          {line.showDropdown && (
+                            <div className="absolute left-0 right-0 top-full mt-1 bg-[#0f1117]/95 backdrop-blur-sm border border-white/10 rounded-xl max-h-64 overflow-y-auto z-50 shadow-2xl shadow-black/60">
+                              {filtered.length === 0 ? (
+                                <div className="px-3 py-3 text-xs text-[#6b7085] text-center">
+                                  没有匹配的池 · 点下方新建
+                                </div>
+                              ) : (
+                                filtered.map(p => (
+                                  <button type="button" key={p.id}
+                                    className="w-full text-left px-3 py-2 text-xs hover:bg-white/[0.08] flex items-center gap-2 border-b border-white/[0.04] last:border-b-0 transition-colors"
+                                    onPointerDown={() => { updateLine(idx, 'product_id', String(p.id)); updateLine(idx, 'search', ''); updateLine(idx, 'showDropdown', false); }}>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="truncate font-medium text-[#d0d4e8]">{p.name_zh || p.name}</div>
+                                      <div className="text-[10px] text-[#6b7085] mt-0.5 truncate">{p.category_name || p.category}</div>
+                                    </div>
+                                    <span className="text-[10px] text-accent shrink-0 tabular-nums">¥{p.avg_unit_cost?.toFixed(0) || '—'}</span>
+                                  </button>
+                                ))
+                              )}
+                              <button type="button"
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-orange-500/10 text-orange-400 border-t border-white/[0.08] flex items-center gap-2"
+                                onPointerDown={() => { updateLine(idx, 'product_id', '__new__'); updateLine(idx, 'search', ''); updateLine(idx, 'showDropdown', false); }}>
+                                <span className="text-base leading-none">＋</span>
+                                <span>新建商品</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </>
                     )}
                   </div>
