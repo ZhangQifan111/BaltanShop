@@ -934,26 +934,93 @@ function PoolifyModal({ toy, products, categories, onConfirm, onCancel }) {
                           onFocus={() => updateLine(idx, 'showDropdown', true)}
                           onBlur={() => setTimeout(() => updateLine(idx, 'showDropdown', false), 200)}
                           onChange={e => { updateLine(idx, 'search', e.target.value); updateLine(idx, 'showDropdown', true); }} />
-                        {line.showDropdown && (
-                          <div className="absolute left-0 right-0 top-full mt-1 bg-[#1a1d27] border border-gray-600 rounded-lg max-h-40 overflow-y-auto z-50 shadow-xl">
-                            {filtered.map(p => (
-                              <button type="button" key={p.id}
-                                className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/10 flex items-center gap-2 border-b border-gray-700/50 last:border-b-0"
-                                onPointerDown={() => { updateLine(idx, 'product_id', String(p.id)); updateLine(idx, 'search', ''); updateLine(idx, 'showDropdown', false); }}>
-                                <span className="truncate flex-1">{p.name_zh || p.name}</span>
-                                <span className="text-[10px] text-[#6b7085] shrink-0">¥{p.avg_unit_cost?.toFixed(0) || '—'}</span>
+                        {line.showDropdown && (() => {
+                          // 按顶级 → 二级 → 池 树状分组
+                          // 第一遍：顶级归桶
+                          const rootBuckets = new Map(); // rootId → { name, pools: [...] }
+                          for (const p of filtered) {
+                            const root = p.category_id ? catIdToRoot[p.category_id] : null;
+                            const key = root ? root.id : 0;
+                            if (!rootBuckets.has(key)) {
+                              rootBuckets.set(key, {
+                                name: root?.name || (p.category_name || p.category || '未分类'),
+                                pools: [],
+                              });
+                            }
+                            rootBuckets.get(key).pools.push(p);
+                          }
+                          // 第二遍：每个顶级桶内按二级分组
+                          const selectPool = (p) => {
+                            updateLine(idx, 'product_id', String(p.id));
+                            updateLine(idx, 'search', '');
+                            updateLine(idx, 'showDropdown', false);
+                          };
+                          return (
+                            <div className="absolute left-0 right-0 top-full mt-1 bg-[#1a1d27] border border-gray-600 rounded-lg max-h-80 overflow-y-auto z-50 shadow-xl">
+                              {[...rootBuckets.entries()].map(([rootId, { name: rootName, pools: rootPools }]) => {
+                                // 二级分组
+                                const byChild = new Map(); // childId → { name, parentId, pools: [...] }
+                                const orphanAtRoot = []; // category 本身就是顶级的池
+                                for (const p of rootPools) {
+                                  const cat = p.category_id ? categories.find(c => c.id === p.category_id) : null;
+                                  if (cat && cat.parent_id) {
+                                    if (!byChild.has(cat.id)) {
+                                      byChild.set(cat.id, { name: cat.name, parentId: cat.parent_id, pools: [] });
+                                    }
+                                    byChild.get(cat.id).pools.push(p);
+                                  } else {
+                                    orphanAtRoot.push(p);
+                                  }
+                                }
+                                return (
+                                  <div key={rootId}>
+                                    {/* 顶级 header */}
+                                    <div className="px-3 py-1 bg-white/[0.06] text-[10px] font-bold text-[#9ba0b5] uppercase tracking-wider sticky top-0">
+                                      {rootName} <span className="text-[#4b5065]">({rootPools.length})</span>
+                                    </div>
+                                    {/* 顶级自身的池（category 直接是顶级） */}
+                                    {orphanAtRoot.map(p => (
+                                      <button type="button" key={p.id}
+                                        className="w-full text-left pl-5 pr-3 py-1.5 text-xs hover:bg-white/10 flex items-center gap-2"
+                                        onPointerDown={() => selectPool(p)}>
+                                        <span className="truncate flex-1">{p.name_zh || p.name}</span>
+                                        <span className="text-[10px] text-[#6b7085] shrink-0">¥{p.avg_unit_cost?.toFixed(0) || '—'}</span>
+                                      </button>
+                                    ))}
+                                    {/* 二级分组 */}
+                                    {[...byChild.values()].map(child => {
+                                      // 按二级内的池名排个序
+                                      const sortedPools = child.pools.sort((a, b) => (a.name_zh || a.name).localeCompare(b.name_zh || b.name));
+                                      return (
+                                        <div key={child.name}>
+                                          <div className="pl-5 pr-3 py-0.5 text-[10px] text-[#6b7085]">
+                                            └ {child.name}
+                                          </div>
+                                          {sortedPools.map(p => (
+                                            <button type="button" key={p.id}
+                                              className="w-full text-left pl-9 pr-3 py-1.5 text-xs hover:bg-white/10 flex items-center gap-2"
+                                              onPointerDown={() => selectPool(p)}>
+                                              <span className="truncate flex-1">{p.name_zh || p.name}</span>
+                                              <span className="text-[10px] text-[#6b7085] shrink-0">¥{p.avg_unit_cost?.toFixed(0) || '—'}</span>
+                                            </button>
+                                          ))}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })}
+                              <button type="button"
+                                className="w-full text-left px-3 py-1.5 text-xs hover:bg-orange-500/10 text-orange-400 border-t border-gray-600"
+                                onPointerDown={() => { updateLine(idx, 'product_id', '__new__'); updateLine(idx, 'search', ''); updateLine(idx, 'showDropdown', false); }}>
+                                + 新建商品
                               </button>
-                            ))}
-                            <button type="button"
-                              className="w-full text-left px-3 py-1.5 text-xs hover:bg-orange-500/10 text-orange-400 border-t border-gray-600"
-                              onPointerDown={() => { updateLine(idx, 'product_id', '__new__'); updateLine(idx, 'search', ''); updateLine(idx, 'showDropdown', false); }}>
-                              + 新建商品
-                            </button>
-                            {filtered.length === 0 && line.search && (
-                              <div className="px-3 py-1.5 text-xs text-[#6b7085]">无匹配，可新建</div>
-                            )}
-                          </div>
-                        )}
+                              {filtered.length === 0 && line.search && (
+                                <div className="px-3 py-1.5 text-xs text-[#6b7085]">无匹配，可新建</div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </>
                     )}
                   </div>
