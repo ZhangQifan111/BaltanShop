@@ -222,7 +222,12 @@ router.post('/', async (req, res) => {
       'stage3_date','stage3_amount','stage3_note','stage3_intl_ship','stage3_tax','stage3_tax_mode',
       'expected_arrival_date',
       'shipment_id','total_cost','profit','baltan_ref_id','notes','image',
-      'product_id','quantity','remaining','unit_cost'
+      'product_id','quantity','remaining','unit_cost',
+      // 物流费对账（拿到真实账单后填实际值；差异 = 实际 - 预估）
+      'japan_domestic_shipping_actual','proxy_intl_shipping_actual','proxy_domestic_shipping_actual',
+      'domestic_shipping_actual','intl_shipping_actual','logistics_fee_actual',
+      'stage1_handling_actual','stage1_domestic_ship_actual','stage2_handling_actual',
+      'stage2_domestic_ship_actual','stage3_intl_ship_actual'
     ];
 
     const vals = cols.map(c => {

@@ -13,9 +13,38 @@ const FILTERS = [
   { key: 'done', label: '已完成' },
 ];
 
-const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn, onDone, onUnsell, onPoolify, onPreviewImage, onUploadImage }) {
+const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn, onDone, onUnsell, onPoolify, onPreviewImage, onUploadImage, onReconcile }) {
   const [doneLoading, setDoneLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
+
+  // 对账差异计算：返回 { field, label, estimated, actual, diff } 列表
+  const reconciliationFields = (() => {
+    if (sourceGroup(toy.source) === 'direct') {
+      return [
+        { label: '日本→国内运费', est: toy.japan_domestic_shipping || 0, act: toy.japan_domestic_shipping_actual || 0, key: 'japan_domestic_shipping_actual' },
+        { label: '③ 国际运费', est: toy.intl_shipping || 0, act: toy.intl_shipping_actual || 0, key: 'intl_shipping_actual' },
+        { label: '国内发货物流费', est: toy.logistics_fee || 0, act: toy.logistics_fee_actual || 0, key: 'logistics_fee_actual' },
+      ];
+    }
+    if (sourceGroup(toy.source) === 'proxy') {
+      return [
+        { label: '代购国际运费', est: toy.proxy_intl_shipping || 0, act: toy.proxy_intl_shipping_actual || 0, key: 'proxy_intl_shipping_actual' },
+        { label: '代购国内运费', est: toy.proxy_domestic_shipping || 0, act: toy.proxy_domestic_shipping_actual || 0, key: 'proxy_domestic_shipping_actual' },
+        { label: '国内发货物流费', est: toy.logistics_fee || 0, act: toy.logistics_fee_actual || 0, key: 'logistics_fee_actual' },
+      ];
+    }
+    if (toy.source === 'domestic' || toy.source === '咸鱼' || toy.source === 'vx好友') {
+      return [
+        { label: '国内运费', est: toy.domestic_shipping || 0, act: toy.domestic_shipping_actual || 0, key: 'domestic_shipping_actual' },
+        { label: '国内发货物流费', est: toy.logistics_fee || 0, act: toy.logistics_fee_actual || 0, key: 'logistics_fee_actual' },
+      ];
+    }
+    return [
+      { label: '国内发货物流费', est: toy.logistics_fee || 0, act: toy.logistics_fee_actual || 0, key: 'logistics_fee_actual' },
+    ];
+  })();
+  const totalDiff = reconciliationFields.reduce((s, f) => s + (f.act > 0 ? f.act - f.est : 0), 0);
+  const reconciledCount = reconciliationFields.filter(f => f.act > 0).length;
 
   const statusBadge = {
     stock: { label: '在库', bg: 'rgba(74,222,128,0.15)', color: '#34d399' },
@@ -118,6 +147,45 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
           )}
           {toy.profit != null && <div className="flex justify-between font-bold" style={{ color: toy.profit >= 0 ? '#34d399' : '#f87171' }}><span className="text-[#6b7085]">利润</span><span>{toy.profit >= 0 ? '+' : ''}¥{toy.profit.toFixed(0)}</span></div>}
           {toy.notes && <div className="flex justify-between text-[#6b7085]"><span>备注</span><span className="text-right max-w-[60%] truncate">{toy.notes}</span></div>}
+
+          {/* 物流费对账：显示预估/实际/差异 + 一键对账按钮 */}
+          <div className="pt-2 mt-2 border-t border-white/5">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-[#f0a030]">📊 物流费对账</span>
+                <span className="text-[10px] text-[#6b7085]">
+                  {reconciledCount}/{reconciliationFields.length} 已对账
+                </span>
+              </div>
+              <button
+                className="btn-ghost text-[10px] py-0.5 px-2"
+                onClick={e => { e.stopPropagation(); onReconcile && onReconcile(toy); }}
+              >
+                {reconciledCount > 0 ? '更新对账' : '📝 开始对账'}
+              </button>
+            </div>
+            <div className="space-y-0.5">
+              {reconciliationFields.map(f => {
+                const diff = f.act > 0 ? f.act - f.est : 0;
+                const color = f.act > 0 ? (diff > 0 ? 'text-red-400' : diff < 0 ? 'text-emerald-400' : 'text-[#6b7085]') : 'text-[#6b7085]';
+                return (
+                  <div key={f.key} className="grid grid-cols-[1fr,auto,auto,auto] gap-2 text-[10px] items-center">
+                    <span className="text-[#8b90a5] truncate">{f.label}</span>
+                    <span className="text-[#6b7085] tabular-nums">预估 ¥{f.est.toFixed(0)}</span>
+                    <span className="text-[#d0d4e8] tabular-nums">实际 {f.act > 0 ? `¥${f.act.toFixed(0)}` : '—'}</span>
+                    <span className={`tabular-nums ${color} w-12 text-right`}>
+                      {f.act > 0 ? (diff > 0 ? `+¥${diff.toFixed(0)}` : `¥${diff.toFixed(0)}`) : ''}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            {totalDiff !== 0 && (
+              <div className={`text-right text-[10px] mt-1.5 font-bold ${totalDiff > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                差异合计 {totalDiff > 0 ? '+' : ''}¥{totalDiff.toFixed(0)}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -1954,6 +2022,7 @@ export default function Warehouse() {
   const [transferPool, setTransferPool] = useState(null); // { batch, sourceProduct }
   const [imageFilter, setImageFilter] = useState(null); // null | 'noImage' | 'hasImage'
   const [imageUploadTarget, setImageUploadTarget] = useState(null); // { endpoint, id, label, currentImage, onDone }
+  const [reconcileTarget, setReconcileTarget] = useState(null); // toy 对象
 
   useEffect(() => {
     api.get('/settings/categories').then(data => setCategories(data.flat || data)).catch(() => {});
@@ -2840,6 +2909,7 @@ export default function Warehouse() {
               currentImage: toy.image,
               onDone: () => { useStore.getState().loadAll(); },
             })}
+            onReconcile={toy => setReconcileTarget(toy)}
           />
         ))}
       </div>
@@ -3049,6 +3119,160 @@ export default function Warehouse() {
           onCancel={() => setImageUploadTarget(null)}
         />
       )}
+
+      {/* 对账弹窗 */}
+      {reconcileTarget && (
+        <ReconcileModal
+          toy={reconcileTarget}
+          onDone={() => { useStore.getState().loadAll(); setReconcileTarget(null); }}
+          onCancel={() => setReconcileTarget(null)}
+        />
+      )}
     </div>
+  );
+}
+
+/*
+ * 对账弹窗：根据 toy.source 显示对应可对账字段，输入实际值后 PUT /api/toys/:id
+ * 字段映射同 utils/calcCost.js 的 pickActual
+ */
+const RECONCILE_FIELDS = {
+  direct: [
+    { key: 'japan_domestic_shipping_actual', label: '日本→国内运费', estField: 'japan_domestic_shipping' },
+    { key: 'intl_shipping_actual', label: '③ 国际运费', estField: 'intl_shipping' },
+    { key: 'logistics_fee_actual', label: '国内发货物流费', estField: 'logistics_fee' },
+  ],
+  proxy: [
+    { key: 'proxy_intl_shipping_actual', label: '代购国际运费', estField: 'proxy_intl_shipping' },
+    { key: 'proxy_domestic_shipping_actual', label: '代购国内运费', estField: 'proxy_domestic_shipping' },
+    { key: 'logistics_fee_actual', label: '国内发货物流费', estField: 'logistics_fee' },
+  ],
+  domestic: [
+    { key: 'domestic_shipping_actual', label: '国内运费', estField: 'domestic_shipping' },
+    { key: 'logistics_fee_actual', label: '国内发货物流费', estField: 'logistics_fee' },
+  ],
+  secondhand: [
+    { key: 'logistics_fee_actual', label: '国内发货物流费', estField: 'logistics_fee' },
+  ],
+};
+
+function ReconcileModal({ toy, onDone, onCancel }) {
+  const group = sourceGroup(toy.source);
+  const fields = RECONCILE_FIELDS[group] || RECONCILE_FIELDS.domestic;
+  const [values, setValues] = useState(() => {
+    const init = {};
+    fields.forEach(f => { init[f.key] = toy[f.key] || ''; });
+    return init;
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleSave = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const payload = { ...toy };
+      fields.forEach(f => {
+        const v = values[f.key];
+        payload[f.key] = v === '' || v == null ? 0 : Number(v);
+      });
+      const r = await api.put(`/toys/${toy.id}`, payload);
+      if (!r.ok) throw new Error(r.error || '保存失败');
+      onDone();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const totalEst = fields.reduce((s, f) => s + (toy[f.estField] || 0), 0);
+  const totalAct = fields.reduce((s, f) => {
+    const v = values[f.key];
+    if (v === '' || v == null) return s;
+    return s + Number(v);
+  }, 0);
+  const totalDiff = fields.reduce((s, f) => {
+    const v = values[f.key];
+    if (v === '' || v == null || Number(v) <= 0) return s;
+    return s + (Number(v) - (toy[f.estField] || 0));
+  }, 0);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[300] bg-black/70 flex items-center justify-center p-4" onClick={onCancel}>
+      <div className="bg-[#1a1d27] rounded-xl border border-white/10 w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-bold">📊 物流费对账</div>
+            <div className="text-[10px] text-[#6b7085] truncate">{toy.name_zh || toy.name}</div>
+          </div>
+          <button className="text-[#6b7085] hover:text-white text-xl leading-none" onClick={onCancel}>✕</button>
+        </div>
+
+        <div className="p-4 space-y-3">
+          {fields.map(f => {
+            const v = values[f.key];
+            const est = toy[f.estField] || 0;
+            const actNum = (v === '' || v == null) ? 0 : Number(v);
+            const diff = actNum > 0 ? actNum - est : 0;
+            return (
+              <div key={f.key}>
+                <div className="flex items-baseline justify-between mb-1">
+                  <label className="text-[10px] text-[#d0d4e8] font-medium">{f.label}</label>
+                  <span className="text-[10px] text-[#6b7085]">预估 ¥{est.toFixed(0)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    className="input text-xs flex-1"
+                    type="text" inputmode="decimal"
+                    placeholder="实际值（留空 = 未对账）"
+                    value={v}
+                    onChange={e => setValues({ ...values, [f.key]: e.target.value })}
+                    onKeyDown={e => { if (e.key === 'Enter') handleSave(); }}
+                    disabled={busy}
+                  />
+                  {actNum > 0 && (
+                    <span className={`text-[10px] tabular-nums w-14 text-right ${diff > 0 ? 'text-red-400' : diff < 0 ? 'text-emerald-400' : 'text-[#6b7085]'}`}>
+                      {diff > 0 ? '+' : ''}¥{diff.toFixed(0)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="pt-2 border-t border-white/5">
+            <div className="flex justify-between text-[11px] mb-1">
+              <span className="text-[#6b7085]">预估合计</span>
+              <span className="text-[#d0d4e8] tabular-nums">¥{totalEst.toFixed(0)}</span>
+            </div>
+            <div className="flex justify-between text-[11px] mb-1">
+              <span className="text-[#6b7085]">实际合计</span>
+              <span className="text-[#d0d4e8] tabular-nums">¥{totalAct.toFixed(0)}</span>
+            </div>
+            {totalDiff !== 0 && (
+              <div className={`flex justify-between text-xs font-bold pt-1 border-t border-white/5 ${totalDiff > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                <span>差异（已对账部分）</span>
+                <span className="tabular-nums">{totalDiff > 0 ? '+' : ''}¥{totalDiff.toFixed(0)}</span>
+              </div>
+            )}
+          </div>
+
+          {error && (
+            <div className="px-3 py-2 bg-red-500/15 border border-red-500/30 rounded text-xs text-red-400">
+              ❌ {error}
+            </div>
+          )}
+        </div>
+
+        <div className="px-4 py-3 border-t border-white/10 flex gap-2">
+          <button className="btn-ghost text-xs flex-1" onClick={onCancel} disabled={busy}>取消</button>
+          <button className="btn-primary text-xs flex-1" onClick={handleSave} disabled={busy}>
+            {busy ? '保存中...' : '保存对账'}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }

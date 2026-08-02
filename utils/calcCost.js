@@ -1,11 +1,23 @@
 /**
+ * 对账拾取：返回 _actual 值（有实际账单时优先用，否则用预估）。
+ * 约定：_actual > 0 表示已对账；= 0 表示未对账（回落主字段）。
+ * 边界：如果用户对账后实际是 0 元（免运费），前端应填 0 但系统按主字段（也是 0）走，差异为 0，语义合理。
+ */
+function pickActual(toy, field, actualField) {
+  const a = toy[actualField];
+  return (a != null && a > 0) ? a : (toy[field] || 0);
+}
+
+/**
  * 计算商品真实总成本
  * 主源：阶段付款 (stage1/2/3) + 物流/纸箱/打包
  * fallback：估算页直接创建的商品 (japan_price_cny + 各项费用)
+ * 对账：每项费用有 _actual 配对字段，已对账（>0）时优先用
  */
 function calcTotalCost(toy) {
   const stages = (toy.stage1_amount || 0) + (toy.stage2_amount || 0) + (toy.stage3_amount || 0);
-  const logistics = (toy.logistics_fee || 0) + (toy.box_fee || 0) + (toy.packing_fee || 0);
+  const logistics_fee = pickActual(toy, 'logistics_fee', 'logistics_fee_actual');
+  const logistics = logistics_fee + (toy.box_fee || 0) + (toy.packing_fee || 0);
 
   if (stages > 0) return stages + logistics;
 
@@ -13,15 +25,20 @@ function calcTotalCost(toy) {
   if (toy.source === 'direct') {
     base = toy.japan_price_cny || 0;
   } else if (toy.source === 'domestic' || toy.source === '咸鱼' || toy.source === 'vx好友') {
-    base = (toy.domestic_price || 0) + (toy.domestic_shipping || 0);
+    base = (toy.domestic_price || 0) + pickActual(toy, 'domestic_shipping', 'domestic_shipping_actual');
   } else if (toy.source === 'secondhand') {
     base = toy.japan_price_cny || 0;
   } else {
     // proxy / 海淘-* / 代购-* / 其他代购
-    base = (toy.proxy_price || 0) + (toy.proxy_intl_shipping || 0) + (toy.proxy_domestic_shipping || 0);
+    base = (toy.proxy_price || 0)
+      + pickActual(toy, 'proxy_intl_shipping', 'proxy_intl_shipping_actual')
+      + pickActual(toy, 'proxy_domestic_shipping', 'proxy_domestic_shipping_actual');
   }
-  const japanFees = (toy.handling_fee || 0) + (toy.japan_domestic_shipping || 0) + (toy.japan_consumption_tax || 0);
-  const intlFees = (toy.intl_shipping || 0) + (toy.import_duty || 0);
+  const japanFees = (toy.handling_fee || 0)
+    + pickActual(toy, 'japan_domestic_shipping', 'japan_domestic_shipping_actual')
+    + (toy.japan_consumption_tax || 0);
+  const intlFees = pickActual(toy, 'intl_shipping', 'intl_shipping_actual')
+    + (toy.import_duty || 0);
   return base + japanFees + intlFees + logistics;
 }
 

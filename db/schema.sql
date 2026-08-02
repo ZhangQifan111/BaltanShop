@@ -60,6 +60,19 @@ CREATE TABLE IF NOT EXISTS toys (
   box_fee REAL DEFAULT 0,
   packing_fee REAL DEFAULT 0,
 
+  -- 物流费实际值（对账用，拿到真实账单后填；差异 = 实际 - 预估）
+  japan_domestic_shipping_actual REAL DEFAULT 0,
+  proxy_intl_shipping_actual REAL DEFAULT 0,
+  proxy_domestic_shipping_actual REAL DEFAULT 0,
+  domestic_shipping_actual REAL DEFAULT 0,
+  intl_shipping_actual REAL DEFAULT 0,
+  logistics_fee_actual REAL DEFAULT 0,
+  stage1_handling_actual REAL DEFAULT 0,
+  stage1_domestic_ship_actual REAL DEFAULT 0,
+  stage2_handling_actual REAL DEFAULT 0,
+  stage2_domestic_ship_actual REAL DEFAULT 0,
+  stage3_intl_ship_actual REAL DEFAULT 0,
+
   -- 销售
   sell_price REAL,
   sell_date TEXT,

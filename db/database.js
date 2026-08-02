@@ -89,6 +89,25 @@ function migrate() {
   if (!colNames.has('image_url')) {
     changes.push("ALTER TABLE toys ADD COLUMN image_url TEXT");
   }
+  // 物流费对账：每个可对账字段加 _actual 列（与原字段平行，存实际账单值）
+  const shippingActualFields = [
+    'japan_domestic_shipping_actual',
+    'proxy_intl_shipping_actual',
+    'proxy_domestic_shipping_actual',
+    'domestic_shipping_actual',
+    'intl_shipping_actual',
+    'logistics_fee_actual',
+    'stage1_handling_actual',
+    'stage1_domestic_ship_actual',
+    'stage2_handling_actual',
+    'stage2_domestic_ship_actual',
+    'stage3_intl_ship_actual',
+  ];
+  for (const f of shippingActualFields) {
+    if (!colNames.has(f)) {
+      changes.push(`ALTER TABLE toys ADD COLUMN ${f} REAL DEFAULT 0`);
+    }
+  }
   if (!colNames.has('image_fetched_at')) {
     changes.push("ALTER TABLE toys ADD COLUMN image_fetched_at TEXT");
   }
