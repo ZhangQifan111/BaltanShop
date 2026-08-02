@@ -2,6 +2,7 @@ import { useState, useEffect, memo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import ConfirmModal from '../components/ConfirmModal';
 import ImageUploadModal from '../components/ImageUploadModal';
+import CategoryPicker from '../components/CategoryPicker';
 import useStore from '../stores/useStore';
 import { api } from '../lib/api';
 import { sourceLabel, sourceGroup, SOURCES } from '../lib/sources';
@@ -105,7 +106,7 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
       <div className="flex gap-2 flex-wrap text-[10px] text-[#6b7085] mb-3">
         <span>{sourceLabel(toy.source)}</span>
         <span>·</span>
-        <span>{toy.category}</span>
+        <span>{toy.category_name || toy.category}</span>
         <span>·</span>
         <span>{toy.purchase_date || toy.created_at?.slice(0, 10)}</span>
       </div>
@@ -238,7 +239,7 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [poolLogs, setPoolLogs] = useState(null); // null=加载中, []=空, [...]有数据
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ name_zh: '', name: '', category: '' });
+  const [editForm, setEditForm] = useState({ name_zh: '', name: '', category_id: null });
   const allIds = group.batches.map(b => b.id);
   const allSelected = allIds.length > 0 && allIds.every(id => selectedIds.has(id));
   const someSelected = allIds.some(id => selectedIds.has(id));
@@ -299,18 +300,12 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
                       lang="zh" spellCheck={false} autoComplete="off" autoFocus />
                   </div>
                   <div>
-                    <label className="text-[10px] text-[#6b7085] block mb-0.5">系列（从商品分类中选择）</label>
-                    <select className="input text-xs w-full"
-                      value={editForm.category}
-                      onChange={e => setEditForm({ ...editForm, category: e.target.value })}>
-                      <option value="">— 选择系列 —</option>
-                      {!categories.some(c => c.name === editForm.category) && editForm.category && (
-                        <option value={editForm.category} disabled>{editForm.category}（旧值，请重新选择）</option>
-                      )}
-                      {categories.map(c => (
-                        <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>
-                      ))}
-                    </select>
+                    <label className="text-[10px] text-[#6b7085] block mb-0.5">分类</label>
+                    <CategoryPicker
+                      value={editForm.category_id}
+                      onChange={v => setEditForm({ ...editForm, category_id: v })}
+                      categories={categories}
+                    />
                   </div>
                   <div className="flex gap-1.5">
                     <button className="text-[10px] px-2.5 py-1 rounded bg-accent text-[#0f1117] font-medium"
@@ -319,7 +314,7 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
                         await api.put(`/products/${group.product_id}`, {
                           name_zh: newName,
                           name: newName,
-                          category: editForm.category || prod?.category || '其他',
+                          category_id: editForm.category_id ?? prod?.category_id ?? null,
                         }).catch(() => {});
                         setEditing(false);
                         api.get('/products').then(prods => {
@@ -341,12 +336,12 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
                         setEditForm({
                           name_zh: prod?.name_zh || '',
                           name: prod?.name || '',
-                          category: prod?.category || '',
+                          category_id: prod?.category_id || null,
                         });
                         setEditing(true);
                       }}>✎ 编辑</button>
                   </div>
-                  <div className="text-[10px] text-[#6b7085] mt-0.5">系列：{prod?.category || '未设置'}　|　批次：{group.batches.length} 批</div>
+                  <div className="text-[10px] text-[#6b7085] mt-0.5">分类：{prod?.category_name || prod?.category || '未设置'}　|　批次：{group.batches.length} 批</div>
                 </>
               )}
             </div>
@@ -498,7 +493,7 @@ function TransferPoolModal({ batch, batches, products, categories, onConfirm, on
   // 新建目标池
   const [showNewPoolInput, setShowNewPoolInput] = useState(false);
   const [newPoolName, setNewPoolName] = useState('');
-  const [newPoolCategory, setNewPoolCategory] = useState('');
+  const [newPoolCategoryId, setNewPoolCategoryId] = useState(null);
   const [creatingPool, setCreatingPool] = useState(false);
 
   const handleCreatePool = async () => {
@@ -508,7 +503,7 @@ function TransferPoolModal({ batch, batches, products, categories, onConfirm, on
       const created = await api.post('/products', {
         name: newPoolName.trim(),
         name_zh: newPoolName.trim(),
-        category: newPoolCategory || '其他',
+        category_id: newPoolCategoryId,
       });
       // 把新池选为目标池（用 callback 把新池加到 products 列表里，让下拉可选）
       onPoolCreated && onPoolCreated(created);
@@ -516,7 +511,7 @@ function TransferPoolModal({ batch, batches, products, categories, onConfirm, on
       setShowNewPoolInput(false);
       setShowDropdown(false);
       setNewPoolName('');
-      setNewPoolCategory('');
+      setNewPoolCategoryId(null);
     } catch (e) {
       setSubmitError('建池失败：' + (e.message || JSON.stringify(e)));
     }
@@ -662,7 +657,7 @@ function TransferPoolModal({ batch, batches, products, categories, onConfirm, on
               <div className="flex items-center gap-1.5 bg-purple-500/10 border border-purple-500/40 rounded-lg px-3 py-2">
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-medium truncate">{targetProd.name_zh || targetProd.name}</div>
-                  <div className="text-[10px] text-[#9ba0b5]">系列：{targetProd.category}　|　库存 {targetProd.total_remaining}/{targetProd.total_qty}</div>
+                  <div className="text-[10px] text-[#9ba0b5]">分类：{targetProd.category_name || targetProd.category}　|　库存 {targetProd.total_remaining}/{targetProd.total_qty}</div>
                 </div>
                 <button type="button"
                   className="text-[#6b7085] hover:text-white text-sm shrink-0"
@@ -689,7 +684,7 @@ function TransferPoolModal({ batch, batches, products, categories, onConfirm, on
                         className="w-full text-left px-3 py-1.5 text-xs hover:bg-purple-500/10 border-b border-gray-700/50 last:border-b-0"
                         onPointerDown={() => { setTargetProductId(String(p.id)); setSearch(''); setShowDropdown(false); }}>
                         <div className="font-medium truncate">{p.name_zh || p.name}</div>
-                        <div className="text-[10px] text-[#6b7085]">系列：{p.category}　|　库存 {p.total_remaining}/{p.total_qty}</div>
+                        <div className="text-[10px] text-[#6b7085]">分类：{p.category_name || p.category}　|　库存 {p.total_remaining}/{p.total_qty}</div>
                       </button>
                     ))}
                     {/* 新建目标池按钮 */}
@@ -708,18 +703,15 @@ function TransferPoolModal({ batch, batches, products, categories, onConfirm, on
                           value={newPoolName}
                           onChange={e => setNewPoolName(e.target.value)}
                           lang="zh" spellCheck={false} autoComplete="off" autoFocus />
-                        <select className="input text-xs w-full"
-                          value={newPoolCategory}
-                          onChange={e => setNewPoolCategory(e.target.value)}>
-                          <option value="">— 选分类 —</option>
-                          {categories && categories.map(c => (
-                            <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>
-                          ))}
-                        </select>
+                        <CategoryPicker
+                          value={newPoolCategoryId}
+                          onChange={setNewPoolCategoryId}
+                          categories={categories || []}
+                        />
                         <div className="flex gap-1.5">
                           <button type="button"
                             className="text-[10px] px-2 py-0.5 rounded border border-white/10 text-[#9ba0b5] hover:bg-white/5 flex-1"
-                            onClick={() => { setShowNewPoolInput(false); setNewPoolName(''); setNewPoolCategory(''); }}>
+                            onClick={() => { setShowNewPoolInput(false); setNewPoolName(''); setNewPoolCategoryId(null); }}>
                             取消
                           </button>
                           <button type="button"
@@ -769,7 +761,7 @@ function TransferPoolModal({ batch, batches, products, categories, onConfirm, on
 
 /* ─── 入池弹窗 ─── */
 function PoolifyModal({ toy, products, categories, onConfirm, onCancel }) {
-  const [poolLines, setPoolLines] = useState([{ product_id: '', quantity: '', search: '', showDropdown: false, custom_name: '', custom_category: '', manual_price: '' }]);
+  const [poolLines, setPoolLines] = useState([{ product_id: '', quantity: '', search: '', showDropdown: false, custom_name: '', custom_category_id: null, manual_price: '' }]);
   const [newCategory, setNewCategory] = useState('');
   const [showNewCatInput, setShowNewCatInput] = useState(false);
   const totalCost = toy.total_cost || 0;
@@ -795,7 +787,7 @@ function PoolifyModal({ toy, products, categories, onConfirm, onCancel }) {
   const ratio = totalRefCost > 0 ? totalCost / totalRefCost : 0;
 
   const updateLine = (idx, field, value) => setPoolLines(prev => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l));
-  const addLine = () => setPoolLines(prev => [...prev, { product_id: '', quantity: '', search: '', showDropdown: false, custom_name: '', custom_category: '', manual_price: '' }]);
+  const addLine = () => setPoolLines(prev => [...prev, { product_id: '', quantity: '', search: '', showDropdown: false, custom_name: '', custom_category_id: null, manual_price: '' }]);
   const removeLine = (idx) => { if (poolLines.length <= 1) return; setPoolLines(prev => prev.filter((_, i) => i !== idx)); };
 
   // 一键新增顶级分类
@@ -804,9 +796,9 @@ function PoolifyModal({ toy, products, categories, onConfirm, onCancel }) {
     try {
       const created = await api.post('/settings/categories', { name: newCategory.trim(), parent_id: null });
       onCategoryCreated(created);
-      // 自动选上新分类
-      const idx = poolLines.findIndex(l => l.product_id === '__new__' && !l.custom_category);
-      if (idx >= 0) updateLine(idx, 'custom_category', created.name);
+      // 自动选上新分类（用 id）
+      const idx = poolLines.findIndex(l => l.product_id === '__new__' && !l.custom_category_id);
+      if (idx >= 0) updateLine(idx, 'custom_category_id', created.id);
       setNewCategory('');
       setShowNewCatInput(false);
     } catch (e) {
@@ -830,7 +822,7 @@ function PoolifyModal({ toy, products, categories, onConfirm, onCancel }) {
       return;
     }
     // 新建池也必须指定分类（不指定就会落到「其他」孤儿桶）
-    const missingCat = validLines.find(l => l.product_id === '__new__' && !l.custom_category);
+    const missingCat = validLines.find(l => l.product_id === '__new__' && !l.custom_category_id);
     if (missingCat) {
       setSubmitError('请给新建的池指定一个分类（不然会落到「其他」桶）');
       return;
@@ -841,7 +833,7 @@ function PoolifyModal({ toy, products, categories, onConfirm, onCancel }) {
         product_id: l.product_id === '__new__' ? null : Number(l.product_id),
         quantity: Number(l.quantity),
         custom_name: l.custom_name || '',
-        custom_category: l.custom_category || '',
+        custom_category_id: l.custom_category_id || null,
       })),
       totalCost,
       totalRefCost,
@@ -886,7 +878,7 @@ function PoolifyModal({ toy, products, categories, onConfirm, onCancel }) {
                       <div className="flex items-center gap-1">
                         <div className="flex-1 input text-xs bg-white/5 flex items-center gap-2 truncate">
                           <span className="truncate">{selectedProd.name_zh || selectedProd.name}</span>
-                          <span className="text-[10px] text-[#6b7085] shrink-0">[{selectedProd.category}]</span>
+                          <span className="text-[10px] text-[#6b7085] shrink-0">[{selectedProd.category_name || selectedProd.category}]</span>
                         </div>
                         <button type="button" className="text-[10px] text-[#6b7085] hover:text-white px-1 shrink-0"
                           onClick={() => updateLine(idx, 'product_id', '')}>✕</button>
@@ -905,17 +897,17 @@ function PoolifyModal({ toy, products, categories, onConfirm, onCancel }) {
                         <div className="flex items-center gap-1">
                           <span className="text-[10px] text-[#6b7085] shrink-0">分类：</span>
                           <select className="input text-[11px] flex-1 py-1"
-                            value={line.custom_category || ''}
+                            value={line.custom_category_id || ''}
                             onChange={e => {
                               if (e.target.value === '__new__') {
                                 setShowNewCatInput(true);
                               } else {
-                                updateLine(idx, 'custom_category', e.target.value);
+                                updateLine(idx, 'custom_category_id', e.target.value ? Number(e.target.value) : null);
                               }
                             }}>
                             <option value="">未指定</option>
                             {categories.filter(c => !c.parent_id).map(c => (
-                              <option key={c.id} value={c.name}>{c.name}</option>
+                              <option key={c.id} value={c.id}>{c.name}</option>
                             ))}
                             <option value="__new__">+ 新建分类…</option>
                           </select>
@@ -2197,7 +2189,7 @@ export default function Warehouse() {
         const created = await api.post('/products', {
           name: first.custom_name || poolifying.name,
           name_zh: first.custom_name || poolifying.name_zh || '',
-          category: first.custom_category || poolifying.category,
+          category_id: first.custom_category_id || poolifying.category_id || null,
           source: poolifying.source,
         });
         productId = created.id;
@@ -2238,7 +2230,7 @@ export default function Warehouse() {
           const created = await api.post('/products', {
             name: line.custom_name || poolifying.name,
             name_zh: line.custom_name || poolifying.name_zh || '',
-            category: line.custom_category || poolifying.category,
+            category_id: line.custom_category_id || poolifying.category_id || null,
             source: poolifying.source,
           });
           pid = created.id;
@@ -2526,8 +2518,8 @@ export default function Warehouse() {
     });
   })();
 
-  // 构建分类名 → 顶级分类名 的映射
-  const catNameToRoot = {};
+  // 构建分类 id → 顶级分类对象 的映射（Stage 3：从 name 字符串映射改 id 映射）
+  const catIdToRoot = {};
   for (const c of categories) {
     let current = c;
     // 向上追溯到顶级
@@ -2537,18 +2529,18 @@ export default function Warehouse() {
       if (!parent) break;
       current = parent;
     }
-    catNameToRoot[c.name] = current.name;
+    catIdToRoot[c.id] = current;
   }
 
   // 按顶级分类分组池商品
   const poolsByCategory = (() => {
     const map = new Map();
     for (const g of poolGrouped) {
-      const rawCat = g.product?.category || '未分类';
-      // 查找该分类对应的顶级分类，找不到则用原值
-      const rootCat = catNameToRoot[rawCat] || rawCat;
-      if (!map.has(rootCat)) map.set(rootCat, []);
-      map.get(rootCat).push(g);
+      const catId = g.product?.category_id;
+      const rootCat = catId ? catIdToRoot[catId] : null;
+      const key = rootCat ? rootCat.name : (g.product?.category_name || g.product?.category || '未分类');
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(g);
     }
     // 每组内按在库数量从多到少排序
     for (const pools of map.values()) {

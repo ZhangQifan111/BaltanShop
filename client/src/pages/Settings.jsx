@@ -456,9 +456,10 @@ export default function Settings() {
                         lang="zh" spellCheck={false} autoComplete="off"
                         onChange={e => stageProductUpdate(p.id, { name: e.target.value, name_zh: e.target.value })} />
                       <div className="text-[10px] text-[#6b7085]">所属分类</div>
-                      <select className="input text-xs w-full" defaultValue={p.category}
-                        onChange={e => stageProductUpdate(p.id, { name: p.name, name_zh: p.name_zh, category: e.target.value })}>
-                        {categories.map(c => <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>)}
+                      <select className="input text-xs w-full" defaultValue={p.category_id || ''}
+                        onChange={e => stageProductUpdate(p.id, { name: p.name, name_zh: p.name_zh, category_id: e.target.value ? Number(e.target.value) : null })}>
+                        <option value="">— 不分类 —</option>
+                        {categories.map(c => <option key={c.id} value={c.id}>{c.parent_id ? '└ ' : ''}{c.name}</option>)}
                       </select>
                       <div className="flex gap-2 pt-1">
                         <button className="btn-ghost flex-1 text-xs py-1.5"

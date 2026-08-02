@@ -343,8 +343,8 @@ function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">品类</label>
               <CategoryPicker
-                value={form.category || ''}
-                onChange={v => setForm({ ...form, category: v })}
+                value={form.category_id || null}
+                onChange={v => setForm({ ...form, category_id: v })}
                 categories={categories}
               />
             </div>
@@ -651,7 +651,7 @@ export default function Procurement() {
   const [poolMode, setPoolMode] = useState(false);
   const [poolLines, setPoolLines] = useState([{ product_id: null, quantity: '', custom_name: '', manual_price: '' }]);
   const [form, setForm] = useState({
-    name: '', category: '其他', source: 'direct', status: 'procurement', procurement_stage: 'stage1',
+    name: '', category_id: null, source: 'direct', status: 'procurement', procurement_stage: 'stage1',
     stage1_amount: '', stage2_amount: '', stage3_amount: '',
     stage1_date: new Date().toISOString().slice(0, 10),
     expected_arrival_date: '',
@@ -676,12 +676,21 @@ export default function Procurement() {
     api.get('/products').then(prods => setProducts(prods)).catch(() => {});
   }, []);
 
+  // categories 加载完后，若 form.category_id 还没值，默认填「其他」id（兼容旧默认）
+  useEffect(() => {
+    if (categories.length > 0 && form.category_id == null) {
+      const other = categories.find(c => c.name === '其他');
+      if (other) setForm(f => ({ ...f, category_id: other.id }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name) return setToast('请填写名称');
     try {
       // 池模式 + 新建池号时，同步创建同名分类（本次会话内去重）
-      const newCategoryNames = new Set();
+      const newCategoryIds = new Set();
       const body = { ...form };
       if (body.status === 'preorder') {
         body.procurement_stage = null;
@@ -711,28 +720,32 @@ export default function Procurement() {
           const lineAmount = totalRefCost > 0
             ? Math.round(line.refCost * ratio * 100) / 100
             : totalQty > 0 ? Math.round(((Number(line.quantity) || 0) / totalQty) * totalStage1 * 100) / 100 : 0;
-          // 池模式 + 新建商品 → 先确保同名分类存在，再创建 product
+          // 池模式 + 新建商品 → 先确保同名分类存在，再创建 product（传 category_id）
           let pid = line.pid;
           if (!line.prod) {
             const customName = (line.custom_name || '').trim();
-            let lineCategory = body.category;
+            let lineCategoryId = body.category_id;
             if (customName) {
-              const exists = newCategoryNames.has(customName)
-                || categories.find(c => c.name === customName);
-              if (!exists) {
+              // 查找/创建同名分类
+              let cat = categories.find(c => c.name === customName);
+              if (!cat) {
                 try {
-                  await api.post('/settings/categories', { name: customName, parent_id: null });
-                  newCategoryNames.add(customName);
+                  const createdCat = await api.post('/settings/categories', { name: customName, parent_id: null });
+                  // 后端返回 {id, name, ...}，需要把新建的加进本地 categories 字典（本次会话）
+                  cat = createdCat;
+                  newCategoryIds.add(createdCat.id);
                 } catch (e) {
-                  // 分类重名等异常忽略，用原 body.category 兜底
+                  // 分类重名等异常忽略，用原 body.category_id 兜底
                 }
+              } else if (!newCategoryIds.has(cat.id)) {
+                newCategoryIds.add(cat.id);
               }
-              lineCategory = customName; // 新建池默认归到自己同名的分类下
+              if (cat) lineCategoryId = cat.id; // 新建池默认归到自己同名的分类下
             }
             const created = await api.post('/products', {
               name: customName || body.name,
               name_zh: customName || body.name_zh || body.name || '',
-              category: lineCategory,
+              category_id: lineCategoryId,
               source: body.source,
             });
             pid = created.id;
@@ -751,7 +764,7 @@ export default function Procurement() {
       setShowForm(false);
       setPoolMode(false);
       setPoolLines([{ product_id: null, quantity: '' }]);
-      setForm({ name: '', category: '其他', source: 'direct', status: 'procurement', procurement_stage: 'stage1', stage1_amount: '', stage2_amount: '', stage3_amount: '', stage1_date: new Date().toISOString().slice(0, 10), expected_arrival_date: '', product_id: null, quantity: '', supplier_name: '' });
+      setForm({ name: '', category_id: null, source: 'direct', status: 'procurement', procurement_stage: 'stage1', stage1_amount: '', stage2_amount: '', stage3_amount: '', stage1_date: new Date().toISOString().slice(0, 10), expected_arrival_date: '', product_id: null, quantity: '', supplier_name: '' });
     } catch (e) {
       setToast('添加失败');
     }
@@ -842,8 +855,8 @@ export default function Procurement() {
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">品类</label>
               <CategoryPicker
-                value={form.category}
-                onChange={v => setForm({ ...form, category: v })}
+                value={form.category_id}
+                onChange={v => setForm({ ...form, category_id: v })}
                 categories={categories}
               />
             </div>
@@ -997,7 +1010,7 @@ export default function Procurement() {
                                 const prod = products.find(p => String(p.id) === String(pid));
                                 updateLine(idx, 'product_id', pid);
                                 if (idx === 0 && prod) {
-                                  setForm(f => ({ ...f, name: prod.name || f.name, category: prod.category || f.category }));
+                                  setForm(f => ({ ...f, name: prod.name || f.name, category_id: prod.category_id || f.category_id }));
                                 }
                               } else {
                                 updateLine(idx, 'product_id', null);
