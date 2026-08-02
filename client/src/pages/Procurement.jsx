@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { useIsTouchDevice } from '../lib/useIsTouchDevice';
 import { sourceLabel, sourceGroup, SOURCE_CATEGORIES, toSourceValue, parseSource } from '../lib/sources';
 import ConfirmModal from '../components/ConfirmModal';
+import CategoryPicker from '../components/CategoryPicker';
 
 const STAGES = ['stage1', 'stage2', 'stage3'];
 const STAGE_NAMES = { stage1: '买货中', stage2: '国内转运', stage3: '国际运输' };
@@ -341,10 +342,11 @@ function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
             </div>
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">品类</label>
-              <select className="input text-xs" value={form.category || ''} onChange={e => setForm({ ...form, category: e.target.value })}>
-                <option value="">选择分类</option>
-                {categories.map(c => <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>)}
-              </select>
+              <CategoryPicker
+                value={form.category || ''}
+                onChange={v => setForm({ ...form, category: v })}
+                categories={categories}
+              />
             </div>
           </div>
 
@@ -839,10 +841,11 @@ export default function Procurement() {
             </div>
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">品类</label>
-              <select className="input text-xs" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
-                <option value="">选择分类</option>
-                {categories.map(c => <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>)}
-              </select>
+              <CategoryPicker
+                value={form.category}
+                onChange={v => setForm({ ...form, category: v })}
+                categories={categories}
+              />
             </div>
             <div>
               <label className="text-[10px] text-[#6b7085] block mb-1">采购方式</label>
