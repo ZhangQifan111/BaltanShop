@@ -936,35 +936,31 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
                       </div>
                     ) : (
                       <>
-                        {/* 顶级筛选：胶囊 segmented control */}
-                        <div className="mb-2">
-                          <div className="text-[10px] text-[#6b7085] mb-1">按分类筛选</div>
-                          <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-thin">
-                            <button type="button"
-                              onClick={() => { setRootFilter(prev => ({ ...prev, [idx]: null })); updateLine(idx, 'showDropdown', true); }}
-                              className={`shrink-0 px-3 py-1 text-[11px] font-medium rounded-full transition-all ${rootFilter[idx] == null ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/30' : 'bg-white/[0.04] text-[#8b90a5] hover:bg-white/[0.08] hover:text-white border border-white/[0.06]'}`}>
-                              全部
-                            </button>
-                            {topLevelCategories.map(c => (
-                              <button type="button" key={c.id}
-                                onClick={() => { setRootFilter(prev => ({ ...prev, [idx]: c.id })); updateLine(idx, 'showDropdown', true); }}
-                                className={`shrink-0 px-3 py-1 text-[11px] font-medium rounded-full transition-all ${rootFilter[idx] === c.id ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/30' : 'bg-white/[0.04] text-[#8b90a5] hover:bg-white/[0.08] hover:text-white border border-white/[0.06]'}`}>
-                                {c.name}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        {/* 搜索框 + 下拉 */}
+                        {/* 分级 select 联动：先选顶级 → 再选池（不挤、不丑、不滚动） */}
+                        <select
+                          className="input text-xs w-full mb-1.5"
+                          value={rootFilter[idx] ?? ''}
+                          onChange={e => {
+                            const v = e.target.value;
+                            setRootFilter(prev => ({ ...prev, [idx]: v ? Number(v) : null }));
+                            updateLine(idx, 'showDropdown', true);
+                          }}
+                        >
+                          <option value="">— 选顶级分类 —</option>
+                          {topLevelCategories.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
                         <div className="relative">
-                          <div className="relative">
-                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#6b7085] text-xs">🔍</span>
-                            <input className="input text-xs w-full pl-7 pr-3"
-                              placeholder={rootFilter[idx] ? `搜 ${topLevelCategories.find(c => c.id === rootFilter[idx])?.name} 下的池` : '搜全部池（池名/分类）'}
-                              value={line.search || ''}
-                              onFocus={() => updateLine(idx, 'showDropdown', true)}
-                              onBlur={() => setTimeout(() => updateLine(idx, 'showDropdown', false), 200)}
-                              onChange={e => { updateLine(idx, 'search', e.target.value); updateLine(idx, 'showDropdown', true); }} />
-                          </div>
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#6b7085] text-xs">🔍</span>
+                          <input className="input text-xs w-full pl-7 pr-3"
+                            placeholder={rootFilter[idx]
+                              ? `搜 ${topLevelCategories.find(c => c.id === rootFilter[idx])?.name} 下的池`
+                              : '先选顶级分类，再搜池'}
+                            value={line.search || ''}
+                            onFocus={() => updateLine(idx, 'showDropdown', true)}
+                            onBlur={() => setTimeout(() => updateLine(idx, 'showDropdown', false), 200)}
+                            onChange={e => { updateLine(idx, 'search', e.target.value); updateLine(idx, 'showDropdown', true); }} />
                           {line.showDropdown && (
                             <div className="absolute left-0 right-0 top-full mt-1 bg-[#0f1117]/95 backdrop-blur-sm border border-white/10 rounded-xl max-h-64 overflow-y-auto z-50 shadow-2xl shadow-black/60">
                               {filtered.length === 0 ? (
