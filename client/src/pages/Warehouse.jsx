@@ -760,7 +760,7 @@ function TransferPoolModal({ batch, batches, products, categories, onConfirm, on
 }
 
 /* ─── 入池弹窗 ─── */
-function PoolifyModal({ toy, products, categories, onConfirm, onCancel }) {
+function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCancel }) {
   const [poolLines, setPoolLines] = useState([{ product_id: '', quantity: '', search: '', showDropdown: false, custom_name: '', custom_category_id: null, manual_price: '' }]);
   const [newCategory, setNewCategory] = useState('');
   const [showNewCatInput, setShowNewCatInput] = useState(false);
@@ -3107,6 +3107,7 @@ export default function Warehouse() {
           toy={poolifying}
           products={products}
           categories={categories}
+          catIdToRoot={catIdToRoot}
           onConfirm={handlePoolify}
           onCancel={() => setPoolifying(null)}
           onCategoryCreated={(cat) => {
