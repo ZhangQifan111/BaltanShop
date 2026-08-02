@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS suppliers (
 CREATE TABLE IF NOT EXISTS toys (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
-  category TEXT DEFAULT '其他',
+  category TEXT DEFAULT '其他',              -- 兼容旧字段（Stage 4 移除）
+  category_id INTEGER,                       -- 指向 categories.id（Stage 1+）
   source TEXT DEFAULT 'direct',   -- direct/proxy/domestic/secondhand
   status TEXT DEFAULT 'procurement', -- procurement/transit/stock/sold/done/returned/preorder
 
@@ -261,7 +262,8 @@ CREATE TABLE IF NOT EXISTS products (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   name_zh TEXT DEFAULT '',
-  category TEXT DEFAULT '其他',
+  category TEXT DEFAULT '其他',      -- 兼容旧字段（Stage 4 移除）
+  category_id INTEGER,                -- 指向 categories.id（Stage 1+）
   source TEXT DEFAULT 'direct',
   image TEXT,
   notes TEXT,

@@ -85,6 +85,22 @@ function migrate() {
   if (!colNames.has('unit_cost')) {
     changes.push("ALTER TABLE toys ADD COLUMN unit_cost REAL");
   }
+  // 品类外键：category_id 指向 categories.id（与 category 字符串并存，Stage 4 移除旧字段）
+  if (!colNames.has('category_id')) {
+    changes.push("ALTER TABLE toys ADD COLUMN category_id INTEGER");
+  }
+  // 数据迁移：把 toys.category 字符串 → category_id（幂等）
+  if (colNames.has('category_id')) {
+    const unmapped = db.exec(
+      "SELECT COUNT(*) FROM toys WHERE category IS NOT NULL AND category != '' AND category_id IS NULL"
+    )[0]?.values[0]?.[0] || 0;
+    if (unmapped > 0) {
+      changes.push(
+        "UPDATE toys SET category_id = (SELECT id FROM categories WHERE name = toys.category) " +
+        "WHERE category IS NOT NULL AND category != '' AND category_id IS NULL"
+      );
+    }
+  }
   // 任你购图片：原始远程 URL + 最近成功下载时间（用于补抓丢失的图片）
   if (!colNames.has('image_url')) {
     changes.push("ALTER TABLE toys ADD COLUMN image_url TEXT");
@@ -126,11 +142,33 @@ function migrate() {
       name TEXT NOT NULL,
       name_zh TEXT DEFAULT '',
       category TEXT DEFAULT '其他',
+      category_id INTEGER,
       source TEXT DEFAULT 'direct',
       image TEXT,
       notes TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     )`);
+  }
+  // 给已存在的 products 表加 category_id 列
+  if (tableNames.has('products')) {
+    const prodCols = new Set(
+      (db.exec("PRAGMA table_info(products)")[0]?.values || []).map(r => r[1])
+    );
+    if (!prodCols.has('category_id')) {
+      changes.push("ALTER TABLE products ADD COLUMN category_id INTEGER");
+    }
+    // 数据迁移：把 category 字符串 → category_id（指向 categories.id），幂等（WHERE category_id IS NULL）
+    if (prodCols.has('category_id')) {
+      const unmapped = db.exec(
+        "SELECT COUNT(*) FROM products WHERE category IS NOT NULL AND category != '' AND category_id IS NULL"
+      )[0]?.values[0]?.[0] || 0;
+      if (unmapped > 0) {
+        changes.push(
+          "UPDATE products SET category_id = (SELECT id FROM categories WHERE name = products.category) " +
+          "WHERE category IS NOT NULL AND category != '' AND category_id IS NULL"
+        );
+      }
+    }
   }
   if (!tableNames.has('pool_logs')) {
     changes.push(`CREATE TABLE pool_logs (
