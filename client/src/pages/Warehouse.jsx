@@ -894,23 +894,19 @@ function PoolifyModal({ toy, products, categories, onConfirm, onCancel }) {
                           <button type="button" className="text-[10px] text-[#6b7085] hover:text-white px-1 shrink-0"
                             onClick={() => updateLine(idx, 'product_id', '')}>✕</button>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-[#6b7085] shrink-0">分类：</span>
-                          <select className="input text-[11px] flex-1 py-1"
-                            value={line.custom_category_id || ''}
-                            onChange={e => {
-                              if (e.target.value === '__new__') {
-                                setShowNewCatInput(true);
-                              } else {
-                                updateLine(idx, 'custom_category_id', e.target.value ? Number(e.target.value) : null);
-                              }
-                            }}>
-                            <option value="">未指定</option>
-                            {categories.filter(c => !c.parent_id).map(c => (
-                              <option key={c.id} value={c.id}>{c.name}</option>
-                            ))}
-                            <option value="__new__">+ 新建分类…</option>
-                          </select>
+                        <div className="flex items-start gap-1">
+                          <span className="text-[10px] text-[#6b7085] shrink-0 pt-1.5">分类：</span>
+                          <div className="flex-1 space-y-1">
+                            <CategoryPicker
+                              value={line.custom_category_id}
+                              onChange={v => updateLine(idx, 'custom_category_id', v)}
+                              categories={categories || []}
+                            />
+                            <button type="button" className="text-[10px] text-orange-400 hover:text-orange-300 px-1"
+                              onClick={() => setShowNewCatInput(true)}>
+                              + 新建分类
+                            </button>
+                          </div>
                         </div>
                         {showNewCatInput && (
                           <div className="flex items-center gap-1 pl-1">
