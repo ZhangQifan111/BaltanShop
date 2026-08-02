@@ -813,9 +813,12 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const validLines = poolLines.filter(l => l.product_id && (Number(l.quantity) || 0) > 0);
+    // 有效行：选了 product_id（具体池 / 新建池）或 custom_category_id（直接归顶级），且有数量
+    const validLines = poolLines.filter(l =>
+      (l.product_id || l.custom_category_id) && (Number(l.quantity) || 0) > 0
+    );
     if (validLines.length === 0) {
-      setSubmitError('请先选择商品并填写数量');
+      setSubmitError('请先选择商品/分类并填写数量');
       return;
     }
     // 新建池必须填名字（否则会被后端 fallback 到商品原名）
