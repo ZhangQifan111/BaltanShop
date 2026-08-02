@@ -856,13 +856,13 @@ function PoolifyModal({ toy, products, categories, onConfirm, onCancel }) {
             const filtered = line.search?.trim()
               ? products.filter(p => {
                   const s = line.search.toLowerCase().trim();
-                  // 直接包含匹配
+                  // 直接包含匹配（池名 / 分类名）
                   if ((p.name_zh || '').toLowerCase().includes(s)
                     || (p.name || '').toLowerCase().includes(s)
-                    || (p.category || '').toLowerCase().includes(s)) return true;
+                    || (p.category_name || p.category || '').toLowerCase().includes(s)) return true;
                   // 拼音匹配（输入纯字母时：gongniu/gns 都能找到「公牛社」）
                   if (/^[a-z]+$/.test(s)) {
-                    const fields = [p.name_zh, p.name, p.category].filter(Boolean);
+                    const fields = [p.name_zh, p.name, p.category_name || p.category].filter(Boolean);
                     return findMatchesByPinyin(s, fields).length > 0;
                   }
                   return false;
@@ -933,7 +933,7 @@ function PoolifyModal({ toy, products, categories, onConfirm, onCancel }) {
                       </div>
                     ) : (
                       <>
-                        <input className="input text-xs w-full" placeholder="搜索商品…"
+                        <input className="input text-xs w-full" placeholder="搜已有池（池名/分类）"
                           value={line.search || ''}
                           onFocus={() => updateLine(idx, 'showDropdown', true)}
                           onBlur={() => setTimeout(() => updateLine(idx, 'showDropdown', false), 200)}
