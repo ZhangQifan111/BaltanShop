@@ -11,7 +11,7 @@ import {
   AdvancedFeesPanel,
   ResultCard,
 } from '../components/EstimateShared';
-import { parseSource } from '../lib/sources';
+import { sourceGroup } from '../lib/sources';
 
 const initial = {
   source: 'direct',
@@ -43,7 +43,7 @@ export default function Estimate() {
       return;
     }
     const body = {
-      source: parseSource(form.source).cat, // 归一化成 direct/proxy/domestic/secondhand
+      source: sourceGroup(form.source), // 归一化成 direct/proxy/domestic/secondhand 之一
       sell_price: sell,
       handling_fee: num(form.handling_fee),
       japan_domestic_shipping: num(form.japan_domestic_shipping),
