@@ -39,7 +39,7 @@ export function sourceLabel(s) {
 export function sourceGroup(s) {
   if (!s) return 'direct';
   if (s === 'direct' || s.startsWith('海淘-')) return 'direct'; // 海淘平台 = 直购
-  if (s === 'domestic') return 'domestic';
+  if (s === 'domestic' || s === '咸鱼' || s === 'vx好友') return 'domestic';
   if (s === 'secondhand') return 'secondhand';
   return 'proxy'; // 代购系列
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, memo, useCallback } from 'react';
+import { useState, useEffect, memo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import ConfirmModal from '../components/ConfirmModal';
 import ImageUploadModal from '../components/ImageUploadModal';
@@ -62,7 +62,7 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
             <>
               <img src={toy.image} alt="" className="w-14 h-14 rounded-lg object-cover bg-white/5 cursor-zoom-in hover:ring-2 hover:ring-accent/50 transition-all" loading="lazy" onError={e => e.target.style.display='none'} onClick={e => { e.stopPropagation(); onPreviewImage && onPreviewImage(toy.image); }} />
               <button
-                className="absolute inset-0 bg-black/70 rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-base transition-opacity"
+                className="absolute bottom-0 right-0 bg-black/70 rounded-tl-lg px-1.5 py-0.5 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs leading-none transition-opacity"
                 onClick={e => { e.stopPropagation(); onUploadImage && onUploadImage(toy); }}
                 title="换图"
               >📷</button>
@@ -233,8 +233,8 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
 });
 
 /* ─── 池详情弹窗 ─── */
-function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify, onBatchTransferPool, onTransferPool, categories, onPreviewImage }) {
-  const prod = group.product;
+function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify, onBatchTransferPool, onTransferPool, categories, onPreviewImage, onProductsChange }) {
+  const [curProd, setCurProd] = useState(group.product); // 本地 product 快照，改名后即时更新
   const avgCost = group.totalQty > 0 ? group.totalCost / group.totalQty : 0;
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [poolLogs, setPoolLogs] = useState(null); // null=加载中, []=空, [...]有数据
@@ -288,7 +288,7 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
         {/* Header */}
         <div className="p-4 border-b border-white/10 shrink-0">
           <div className="flex items-center gap-3">
-            {prod?.image && <img src={prod.image} alt="" className="w-12 h-12 rounded-lg object-cover bg-white/5" onError={e => e.target.style.display = 'none'} />}
+            {curProd?.image && <img src={curProd.image} alt="" className="w-12 h-12 rounded-lg object-cover bg-white/5" onError={e => e.target.style.display = 'none'} />}
             <div className="flex-1 min-w-0">
               {editing ? (
                 <div className="space-y-1.5">
@@ -310,18 +310,21 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
                   <div className="flex gap-1.5">
                     <button className="text-[10px] px-2.5 py-1 rounded bg-accent text-[#0f1117] font-medium"
                       onClick={async () => {
-                        const newName = editForm.name_zh || prod?.name_zh || '';
+                        const newName = editForm.name_zh || curProd?.name_zh || '';
                         await api.put(`/products/${group.product_id}`, {
                           name_zh: newName,
                           name: newName,
-                          category_id: editForm.category_id ?? prod?.category_id ?? null,
+                          category_id: editForm.category_id ?? curProd?.category_id ?? null,
                         }).catch(() => {});
                         setEditing(false);
+                        // 刷新 products 本地列表（loadAll 不拉 /products，必须显式刷新，否则页面还是旧名）
                         api.get('/products').then(prods => {
-                          // 更新 products 列表，触发重渲染
-                          const { loadAll } = useStore.getState();
-                          loadAll();
+                          onProductsChange(prods);
+                          const updated = prods.find(p => p.id === group.product_id);
+                          if (updated) setCurProd(updated);
                         }).catch(() => {});
+                        const { loadAll } = useStore.getState();
+                        loadAll();
                       }}>保存</button>
                     <button className="text-[10px] px-2.5 py-1 rounded border border-white/10 text-[#6b7085]"
                       onClick={() => setEditing(false)}>取消</button>
@@ -330,18 +333,18 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
               ) : (
                 <>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold truncate">{prod?.name_zh || prod?.name || '未命名'}</h3>
+                    <h3 className="text-base font-bold truncate">{curProd?.name_zh || curProd?.name || '未命名'}</h3>
                     <button className="text-[10px] text-[#6b7085] hover:text-white shrink-0"
                       onClick={() => {
                         setEditForm({
-                          name_zh: prod?.name_zh || '',
-                          name: prod?.name || '',
-                          category_id: prod?.category_id || null,
+                          name_zh: curProd?.name_zh || curProd?.name || '',
+                          name: curProd?.name || '',
+                          category_id: curProd?.category_id || null,
                         });
                         setEditing(true);
                       }}>✎ 编辑</button>
                   </div>
-                  <div className="text-[10px] text-[#6b7085] mt-0.5">分类：{prod?.category_name || prod?.category || '未设置'}　|　批次：{group.batches.length} 批</div>
+                  <div className="text-[10px] text-[#6b7085] mt-0.5">分类：{curProd?.category_name || curProd?.category || '未设置'}　|　批次：{group.batches.length} 批</div>
                 </>
               )}
             </div>
@@ -764,13 +767,26 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
   const [poolLines, setPoolLines] = useState([{ product_id: '', quantity: '', search: '', showDropdown: false, custom_name: '', custom_category_id: null, manual_price: '' }]);
   const [newCategory, setNewCategory] = useState('');
   const [showNewCatInput, setShowNewCatInput] = useState(false);
+  // 下拉框固定定位：记录各搜索框相对视口的位置（fixed 与视口同坐标系），
+  // 脱离 form 的 overflow-y-auto 裁剪，否则列表展开会被截断成两行
+  const searchRefs = useRef({});
+  const [ddRects, setDdRects] = useState({}); // { [lineIdx]: { top, left, width } }
+  const openDD = (idx) => {
+    const el = searchRefs.current[idx];
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      setDdRects(prev => ({ ...prev, [idx]: { top: rect.bottom + 4, left: rect.left, width: rect.width } }));
+    }
+    updateLine(idx, 'showDropdown', true);
+  };
   // 顶级筛选：每个 # 行各自的 scope（默认 null = 全部）
   const [rootFilter, setRootFilter] = useState({}); // { [lineIdx]: rootId | null }
   const topLevelCategories = categories.filter(c => !c.parent_id);
   const totalCost = toy.total_cost || 0;
   const toyQty = toy.quantity || 1;
 
-  // 各行参考成本 (prod 统一从此处取，JSX 不再重复查找)
+  // 参考单价 = 商品总成本 ÷ 全部数量（总价固定，按数量分摊），手动估价优先，池均价兜底
+  const totalQtyAll = poolLines.reduce((s, l) => s + (Number(l.quantity) || 0), 0);
   const linesWithRef = poolLines.map(l => {
     const isNew = l.product_id === '__new__';
     const prod = (l.product_id && !isNew) ? products.find(p => String(p.id) === String(l.product_id)) : null;
@@ -778,9 +794,9 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
     const poolRefUnit = (prod && prod.avg_unit_cost > 0 ? prod.avg_unit_cost : 0)
       || (prod && prod.total_qty > 0 ? prod.total_cost / prod.total_qty : 0);
     const manualPrice = Number(l.manual_price) > 0 ? Number(l.manual_price) : 0;
-    const refUnit = poolRefUnit
-      || manualPrice
-      || (toy.total_cost / (toy.quantity || 1))
+    const refUnit = manualPrice
+      || (toy.total_cost > 0 && totalQtyAll > 0 ? toy.total_cost / totalQtyAll : 0)
+      || poolRefUnit
       || 0;
     const refCost = refUnit * qty;
     return { ...l, isNew, prod, qty, refUnit, refCost, poolRefUnit, manualPrice };
@@ -813,7 +829,7 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // 有效行：选了 product_id（具体池 / 新建池）或 custom_category_id（直接归顶级），且有数量
+    // 有效行：选了 product_id（具体池 / 新建池）或 custom_category_id（顶级下自动建池），且有数量
     const validLines = poolLines.filter(l =>
       (l.product_id || l.custom_category_id) && (Number(l.quantity) || 0) > 0
     );
@@ -840,6 +856,7 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
         quantity: Number(l.quantity),
         custom_name: l.custom_name || '',
         custom_category_id: l.custom_category_id || null,
+        manual_price: Number(l.manual_price) > 0 ? Number(l.manual_price) : 0,
       })),
       totalCost,
       totalRefCost,
@@ -848,11 +865,12 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4" onClick={onCancel}>
-      <div className="bg-[#1a1d27] rounded-xl border border-orange-500/20 p-5 w-full max-w-sm space-y-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <h3 className="text-base font-bold">转入池模式 — 拆分到多个池</h3>
+      <div className="bg-[#1a1d27] rounded-xl border border-orange-500/20 p-5 w-full max-w-3xl space-y-4 flex flex-col" style={{ maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
+        <h3 className="text-base font-bold">入池{poolLines.length > 1 ? ' — 拆分到多个池' : ''}</h3>
         <div className="text-xs text-[#6b7085]">「{toy.name_zh || toy.name}」共 {toyQty} 件 · 总成本 ¥{totalCost.toFixed(0)}</div>
 
-        <form className="space-y-3" onSubmit={handleSubmit}>
+        <form className="space-y-3 flex-1 min-h-0 overflow-y-auto pr-1" onSubmit={handleSubmit}
+          onScroll={() => setPoolLines(prev => prev.map(l => ({ ...l, showDropdown: false })))}>
           {poolLines.map((line, idx) => {
             const ref = linesWithRef[idx];
             const allocated = totalRefCost > 0 && ref.refCost > 0
@@ -879,7 +897,7 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
                 })
               : rootFiltered;
 
-            // 选了顶级但该顶级下 0 个池 → 直接归顶级（不入具体池）
+            // 选了顶级但该顶级下 0 个池 → 自动建池入池
             const rootHasNoPool = rootFilter[idx] && rootFiltered.length === 0;
             const assignDirectToRoot = rootHasNoPool && !line.product_id && !line.custom_name;
 
@@ -890,9 +908,9 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
                   <div className="relative flex-1">
                     {selectedProd ? (
                       <div className="flex items-center gap-1">
-                        <div className="flex-1 input text-xs bg-white/5 flex items-center gap-2 truncate">
+                        <div className="flex-1 input text-sm bg-white/5 flex items-center gap-2 truncate">
                           <span className="truncate">{selectedProd.name_zh || selectedProd.name}</span>
-                          <span className="text-[10px] text-[#6b7085] shrink-0">[{selectedProd.category_name || selectedProd.category}]</span>
+                          <span className="text-xs text-[#6b7085] shrink-0">[{selectedProd.category_name || selectedProd.category}]</span>
                         </div>
                         <button type="button" className="text-[10px] text-[#6b7085] hover:text-white px-1 shrink-0"
                           onClick={() => updateLine(idx, 'product_id', '')}>✕</button>
@@ -900,7 +918,7 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
                     ) : isNew ? (
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-1">
-                          <input className="input text-xs flex-1"
+                          <input className="input text-sm flex-1"
                             placeholder="请输入新池名（必填）"
                             value={line.custom_name || ''}
                             onChange={e => updateLine(idx, 'custom_name', e.target.value)}
@@ -943,73 +961,81 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
                       </div>
                     ) : (
                       <>
-                        {/* 分级 select 联动：先选顶级 → 再选池（不挤、不丑、不滚动） */}
-                        <select
-                          className="input text-xs w-full mb-1.5"
-                          value={rootFilter[idx] ?? ''}
-                          onChange={e => {
-                            const v = e.target.value;
-                            setRootFilter(prev => ({ ...prev, [idx]: v ? Number(v) : null }));
-                            updateLine(idx, 'showDropdown', true);
-                          }}
-                        >
-                          <option value="">— 选顶级分类 —</option>
-                          {topLevelCategories.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                          ))}
-                        </select>
-                        <div className="relative">
-                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#6b7085] text-xs">🔍</span>
-                          <input className="input text-xs w-full pl-7 pr-3"
-                            placeholder={rootFilter[idx]
-                              ? `搜 ${topLevelCategories.find(c => c.id === rootFilter[idx])?.name} 下的池`
-                              : '先选顶级分类，再搜池'}
-                            value={line.search || ''}
-                            onFocus={() => updateLine(idx, 'showDropdown', true)}
-                            onBlur={() => setTimeout(() => updateLine(idx, 'showDropdown', false), 200)}
-                            onChange={e => { updateLine(idx, 'search', e.target.value); updateLine(idx, 'showDropdown', true); }} />
-                          {rootHasNoPool && !line.product_id && !assignDirectToRoot ? (
-                            // 选了顶级但 0 个池 → 提示用户直接归顶级
-                            <button type="button"
-                              onClick={() => updateLine(idx, 'custom_category_id', rootFilter[idx])}
-                              className="w-full mt-1 px-3 py-2 text-xs text-left bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-emerald-300 flex items-center gap-2">
-                              <span>↳</span>
-                              <span className="flex-1">该顶级暂无池，点此直接归顶级（<b>{topLevelCategories.find(c => c.id === rootFilter[idx])?.name}</b>），不入具体池</span>
-                            </button>
-                          ) : assignDirectToRoot ? (
-                            <div className="mt-1 px-3 py-2 text-xs bg-emerald-500/15 border border-emerald-500/40 rounded-lg text-emerald-300 flex items-center gap-2">
-                              <span>✓</span>
-                              <span className="flex-1">已选：直接归顶级 <b>{topLevelCategories.find(c => c.id === rootFilter[idx])?.name}</b></span>
-                              <button type="button" className="text-[#6b7085] hover:text-red-400 text-xs"
-                                onClick={() => { updateLine(idx, 'custom_category_id', null); setRootFilter(prev => ({ ...prev, [idx]: null })); }}>✕</button>
-                            </div>
-                          ) : line.showDropdown && (
-                            <div className="absolute left-0 right-0 top-full mt-1 bg-[#0f1117]/95 backdrop-blur-sm border border-white/10 rounded-xl max-h-64 overflow-y-auto z-50 shadow-2xl shadow-black/60">
+                        {/* 主搜索：直接搜池（全局，支持拼音）；分类筛选可选，用来缩小范围 */}
+                        <div className="flex gap-1.5 mb-1.5">
+                          <div className="relative flex-1">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#6b7085] text-xs">🔍</span>
+                            <input ref={el => { searchRefs.current[idx] = el; }} className="input text-sm w-full pl-7 pr-3 py-2"
+                              placeholder="搜池名 / 分类（支持拼音）..."
+                              value={line.search || ''}
+                              onFocus={() => openDD(idx)}
+                              onBlur={() => setTimeout(() => updateLine(idx, 'showDropdown', false), 200)}
+                              onChange={e => { updateLine(idx, 'search', e.target.value); openDD(idx); }} />
+                            {assignDirectToRoot ? (
+                              <div className="mt-1 px-3 py-2 text-xs bg-emerald-500/15 border border-emerald-500/40 rounded-lg text-emerald-300 flex items-center gap-2">
+                                <span>✓</span>
+                                <span className="flex-1">已选：<b>{topLevelCategories.find(c => c.id === rootFilter[idx])?.name}</b>（该分类暂无池，将自动建池入池）</span>
+                                <button type="button" className="text-[#6b7085] hover:text-red-400 text-xs"
+                                  onClick={() => { updateLine(idx, 'custom_category_id', null); setRootFilter(prev => ({ ...prev, [idx]: null })); }}>✕</button>
+                              </div>
+                            ) : line.showDropdown && ddRects[idx] && (
+                            <div className="fixed z-[110] bg-[#0f1117]/95 backdrop-blur-sm border border-white/10 rounded-xl overflow-y-auto shadow-2xl shadow-black/60"
+                              style={{ top: ddRects[idx].top, left: ddRects[idx].left, width: ddRects[idx].width, maxHeight: Math.max(160, Math.min(480, window.innerHeight - ddRects[idx].top - 8)) }}>
                               {filtered.length === 0 ? (
                                 <div className="px-3 py-3 text-xs text-[#6b7085] text-center">
                                   没有匹配的池 · 点下方新建
                                 </div>
                               ) : (
-                                filtered.map(p => (
+                                <>
+                                {!line.search?.trim() && (
+                                  <div className="px-3 py-2 text-[10px] text-[#6b7085] bg-white/[0.02] border-b border-white/[0.04]">
+                                    共 {filtered.length} 个池 · 输入名称 / 拼音快速查找
+                                  </div>
+                                )}
+                                {filtered.map(p => (
                                   <button type="button" key={p.id}
-                                    className="w-full text-left px-3 py-2 text-xs hover:bg-white/[0.08] flex items-center gap-2 border-b border-white/[0.04] last:border-b-0 transition-colors"
+                                    className="w-full text-left px-3 py-3 text-base hover:bg-white/[0.08] flex items-center gap-2 border-b border-white/[0.04] last:border-b-0 transition-colors"
                                     onPointerDown={() => { updateLine(idx, 'product_id', String(p.id)); updateLine(idx, 'search', ''); updateLine(idx, 'showDropdown', false); }}>
                                     <div className="flex-1 min-w-0">
                                       <div className="truncate font-medium text-[#d0d4e8]">{p.name_zh || p.name}</div>
-                                      <div className="text-[10px] text-[#6b7085] mt-0.5 truncate">{p.category_name || p.category}</div>
+                                      <div className="text-xs text-[#6b7085] mt-0.5 truncate">{p.category_name || p.category}</div>
                                     </div>
-                                    <span className="text-[10px] text-accent shrink-0 tabular-nums">¥{p.avg_unit_cost?.toFixed(0) || '—'}</span>
+                                    <span className="text-xs text-accent shrink-0 tabular-nums">¥{p.avg_unit_cost?.toFixed(0) || '—'}</span>
                                   </button>
-                                ))
+                                ))}
+                              </>
                               )}
                               <button type="button"
-                                className="w-full text-left px-3 py-2 text-xs hover:bg-orange-500/10 text-orange-400 border-t border-white/[0.08] flex items-center gap-2"
+                                className="w-full text-left px-3 py-3 text-base hover:bg-orange-500/10 text-orange-400 border-t border-white/[0.08] flex items-center gap-2"
                                 onPointerDown={() => { updateLine(idx, 'product_id', '__new__'); updateLine(idx, 'search', ''); updateLine(idx, 'showDropdown', false); }}>
                                 <span className="text-base leading-none">＋</span>
                                 <span>新建商品</span>
                               </button>
                             </div>
                           )}
+                          </div>
+                          <select
+                            className="input text-sm w-32 shrink-0 py-2"
+                            value={rootFilter[idx] ?? ''}
+                            onChange={e => {
+                              const v = e.target.value;
+                              const rootId = v ? Number(v) : null;
+                              setRootFilter(prev => ({ ...prev, [idx]: rootId }));
+                              // 该顶级下没有池 → 自动建池入池（用户不用再多点一下）
+                              if (rootId) {
+                                const rootPools = products.filter(p => p.category_id && catIdToRoot[p.category_id]?.id === rootId);
+                                updateLine(idx, 'custom_category_id', rootPools.length === 0 ? rootId : null);
+                              } else {
+                                updateLine(idx, 'custom_category_id', null);
+                              }
+                              openDD(idx);
+                            }}
+                          >
+                            <option value="">全部分类</option>
+                            {topLevelCategories.map(c => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
                         </div>
                       </>
                     )}
@@ -1020,21 +1046,23 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <input className="input text-xs w-16 text-center" type="text" inputmode="decimal" placeholder="数量"
+                  <input className="input text-sm w-20 text-center py-2" type="text" inputmode="decimal" placeholder="数量"
                     value={line.quantity || ''}
                     onChange={e => updateLine(idx, 'quantity', e.target.value)} />
-                  <span className="text-[10px] text-[#6b7085] flex-1 leading-tight">
-                    {ref.poolRefUnit > 0 ? (
-                      <>参考 ¥{ref.refUnit.toFixed(0)}/件 = ¥{ref.refCost.toFixed(0)}{allocated > 0 ? <><br/>实摊 ¥{allocated.toFixed(0)}</> : ''}</>
+                  <span className="text-xs text-[#6b7085] flex-1 leading-tight">
+                    {ref.manualPrice > 0 ? (
+                      <>估价 ¥{ref.refUnit.toFixed(0)}/件 = ¥{ref.refCost.toFixed(0)}{poolLines.length > 1 && allocated > 0 ? <> · 实摊 ¥{allocated.toFixed(0)}</> : ''}</>
+                    ) : ref.refUnit > 0 ? (
+                      <>参考 ¥{ref.refUnit.toFixed(0)}/件 = ¥{ref.refCost.toFixed(0)}{poolLines.length > 1 && allocated > 0 ? <><br/>实摊 ¥{allocated.toFixed(0)}</> : ''}</>
                     ) : line.product_id ? (
                       <span className="inline-flex items-center gap-1 flex-wrap">
                         <span className="text-[#4b5065]">估价</span>
-                        <input className="input text-xs w-14 text-center px-1 py-0.5" type="text" inputmode="decimal" placeholder="单价"
+                        <input className="input text-sm w-16 text-center px-1 py-1" type="text" inputmode="decimal" placeholder="单价"
                           value={line.manual_price || ''}
                           onChange={e => updateLine(idx, 'manual_price', e.target.value)} />
                         <span className="text-[#4b5065]">/件</span>
                         {ref.manualPrice > 0 && (
-                          <span className="text-[#9ba0b5]">= ¥{ref.refCost.toFixed(0)}{allocated > 0 ? <> · 实摊 ¥{allocated.toFixed(0)}</> : ''}</span>
+                          <span className="text-[#9ba0b5]">= ¥{ref.refCost.toFixed(0)}{poolLines.length > 1 && allocated > 0 ? <> · 实摊 ¥{allocated.toFixed(0)}</> : ''}</span>
                         )}
                       </span>
                     ) : null}
@@ -1053,7 +1081,7 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
                 <span>分配 {totalQty} / 原 {toyQty} 件</span>
                 <span>参考总成本 ¥{totalRefCost.toFixed(0)}</span>
               </div>
-              {totalCost > 0 && totalRefCost > 0 && (
+              {poolLines.length > 1 && totalCost > 0 && totalRefCost > 0 && (
                 <div className="text-accent">
                   分摊（比例 {(ratio * 100).toFixed(0)}%）：{linesWithRef.filter(l => l.refCost > 0 && l.qty > 0).map(l => {
                     const a = Math.round(l.refCost * ratio * 100) / 100;
@@ -2051,6 +2079,7 @@ export default function Warehouse() {
   const [filter, setFilter] = useState('stock');
   const [sourceFilter, setSourceFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [poolSearch, setPoolSearch] = useState('');
   const [selling, setSelling] = useState(null);
   const [editing, setEditing] = useState(null);
   const [returning, setReturning] = useState(null);
@@ -2077,6 +2106,7 @@ export default function Warehouse() {
   const [page, setPage] = useState(1);
   const [sortNewest, setSortNewest] = useState(true);
   const [previewImage, setPreviewImage] = useState(null);
+  const [previewZoom, setPreviewZoom] = useState(1);
   const [view, setView] = useState('pool'); // 'pool' | 'single'
   const [collapsedCats, setCollapsedCats] = useState(() => {
     // 默认折叠空 / 库存为 0 的分类，活跃的展开
@@ -2236,16 +2266,44 @@ export default function Warehouse() {
       // 第一行：更新原始 toy
       const first = lines[0];
       let productId = first.product_id;
-      // 模式 A：直接归顶级（product_id 空 + custom_category_id 有值）
-      //   → 不创建 product，只更新 toy.category_id = 顶级 id
+      // 模式 A：选了顶级分类但该顶级下 0 池（product_id 空 + custom_category_id 有值）
+      //   → 自动按商品名建池并真正入池（否则商品不会出现在池商品区）
       if (!productId && first.custom_category_id) {
         const catName = categories.find(c => c.id === first.custom_category_id)?.name;
+        const qty = first.quantity;
+        const created = await api.post('/products', {
+          name: first.custom_name || poolifying.name,
+          name_zh: first.custom_name || poolifying.name_zh || '',
+          category_id: first.custom_category_id,
+          source: poolifying.source,
+        });
+        productId = created.id;
+        setProducts(prev => [...prev, created]);
         await updateToy(poolifying.id, {
           ...poolifying,
+          product_id: productId,
           category_id: first.custom_category_id,
           category: catName || poolifying.category,
+          quantity: qty,
+          remaining: qty,
+          total_cost: poolifying.total_cost || 0,
+          unit_cost: qty > 0 ? Math.round((poolifying.total_cost || 0) / qty * 100) / 100 : 0,
         });
-        setToast(`已归顶级「${catName}」（不入具体池）`);
+        // 入池日志
+        await api.post('/toys/pool-logs', {
+          product_id: productId,
+          toy_id: poolifying.id,
+          action: '入池',
+          toy_name: poolifying.name_zh || poolifying.name,
+          quantity: qty,
+          unit_cost: qty > 0 ? Math.round((poolifying.total_cost || 0) / qty * 100) / 100 : 0,
+          total_cost: poolifying.total_cost || 0,
+        }).catch(() => {});
+        setPoolifying(null);
+        setToast(`已入池「${catName}」× ${qty}`);
+        api.get('/products').then(prods => setProducts(prods)).catch(() => {});
+        const { loadAll } = useStore.getState();
+        loadAll();
         return;
       }
       // 模式 B：入具体池（正常逻辑）
@@ -2259,10 +2317,14 @@ export default function Warehouse() {
         });
         productId = created.id;
       }
+      // 参考单价与弹窗一致：手动估价 → 商品总成本 ÷ 全部数量 → 池均价兜底
+      const totalQtyAll = lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0);
+      const refUnitOf = (l) => l.manual_price
+        || (poolifying.total_cost > 0 && totalQtyAll > 0 ? poolifying.total_cost / totalQtyAll : 0)
+        || products.find(p => String(p.id) === String(l.product_id))?.avg_unit_cost
+        || 0;
       const firstRefCost = (() => {
-        const p = products.find(p => String(p.id) === String(first.product_id));
-        const refUnit = p?.avg_unit_cost || (poolifying.total_cost / (poolifying.quantity || 1)) || 0;
-        return refUnit * first.quantity;
+        return refUnitOf(first) * first.quantity;
       })();
       const firstAllocated = ratio > 0 ? Math.round(firstRefCost * ratio * 100) / 100 : 0;
       const firstUnitCost = first.quantity > 0 ? firstAllocated / first.quantity : 0;
@@ -2300,11 +2362,7 @@ export default function Warehouse() {
           });
           pid = created.id;
         }
-        const refCost = (() => {
-          const p = products.find(p => String(p.id) === String(line.product_id));
-          const refUnit = p?.avg_unit_cost || (poolifying.total_cost / (poolifying.quantity || 1)) || 0;
-          return refUnit * line.quantity;
-        })();
+        const refCost = refUnitOf(line) * line.quantity;
         const allocated = ratio > 0 ? Math.round(refCost * ratio * 100) / 100 : 0;
         const unitCost = line.quantity > 0 ? allocated / line.quantity : 0;
 
@@ -2337,7 +2395,7 @@ export default function Warehouse() {
       }
 
       setPoolifying(null);
-      setToast(lines.length > 1 ? `已拆分入池：${lines.length} 个商品` : '已转入池模式');
+      setToast(lines.length > 1 ? `已拆分入池：${lines.length} 个商品` : '已入池');
       api.get('/products').then(prods => setProducts(prods)).catch(() => {});
       const { loadAll } = useStore.getState();
       loadAll();
@@ -2619,6 +2677,21 @@ export default function Warehouse() {
     });
   })();
 
+  // 池搜索：按池名/分类名过滤分组（搜索词为空时原样返回）
+  const poolGroups = (() => {
+    const s = poolSearch.trim().toLowerCase();
+    if (!s) return poolsByCategory;
+    return poolsByCategory
+      .map(([cat, pools]) => [
+        cat,
+        pools.filter(g => {
+          const name = (g.product?.name_zh || g.product?.name || '').toLowerCase();
+          return name.includes(s) || cat.toLowerCase().includes(s);
+        }),
+      ])
+      .filter(([, pools]) => pools.length > 0);
+  })();
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
@@ -2753,7 +2826,17 @@ export default function Warehouse() {
               {collapsedCats.size === poolsByCategory.length ? '全部展开' : '全部折叠'}
             </button>
           </div>
-          {poolsByCategory.map(([cat, pools]) => {
+          <input
+            className="input"
+            placeholder="🔍 搜索池（按池名/分类）..."
+            value={poolSearch}
+            onChange={e => setPoolSearch(e.target.value)}
+          />
+          {poolGroups.length === 0 ? (
+            <div className="text-center text-xs text-[#6b7085] py-8">没有找到匹配「{poolSearch.trim()}」的池</div>
+          ) : (
+          <>
+          {poolGroups.map(([cat, pools]) => {
             const isCollapsed = collapsedCats.has(cat);
             return (
             <div key={cat} className="space-y-2">
@@ -2795,7 +2878,7 @@ export default function Warehouse() {
                         <>
                           <img src={poolImage} alt="" className="w-10 h-10 rounded-lg object-cover bg-white/5 cursor-zoom-in hover:ring-2 hover:ring-accent/50 transition-all" loading="lazy" onError={e => e.target.style.display='none'} onClick={e => { e.stopPropagation(); setPreviewImage(poolImage); }} />
                           <button
-                            className="absolute inset-0 bg-black/70 rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-sm transition-opacity"
+                            className="absolute bottom-0 right-0 bg-black/70 rounded-tl-lg px-1.5 py-0.5 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs leading-none transition-opacity"
                             onClick={(e) => {
                               e.stopPropagation();
                               setImageUploadTarget({
@@ -2891,6 +2974,8 @@ export default function Warehouse() {
             </div>
             );
           })}
+          </>
+          )}
         </div>
       )}
 
@@ -3132,6 +3217,7 @@ export default function Warehouse() {
           onBatchTransferPool={(batches) => { setViewingPool(null); setTransferPool({ batches }); }}
           onTransferPool={(b) => { setTransferPool({ batch: b, sourceProduct: viewingPool }); }}
           onPreviewImage={setPreviewImage}
+          onProductsChange={setProducts}
         />
       )}
 
@@ -3150,15 +3236,26 @@ export default function Warehouse() {
 
       {/* 全局图片大图预览（单品卡片 + 池卡片共用） */}
       {previewImage && createPortal(
-        <div className="fixed inset-0 bg-black/95 z-[9999]"
+        <div className="fixed inset-0 bg-black/95 z-[9999] overflow-auto"
           onMouseDown={e => e.stopPropagation()}
           onClick={e => { e.stopPropagation(); setPreviewImage(null); }}>
-          <button className="absolute top-4 right-4 text-white/60 hover:text-white text-2xl z-10"
+          <div className="sticky top-0 flex items-center justify-between px-3 py-2 z-10 pointer-events-none">
+            <button className="pointer-events-auto text-xs text-white/80 border border-white/25 rounded-lg px-3 py-1.5 bg-black/50 hover:text-white hover:border-white/50"
+              onClick={e => { e.stopPropagation(); setPreviewZoom(z => (z >= 3 ? 1 : z + 1)); }}>
+              {previewZoom > 1 ? `已放大 ${previewZoom}×（点击图片继续放大，滚动看细节）` : '点击图片放大'}
+            </button>
+            <button className="pointer-events-auto text-white/60 hover:text-white text-2xl leading-none"
+              onMouseDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); setPreviewImage(null); }}>✕</button>
+          </div>
+          <img src={previewImage} alt=""
+            className="block mx-auto transition-transform duration-200 object-contain"
+            style={{
+              maxWidth: previewZoom > 1 ? `${previewZoom * 100}vw` : '100vw',
+              maxHeight: previewZoom > 1 ? 'none' : '100vh',
+            }}
             onMouseDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); setPreviewImage(null); }}>✕</button>
-          <img src={previewImage} alt="" className="absolute inset-0 w-full h-full object-contain"
-            onMouseDown={e => e.stopPropagation()}
-            onClick={e => e.stopPropagation()} />
+            onClick={e => { e.stopPropagation(); setPreviewZoom(z => (z >= 3 ? 1 : z + 1)); }} />
         </div>,
         document.body
       )}

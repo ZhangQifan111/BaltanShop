@@ -91,7 +91,7 @@ export default function Estimate() {
 
           <SourcePicker value={form.source} onChange={onSourceChange} />
 
-          {form.source === 'direct' && (
+          {sourceGroup(form.source) === 'direct' && (
             <TaxModePicker
               value={form.japan_price_includes_tax}
               onChange={(v) => update('japan_price_includes_tax', v)}

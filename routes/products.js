@@ -68,8 +68,11 @@ router.get('/', async (req, res) => {
         totalCost += cost;
         totalQty += (t.quantity || 0);
         if (t.status === 'stock') {
-          totalRemaining += (t.remaining != null ? t.remaining : (t.quantity || 0));
-          totalRemainingCost += cost * (t.remaining != null ? t.remaining : (t.quantity || 0));
+          const remaining = t.remaining != null ? t.remaining : (t.quantity || 0);
+          totalRemaining += remaining;
+          // 剩余库存成本 = 批次单价（总成本÷件数）× 剩余件数
+          // 注意：不能用「批次总成本 × 剩余件数」，那会把均价放大 quantity 倍
+          totalRemainingCost += (t.quantity > 0 ? cost / t.quantity : 0) * remaining;
           stockBatchCount++;
         }
       }

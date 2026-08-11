@@ -174,7 +174,7 @@ function EstimateForm({ item, onClose, onUseForAdd, onSaveAsReference }) {
     setLoading(true);
     try {
       const body = {
-        source: form.source,
+        source: sourceGroup(form.source), // 归一化成 direct/proxy/domestic/secondhand 之一
         sell_price: sell,
         handling_fee: num(form.handling_fee),
         japan_domestic_shipping: num(form.japan_domestic_shipping),
@@ -228,7 +228,7 @@ function EstimateForm({ item, onClose, onUseForAdd, onSaveAsReference }) {
 
         <SourcePicker value={form.source} onChange={onSourceChange} />
 
-        {form.source === 'direct' && (
+        {sourceGroup(form.source) === 'direct' && (
           <TaxModePicker
             value={form.japan_price_includes_tax}
             onChange={(v) => update('japan_price_includes_tax', v)}
