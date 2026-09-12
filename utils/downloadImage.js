@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
+const { makeThumb } = require('./thumbnail');
 
 // 任你购代理 URL（rl.rng.vip/...）里 base64 编码了真实源 URL，解码出来直接下载更稳
 function decodeRngImg(url) {
@@ -40,7 +41,7 @@ function downloadImageOnce(imgUrl, destPath, referer) {
       }
       if (res.statusCode !== 200) { file.close(); try { fs.unlinkSync(destPath); } catch {} return resolve(false); }
       res.pipe(file);
-      file.on('finish', () => file.close(() => resolve(true)));
+      file.on('finish', () => file.close(() => { makeThumb(destPath); resolve(true); }));
       file.on('error', () => { try { fs.unlinkSync(destPath); } catch {} resolve(false); });
     });
     req.on('error', () => { try { fs.unlinkSync(destPath); } catch {} resolve(false); });

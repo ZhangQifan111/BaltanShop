@@ -4,6 +4,7 @@ import useStore from '../stores/useStore';
 import { api } from '../lib/api';
 import { useIsTouchDevice } from '../lib/useIsTouchDevice';
 import { sourceLabel, sourceGroup, SOURCE_CATEGORIES, toSourceValue, parseSource } from '../lib/sources';
+import { thumbOf } from '../lib/thumbnail';
 import ConfirmModal from '../components/ConfirmModal';
 import CategoryPicker from '../components/CategoryPicker';
 
@@ -53,7 +54,7 @@ function ArrivalBadge({ info }) {
   if (!info) return null;
   const t = ARRIVAL_TONE[info.tone];
   return (
-    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${t.bg} ${t.text} ${t.border}`}>
+    <span className={`text-xs font-medium px-1.5 py-0.5 rounded border ${t.bg} ${t.text} ${t.border}`}>
       {info.label}
     </span>
   );
@@ -61,7 +62,7 @@ function ArrivalBadge({ info }) {
 
 function StageChip({ stage }) {
   return (
-    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: STAGE_COLORS[stage] + '22', color: STAGE_COLORS[stage] }}>
+    <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: STAGE_COLORS[stage] + '22', color: STAGE_COLORS[stage] }}>
       {STAGE_LABELS[stage]} {STAGE_NAMES[stage]}
     </span>
   );
@@ -69,7 +70,7 @@ function StageChip({ stage }) {
 
 function PreorderChip() {
   return (
-    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-500/15 text-pink-300 border border-pink-500/30">
+    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-pink-500/15 text-pink-300 border border-pink-500/30">
       📌 预购
     </span>
   );
@@ -175,20 +176,20 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
             <p className="text-xs text-[#6b7085]">填写日本境内产生的费用：</p>
             <div className="space-y-3">
               <div>
-                <label className="text-[10px] text-[#6b7085] block mb-1">重量 (kg)</label>
+                <label className="text-xs text-[#6b7085] block mb-1">重量 (kg)</label>
                 <input className="input text-xs" type="text" inputmode={isTouch ? "decimal" : undefined} lang="zh-CN" min="0" step="0.1" value={weight ?? ''} placeholder="0" onChange={e => setWeight(e.target.value === '' ? '' : +e.target.value)} />
               </div>
               <div>
-                <label className="text-[10px] text-[#6b7085] block mb-1">手续费 (¥)</label>
+                <label className="text-xs text-[#6b7085] block mb-1">手续费 (¥)</label>
                 <input className="input text-xs" type="text" inputmode={isTouch ? "decimal" : undefined} lang="zh-CN" min="0" value={stage2_handling ?? ''} placeholder="5" onChange={e => setStage2_handling(e.target.value === '' ? '' : +e.target.value)} />
               </div>
               <div>
-                <label className="text-[10px] text-[#6b7085] block mb-1">国内物流费 (¥)</label>
+                <label className="text-xs text-[#6b7085] block mb-1">国内物流费 (¥)</label>
                 <input className="input text-xs" type="text" inputmode={isTouch ? "decimal" : undefined} lang="zh-CN" min="0" value={stage2_domestic_ship ?? ''} placeholder="0" onChange={e => setStage2_domestic_ship(e.target.value === '' ? '' : +e.target.value)} />
               </div>
             </div>
             <div className="bg-black/30 rounded-lg p-3 text-center">
-              <span className="text-[10px] text-[#6b7085]">阶段②小计：</span>
+              <span className="text-xs text-[#6b7085]">阶段②小计：</span>
               <span className="ml-2 text-sm font-bold text-[#d0d4e8]">¥{stage2Total.toFixed(2)}</span>
             </div>
           </>
@@ -197,11 +198,11 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
           <>
             <p className="text-xs text-[#6b7085]">填写国内运费：</p>
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">国内运费 (¥)</label>
+              <label className="text-xs text-[#6b7085] block mb-1">国内运费 (¥)</label>
               <input className="input text-xs" type="text" inputmode={isTouch ? "decimal" : undefined} lang="zh-CN" min="0" value={stage2_domestic_ship ?? ''} placeholder="0" onChange={e => setStage2_domestic_ship(e.target.value === '' ? '' : +e.target.value)} />
             </div>
             <div className="bg-black/30 rounded-lg p-3 text-center mt-3">
-              <span className="text-[10px] text-[#6b7085]">阶段②小计：</span>
+              <span className="text-xs text-[#6b7085]">阶段②小计：</span>
               <span className="ml-2 text-sm font-bold text-[#d0d4e8]">¥{(stage2_domestic_ship || 0).toFixed(2)}</span>
             </div>
           </>
@@ -211,7 +212,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
           <>
             {batchCandidates.length > 0 && (
               <div>
-                <p className="text-[10px] text-[#6b7085] mb-1">勾选同批次直购商品（已在②阶段），一起分摊运费：</p>
+                <p className="text-xs text-[#6b7085] mb-1">勾选同批次直购商品（已在②阶段），一起分摊运费：</p>
                 <div className="space-y-1 max-h-32 overflow-y-auto bg-black/20 rounded-lg p-2">
                   {batchCandidates.map(t => (
                     <label key={t.id} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-white/5 rounded px-1 py-0.5">
@@ -222,7 +223,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
                       <span className="flex-1 truncate text-[#d0d4e8]">{t.name_zh || t.name}</span>
                       {t.logistics_weight > 0
                         ? <span className="text-[#6b7085]">{t.logistics_weight}kg</span>
-                        : <span className="text-red-400 text-[9px]">未填重量</span>}
+                        : <span className="text-red-400 text-xs">未填重量</span>}
                     </label>
                   ))}
                 </div>
@@ -230,7 +231,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
             )}
 
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">
+              <label className="text-xs text-[#6b7085] block mb-1">
                 整批总国际运费 (¥){selectedIds.size > 0 && <span className="text-orange-400">（含 {selectedIds.size + 1} 件）</span>}
               </label>
               <input className="input text-xs" type="text" inputmode={isTouch ? "decimal" : undefined} lang="zh-CN" min="0" value={total_ship_fee} placeholder="0"
@@ -239,7 +240,7 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
 
             {sourceGroup(toy.source) !== 'proxy' && (
               <div>
-                <label className="text-[10px] text-[#6b7085] block mb-1">运输方式</label>
+                <label className="text-xs text-[#6b7085] block mb-1">运输方式</label>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -271,14 +272,14 @@ function StageAdvanceModal({ toy, allToys, onConfirm, onCancel }) {
 
             {selectedIds.size > 0 && totalWeight > 0 && shipFee > 0 && (
               <div className="bg-black/20 rounded-lg p-2 space-y-0.5">
-                <p className="text-[10px] text-[#6b7085] mb-1">其他商品分摊：</p>
+                <p className="text-xs text-[#6b7085] mb-1">其他商品分摊：</p>
                 {[...selectedIds].map(id => {
                   const t = (allToys || []).find(x => x.id === id);
                   if (!t) return null;
                   const share = calcShare(t);
                   const tTax = computeStage3Tax(t.stage1_amount, t.source, stage3_tax_mode);
                   return (
-                    <div key={id} className="flex justify-between text-[10px]">
+                    <div key={id} className="flex justify-between text-xs">
                       <span className="text-[#6b7085] truncate flex-1">{t.name_zh || t.name}</span>
                       <span className="text-[#d0d4e8] ml-2">¥{share.toFixed(2)}{tTax > 0 ? ` + ¥${tTax.toFixed(2)}税` : ''}</span>
                     </div>
@@ -337,11 +338,11 @@ function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
         <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">商品名称</label>
+              <label className="text-xs text-[#6b7085] block mb-1">商品名称</label>
               <input className="input text-xs" lang="zh-CN" spellCheck={false} autoComplete="off" value={form.name || ''} onChange={e => setForm({ ...form, name: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
             </div>
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">品类</label>
+              <label className="text-xs text-[#6b7085] block mb-1">品类</label>
               <CategoryPicker
                 value={form.category_id || null}
                 onChange={v => setForm({ ...form, category_id: v })}
@@ -353,54 +354,54 @@ function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
           {!isPreorder && (
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-black/20 rounded-lg p-3 border border-[#f0a030]/20">
-                <div className="text-[10px] font-bold text-[#f0a030] mb-2">① 买货</div>
+                <div className="text-xs font-bold text-[#f0a030] mb-2">① 买货</div>
                 <div>
-                  <label className="text-[10px] text-[#6b7085] block mb-1">买价 (¥)</label>
+                  <label className="text-xs text-[#6b7085] block mb-1">买价 (¥)</label>
                   <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={form.stage1_amount ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage1_amount: e.target.value === '' ? '' : +e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
                 </div>
               </div>
               <div className="bg-black/20 rounded-lg p-3 border border-[#60a5fa]/20">
-                <div className="text-[10px] font-bold text-[#60a5fa] mb-2">② 国内转运</div>
+                <div className="text-xs font-bold text-[#60a5fa] mb-2">② 国内转运</div>
                 <div className="space-y-2">
                   {sourceGroup(toy.source) === 'direct' && (
                     <div>
-                      <label className="text-[10px] text-[#6b7085] block mb-1">重量 (kg)</label>
+                      <label className="text-xs text-[#6b7085] block mb-1">重量 (kg)</label>
                       <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" min="0" step="0.1" value={form.logistics_weight ?? ''} placeholder="0" onChange={e => setForm({ ...form, logistics_weight: e.target.value === '' ? '' : +e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
                     </div>
                   )}
                   <div>
-                    <label className="text-[10px] text-[#6b7085] block mb-1">手续费 (¥)</label>
+                    <label className="text-xs text-[#6b7085] block mb-1">手续费 (¥)</label>
                     <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={form.stage2_handling ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage2_handling: e.target.value === '' ? '' : +e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
                   </div>
                   <div>
-                    <label className="text-[10px] text-[#6b7085] block mb-1">国内物流费 (¥)</label>
+                    <label className="text-xs text-[#6b7085] block mb-1">国内物流费 (¥)</label>
                     <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={form.stage2_domestic_ship ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage2_domestic_ship: e.target.value === '' ? '' : +e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
                   </div>
                 </div>
               </div>
               <div className="bg-black/20 rounded-lg p-3 border border-[#a78bfa]/20">
-                <div className="text-[10px] font-bold text-[#a78bfa] mb-2">③ 国际运输</div>
+                <div className="text-xs font-bold text-[#a78bfa] mb-2">③ 国际运输</div>
                 <div className="space-y-2">
                   <div>
-                    <label className="text-[10px] text-[#6b7085] block mb-1">国际运费 (¥)</label>
+                    <label className="text-xs text-[#6b7085] block mb-1">国际运费 (¥)</label>
                     <input className="input text-xs" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={form.stage3_intl_ship ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage3_intl_ship: e.target.value === '' ? '' : +e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
                   </div>
                   <div>
-                    <label className="text-[10px] text-[#6b7085] block mb-1">税费 (¥，13%)</label>
+                    <label className="text-xs text-[#6b7085] block mb-1">税费 (¥，13%)</label>
                     <input className="input text-xs bg-black/20 cursor-default" type="text" inputMode={isTouch ? "decimal" : undefined} lang="zh-CN" value={computeStage3Tax(form.stage1_amount, toy.source, form.stage3_tax_mode || toy.stage3_tax_mode).toFixed(2)} readOnly />
                   </div>
                   {sourceGroup(toy.source) !== 'proxy' && (
                     <div className="flex gap-1 pt-1">
                       <button
                         type="button"
-                        className={`flex-1 text-[10px] py-1 rounded border ${(form.stage3_tax_mode || toy.stage3_tax_mode) === 'normal' ? 'bg-orange-500/20 border-orange-500 text-orange-300' : 'bg-black/20 border-white/10 text-[#6b7085]'}`}
+                        className={`flex-1 text-xs py-1 rounded border ${(form.stage3_tax_mode || toy.stage3_tax_mode) === 'normal' ? 'bg-orange-500/20 border-orange-500 text-orange-300' : 'bg-black/20 border-white/10 text-[#6b7085]'}`}
                         onClick={() => setForm({ ...form, stage3_tax_mode: 'normal' })}
                       >
                         正常运输
                       </button>
                       <button
                         type="button"
-                        className={`flex-1 text-[10px] py-1 rounded border ${(form.stage3_tax_mode || toy.stage3_tax_mode) === 'tax_included' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300' : 'bg-black/20 border-white/10 text-[#6b7085]'}`}
+                        className={`flex-1 text-xs py-1 rounded border ${(form.stage3_tax_mode || toy.stage3_tax_mode) === 'tax_included' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300' : 'bg-black/20 border-white/10 text-[#6b7085]'}`}
                         onClick={() => setForm({ ...form, stage3_tax_mode: 'tax_included' })}
                       >
                         包税线路
@@ -414,13 +415,13 @@ function EditToyModal({ toy, form, setForm, categories, onSave, onCancel }) {
 
           {isPreorder && (
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">上市/到货日 <span className="text-[#6b7085]">(可选)</span></label>
+              <label className="text-xs text-[#6b7085] block mb-1">上市/到货日 <span className="text-[#6b7085]">(可选)</span></label>
               <input className="input text-xs" type="date" value={form.expected_arrival_date || ''} onChange={e => setForm({ ...form, expected_arrival_date: e.target.value })} />
             </div>
           )}
 
           <div>
-            <label className="text-[10px] text-[#6b7085] block mb-1">备注</label>
+            <label className="text-xs text-[#6b7085] block mb-1">备注</label>
             <input className="input text-xs" value={form.notes || ''} onChange={e => setForm({ ...form, notes: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') handleSave(); }} />
           </div>
         </div>
@@ -494,14 +495,14 @@ const ToyRow = memo(function ToyRow({ toy, onUpdate, onDelete, categories, allTo
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
             {batchMode && <input type="checkbox" className="shrink-0 mt-1 accent-orange-500" checked={selected} onChange={() => onToggleSelect(toy.id)} />}
-            {toy.image && <img src={toy.image} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 bg-white/5" loading="lazy" onError={e => e.target.style.display='none'} />}
+            {toy.image && <img src={thumbOf(toy.image)} data-full={toy.image} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 bg-white/5" loading="lazy" decoding="async" onError={e => { const f = e.currentTarget.dataset.full; if (f && !e.currentTarget.dataset.fb) { e.currentTarget.dataset.fb = '1'; e.currentTarget.src = f; } else e.currentTarget.style.display = 'none'; }} />}
             <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="text-sm font-bold truncate">{toy.name_zh || toy.name}</span>
               {isPreorder ? <PreorderChip /> : <StageChip stage={toy.procurement_stage} />}
               <ArrivalBadge info={arrival} />
             </div>
-            <div className="text-[10px] text-[#6b7085] flex gap-2 flex-wrap">
+            <div className="text-xs text-[#6b7085] flex gap-2 flex-wrap">
               {isPreorder ? (
                 <>
                   <span>创建 {toy.created_at?.slice(0, 10) || toy.purchase_date}</span>
@@ -533,18 +534,18 @@ const ToyRow = memo(function ToyRow({ toy, onUpdate, onDelete, categories, allTo
               ) : toy.stage1_amount > 0 ? (
                 <div className="cursor-pointer hover:opacity-80" onClick={(e) => { e.stopPropagation(); setEditingPreorderAmount(true); setPreorderAmountInput(toy.stage1_amount); }} title="点击修改金额">
                   <div className="text-lg font-bold text-pink-300">¥{toy.stage1_amount.toFixed(0)}</div>
-                  <div className="text-[9px] text-[#6b7085]">已付 (未到货)</div>
+                  <div className="text-xs text-[#6b7085]">已付 (未到货)</div>
                 </div>
               ) : (
                 <div className="cursor-pointer hover:opacity-80" onClick={(e) => { e.stopPropagation(); setEditingPreorderAmount(true); setPreorderAmountInput(''); }} title="点击填写已付金额">
                   <div className="text-lg font-bold text-pink-300">📌</div>
-                  <div className="text-[9px] text-[#6b7085]">未到货 · 点填金额</div>
+                  <div className="text-xs text-[#6b7085]">未到货 · 点填金额</div>
                 </div>
               )
             ) : (
               <>
                 <div className="text-lg font-bold text-accent">¥{totalCost.toFixed(0)}</div>
-                <div className="text-[9px] text-[#6b7085]">总成本</div>
+                <div className="text-xs text-[#6b7085]">总成本</div>
               </>
             )}
           </div>
@@ -554,19 +555,19 @@ const ToyRow = memo(function ToyRow({ toy, onUpdate, onDelete, categories, allTo
         {!isPreorder && (
           <div className="mt-3 grid grid-cols-3 gap-2">
             <div className="bg-black/20 rounded-lg p-2 text-center">
-              <div className="text-[9px] text-[#6b7085] mb-1">① 买货</div>
+              <div className="text-xs text-[#6b7085] mb-1">① 买货</div>
               <div className="text-sm font-bold text-[#d0d4e8]">¥{toy.stage1_amount || 0}</div>
-              {toy.source && <div className="text-[9px] text-[#6b7085] mt-0.5">{sourceLabel(toy.source)}</div>}
+              {toy.source && <div className="text-xs text-[#6b7085] mt-0.5">{sourceLabel(toy.source)}</div>}
             </div>
             <div className={`rounded-lg p-2 text-center ${toy.stage2_amount > 0 ? 'bg-black/20' : 'bg-black/10 border border-dashed border-white/10'}`}>
-              <div className="text-[9px] text-[#6b7085] mb-1">② 国内转运</div>
+              <div className="text-xs text-[#6b7085] mb-1">② 国内转运</div>
               <div className="text-sm font-bold text-[#d0d4e8]">¥{toy.stage2_amount || 0}</div>
-              {stage2SubLabel && <div className="text-[8px] text-[#6b7085] mt-0.5 truncate">{stage2SubLabel}</div>}
+              {stage2SubLabel && <div className="text-xs text-[#6b7085] mt-0.5 truncate">{stage2SubLabel}</div>}
             </div>
             <div className={`rounded-lg p-2 text-center ${toy.stage3_amount > 0 ? 'bg-black/20' : 'bg-black/10 border border-dashed border-white/10'}`}>
-              <div className="text-[9px] text-[#6b7085] mb-1">③ 国际运输</div>
+              <div className="text-xs text-[#6b7085] mb-1">③ 国际运输</div>
               <div className="text-sm font-bold text-[#d0d4e8]">¥{toy.stage3_amount || 0}</div>
-              {toy.stage3_tax > 0 && <div className="text-[8px] text-[#6b7085] mt-0.5">含税 ¥{toy.stage3_tax}</div>}
+              {toy.stage3_tax > 0 && <div className="text-xs text-[#6b7085] mt-0.5">含税 ¥{toy.stage3_tax}</div>}
             </div>
           </div>
         )}
@@ -842,18 +843,18 @@ export default function Procurement() {
         <form className="card space-y-3" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">商品名称 *</label>
+              <label className="text-xs text-[#6b7085] block mb-1">商品名称 *</label>
               <input className="input text-xs" lang="zh-CN" spellCheck={false} autoComplete="off" placeholder="商品名" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             </div>
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">类型</label>
+              <label className="text-xs text-[#6b7085] block mb-1">类型</label>
               <select className="input text-xs" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
                 <option value="procurement">采购中</option>
                 <option value="preorder">预购（未上市/未到货）</option>
               </select>
             </div>
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">品类</label>
+              <label className="text-xs text-[#6b7085] block mb-1">品类</label>
               <CategoryPicker
                 value={form.category_id}
                 onChange={v => setForm({ ...form, category_id: v })}
@@ -861,7 +862,7 @@ export default function Procurement() {
               />
             </div>
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">采购方式</label>
+              <label className="text-xs text-[#6b7085] block mb-1">采购方式</label>
               <div className="space-y-1.5">
                 <select
                   className="input text-xs"
@@ -911,20 +912,20 @@ export default function Procurement() {
               </div>
             </div>
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">
+              <label className="text-xs text-[#6b7085] block mb-1">
                 {isPreorderForm ? '已付金额 (¥)' : (poolMode ? '①总买价 (¥) — 按均价配比分摊' : '①买价 (¥)')}
               </label>
               <input className="input text-xs" type="text" inputmode={isTouch ? "decimal" : undefined} lang="zh-CN" value={form.stage1_amount ?? ''} placeholder="0" onChange={e => setForm({ ...form, stage1_amount: e.target.value === '' ? '' : +e.target.value })} />
             </div>
             {!poolMode && (
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">数量</label>
+              <label className="text-xs text-[#6b7085] block mb-1">数量</label>
               <input className="input text-xs" type="text" inputmode="decimal" lang="zh-CN" placeholder="1"
                 value={form.quantity || ''} onChange={e => setForm({ ...form, quantity: e.target.value })} />
             </div>
             )}
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">
+              <label className="text-xs text-[#6b7085] block mb-1">
                 {isPreorderForm ? '上市/到货日' : '购入日期'}
               </label>
               <input className="input text-xs" type="date" value={form.stage1_date} onChange={e => setForm({ ...form, stage1_date: e.target.value })} />
@@ -987,7 +988,7 @@ export default function Procurement() {
                         {selectedProd ? (
                           <div className="flex items-center gap-1 flex-1 min-w-0">
                             <div className="flex-1 input text-xs bg-white/5 truncate">{selectedProd.name_zh || selectedProd.name}</div>
-                            <button type="button" className="text-[10px] text-[#6b7085] hover:text-white px-1 shrink-0"
+                            <button type="button" className="text-xs text-[#6b7085] hover:text-white px-1 shrink-0"
                               onClick={() => updateLine(idx, 'product_id', null)}>✕</button>
                           </div>
                         ) : isNew ? (
@@ -996,7 +997,7 @@ export default function Procurement() {
                               value={line.custom_name || ''}
                               onChange={e => updateLine(idx, 'custom_name', e.target.value)}
                               lang="zh" spellCheck={false} autoComplete="off" />
-                            <button type="button" className="text-[10px] text-[#6b7085] hover:text-white px-1 shrink-0"
+                            <button type="button" className="text-xs text-[#6b7085] hover:text-white px-1 shrink-0"
                               onClick={() => updateLine(idx, 'product_id', null)}>✕</button>
                           </div>
                         ) : (
@@ -1026,13 +1027,13 @@ export default function Procurement() {
                         <input className="input text-xs w-14 text-center" type="text" inputmode="decimal" placeholder="数量"
                           value={line.quantity || ''}
                           onChange={e => updateLine(idx, 'quantity', e.target.value)} />
-                        <span className="text-[10px] text-[#6b7085] shrink-0 leading-tight text-right">
+                        <span className="text-xs text-[#6b7085] shrink-0 leading-tight text-right">
                           {ref.poolRefUnit > 0 ? (
                             <>参考 ¥{ref.refUnit.toFixed(0)}<br/>= ¥{ref.refCost.toFixed(0)}</>
                           ) : line.product_id ? (
                             <span className="inline-flex items-center gap-0.5">
                               <span className="text-[#4b5065]">¥</span>
-                              <input className="input text-[10px] w-12 text-center px-1 py-0" type="text" inputmode="decimal" placeholder="估价"
+                              <input className="input text-xs w-12 text-center px-1 py-0" type="text" inputmode="decimal" placeholder="估价"
                                 value={line.manual_price || ''}
                                 onChange={e => updateLine(idx, 'manual_price', e.target.value)} />
                               {ref.manualPrice > 0 && (
@@ -1048,11 +1049,11 @@ export default function Procurement() {
                       </div>
                     );
                   })}
-                  <button type="button" className="text-[11px] text-accent font-medium hover:text-white border border-accent/40 rounded-lg px-3 py-1.5 w-full bg-accent/5 hover:bg-accent/10"
+                  <button type="button" className="text-xs text-accent font-medium hover:text-white border border-accent/40 rounded-lg px-3 py-1.5 w-full bg-accent/5 hover:bg-accent/10"
                     onClick={addLine}>＋ 添加商品行</button>
                   {/* 汇总 */}
                   {totalQty > 0 && (
-                    <div className="text-[10px] text-[#6b7085] space-y-0.5 pt-1 border-t border-white/5">
+                    <div className="text-xs text-[#6b7085] space-y-0.5 pt-1 border-t border-white/5">
                       <div className="flex justify-between">
                         <span>总数量 {totalQty} 件 · 参考总成本</span>
                         <span>¥{totalRefCost.toFixed(0)}</span>
@@ -1080,7 +1081,7 @@ export default function Procurement() {
 
           {isPreorderForm && (
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">
+              <label className="text-xs text-[#6b7085] block mb-1">
                 预计到货日 <span className="text-[#6b7085]">(可选)</span>
               </label>
               <input className="input text-xs" type="date" value={form.expected_arrival_date || ''} onChange={e => setForm({ ...form, expected_arrival_date: e.target.value })} />
@@ -1114,7 +1115,7 @@ export default function Procurement() {
               }}
             >
               <div className="text-lg font-bold" style={{ color: t.color }}>{count}</div>
-              <div className="text-[10px] text-[#6b7085]">{t.label}</div>
+              <div className="text-xs text-[#6b7085]">{t.label}</div>
             </button>
           );
         })}

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import useStore from '../stores/useStore';
 import { batchTranslateJpToCn } from '../lib/translator';
 import ImageFixPanel from './ImageFixPanel';
+import api from '../lib/api';
 
 function fmt(n, d) { return Number(n).toFixed(d||0); }
 function yne(n) { return '¥' + Number(n).toLocaleString('zh-CN'); }
@@ -118,7 +119,7 @@ export default function OrderAnalyzer() {
   const bulkImport = useStore(s => s.bulkImport);
 
   const _fetchFiles = () => {
-    return fetch('/api/order-data?t=' + Date.now()).then(r => r.json());
+    return fetch('/api/order-data?t=' + Date.now(), { headers: api.authHeaders() }).then(r => r.json());
   };
 
   useEffect(() => {
@@ -151,7 +152,7 @@ export default function OrderAnalyzer() {
         const latest = files[files.length - 1];
         if (latest && latest.name !== lastLoadedFile.current) {
           try {
-            const r = await fetch('/api/order-data/' + latest.name);
+            const r = await fetch('/api/order-data/' + latest.name, { headers: api.authHeaders() });
             const data = await r.json();
             setRaw(JSON.stringify(data));
             runAnalysis(data);
@@ -237,7 +238,7 @@ export default function OrderAnalyzer() {
     if (!parsedData) { setSaveMsg('请先分析数据再保存'); return; }
     try {
       const body = JSON.stringify(parsedData);
-      const r = await fetch('/api/order-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+      const r = await fetch('/api/order-data', { method: 'POST', headers: api.authHeaders({ 'Content-Type': 'application/json' }), body });
       if (!r.ok) { setSaveMsg('保存失败: HTTP ' + r.status); return; }
       const info = await r.json();
       setSaveMsg('已保存: ' + info.name);
@@ -248,7 +249,7 @@ export default function OrderAnalyzer() {
   const autoSave = async (data) => {
     try {
       const body = JSON.stringify(data);
-      await fetch('/api/order-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+      await fetch('/api/order-data', { method: 'POST', headers: api.authHeaders({ 'Content-Type': 'application/json' }), body });
       refreshFiles();
     } catch(e) {}
   };
@@ -257,7 +258,7 @@ export default function OrderAnalyzer() {
 
   const loadFile = async (name) => {
     try {
-      const r = await fetch('/api/order-data/' + name);
+      const r = await fetch('/api/order-data/' + name, { headers: api.authHeaders() });
       const data = await r.json();
       setRaw(JSON.stringify(data));
       setResult(null);
@@ -268,7 +269,7 @@ export default function OrderAnalyzer() {
 
   const deleteFile = async (name) => {
     try {
-      const r = await fetch('/api/order-data/' + name, { method: 'DELETE' });
+      const r = await fetch('/api/order-data/' + name, { method: 'DELETE', headers: api.authHeaders() });
       const j = await r.json();
       if (!j.ok) { setSaveMsg('删除失败: ' + (j.error || 'unknown')); return; }
       setSavedFiles(prev => prev.filter(f => f.name !== name));

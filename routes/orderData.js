@@ -9,6 +9,15 @@ function ensureDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
+// 文件名白名单：只允许 data/orders 下的 json 文件，防路径穿越（../、绝对路径、%2F 编码斜杠一律拒绝）
+function safeOrderPath(name) {
+  const base = path.basename(String(name));
+  if (base !== name || !/^[\w.\-]+\.json$/.test(base)) return null;
+  const p = path.join(DATA_DIR, base);
+  if (!p.startsWith(DATA_DIR + path.sep)) return null;
+  return p;
+}
+
 // List saved files
 router.get('/', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -25,7 +34,8 @@ router.get('/', (req, res) => {
 
 // Get one
 router.get('/:name', (req, res) => {
-  const p = path.join(DATA_DIR, req.params.name);
+  const p = safeOrderPath(req.params.name);
+  if (!p) return res.status(400).json({ error: 'invalid name' });
   if (!fs.existsSync(p)) return res.status(404).json({ error: 'not found' });
   res.type('json').send(fs.readFileSync(p, 'utf-8'));
 });
@@ -41,7 +51,8 @@ router.post('/', (req, res) => {
 
 // Delete
 router.delete('/:name', (req, res) => {
-  const p = path.join(DATA_DIR, req.params.name);
+  const p = safeOrderPath(req.params.name);
+  if (!p) return res.status(400).json({ error: 'invalid name' });
   if (!fs.existsSync(p)) return res.status(404).json({ error: 'not found' });
   try { fs.unlinkSync(p); } catch(e) {
     return res.status(500).json({ error: e.message });

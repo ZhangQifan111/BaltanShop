@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db/database');
 const { enrichToy, calcBaseFromTarget, calcTotalCost } = require('../utils/calcCost');
 const { fetchAndSaveImage } = require('../utils/downloadImage');
+const { makeThumb } = require('../utils/thumbnail');
 const path = require('path');
 const fs = require('fs');
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
@@ -181,8 +182,24 @@ router.get('/pool-logs', async (req, res) => {
     if (!product_id) {
       return res.status(400).json({ error: 'product_id is required' });
     }
+    // JOIN toys 表带上费用明细（stage1/2/3、各项物流、税费、备注等），便于前端展示入库详情
     const logs = await db.all(
-      'SELECT * FROM pool_logs WHERE product_id = ? ORDER BY created_at DESC',
+      `SELECT pl.*,
+              t.purchase_date, t.source, t.supplier_name,
+              t.japan_price_cny, t.japan_consumption_tax,
+              t.handling_fee, t.japan_domestic_shipping,
+              t.proxy_price, t.proxy_intl_shipping, t.proxy_domestic_shipping,
+              t.domestic_price, t.domestic_shipping,
+              t.intl_shipping, t.import_duty,
+              t.logistics_fee, t.box_fee, t.packing_fee,
+              t.stage1_amount, t.stage2_amount, t.stage3_amount,
+              t.stage1_date, t.stage2_date, t.stage3_date,
+              t.stage1_note, t.stage2_note, t.stage3_note,
+              t.notes AS toy_notes,
+              t.image AS toy_image
+       FROM pool_logs pl
+       LEFT JOIN toys t ON t.id = pl.toy_id
+       WHERE pl.product_id = ? ORDER BY pl.created_at DESC`,
       [Number(product_id)]
     );
     res.json(logs);
@@ -432,6 +449,7 @@ router.post('/:id/image-base64', async (req, res) => {
     const fname = `toy_manual_${toy.id}_${Date.now()}${safeName ? '_' + safeName : ''}${ext}`;
     const dest = path.join(UPLOADS_DIR, fname);
     fs.writeFileSync(dest, buf);
+    makeThumb(dest); // 生成缩略图供列表使用
     const localPath = '/uploads/' + fname;
 
     db.update('UPDATE toys SET image = ?, image_fetched_at = ? WHERE id = ?',

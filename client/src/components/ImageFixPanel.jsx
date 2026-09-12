@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import api from '../lib/api';
 
 /*
  * 任你购图片补抓面板
@@ -37,7 +38,7 @@ export default function ImageFixPanel() {
     try {
       const r = await fetch('/api/fix-renrigou-images', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: api.authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ dryRun: true })
       });
       const data = await r.json();
@@ -67,7 +68,7 @@ export default function ImageFixPanel() {
     try {
       const res = await fetch('/api/fix-renrigou-images', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: api.authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ dryRun: false }),
         signal: controller.signal
       });
@@ -211,7 +212,7 @@ export default function ImageFixPanel() {
   const handleCleanup = async () => {
     setBusy(true);
     try {
-      const r = await fetch('/api/fix-renrigou-images/cleanup', { method: 'POST' });
+      const r = await fetch('/api/fix-renrigou-images/cleanup', { method: 'POST', headers: api.authHeaders() });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
       showToast('已清理 ' + data.cleaned + ' 条失效图片记录', 'success');

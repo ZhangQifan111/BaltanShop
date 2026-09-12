@@ -14,7 +14,8 @@
 body {
   background: var(--bg);
   color: #d0d4e8;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  /* 系统 UI 字体：中文用系统黑体/苹方，数字对齐用局部等宽，告别全局 monospace 的中文回退混杂 */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
   -webkit-font-smoothing: antialiased;
   padding-bottom: 80px;
 }
@@ -61,31 +62,32 @@ body {
 
   /* 状态标签（v2 文案映射） */
   .status-tag {
-    @apply inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium;
+    @apply inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium;
   }
 
+  /* 按钮统一最小点击区：手机手指好点（高度 40px+，字号 ≥14px） */
   .btn-primary {
-    @apply bg-accent text-[#0f1117] font-semibold rounded-lg px-4 py-2 text-sm hover:opacity-90 transition-opacity;
+    @apply bg-accent text-[#0f1117] font-semibold rounded-lg px-4 py-2.5 text-sm hover:opacity-90 transition-opacity;
   }
 
   .btn-ghost {
-    @apply border border-white/10 text-[#a0a4b8] rounded-lg px-3 py-1.5 text-xs hover:bg-white/5 transition-colors;
+    @apply border border-white/10 text-[#a0a4b8] rounded-lg px-3.5 py-2 text-sm hover:bg-white/5 transition-colors;
   }
 
   .btn-outline {
-    @apply border border-white/10 text-[#a0a4b8] rounded-lg px-3 py-1.5 text-xs hover:bg-white/5 transition-colors flex items-center justify-center gap-1.5;
+    @apply border border-white/10 text-[#a0a4b8] rounded-lg px-3.5 py-2 text-sm hover:bg-white/5 transition-colors flex items-center justify-center gap-1.5;
   }
 
   .btn-danger {
-    @apply border border-red-500/20 text-red-400/70 rounded-lg px-3 py-1.5 text-xs hover:bg-red-500/10 hover:border-red-500/40 hover:text-red-400 transition-colors flex items-center justify-center gap-1;
+    @apply border border-red-500/20 text-red-400/70 rounded-lg px-3.5 py-2 text-sm hover:bg-red-500/10 hover:border-red-500/40 hover:text-red-400 transition-colors flex items-center justify-center gap-1;
   }
 
   .btn-warn {
-    @apply border border-orange-500/20 text-orange-400/70 rounded-lg px-3 py-1.5 text-xs hover:bg-orange-500/10 hover:border-orange-500/40 hover:text-orange-400 transition-colors flex items-center justify-center gap-1;
+    @apply border border-orange-500/20 text-orange-400/70 rounded-lg px-3.5 py-2 text-sm hover:bg-orange-500/10 hover:border-orange-500/40 hover:text-orange-400 transition-colors flex items-center justify-center gap-1;
   }
 
   .btn-success {
-    @apply border border-green-500/20 text-green-400/70 rounded-lg px-3 py-1.5 text-xs hover:bg-green-500/10 hover:border-green-500/40 hover:text-green-400 transition-colors flex items-center justify-center gap-1;
+    @apply border border-green-500/20 text-green-400/70 rounded-lg px-3.5 py-2 text-sm hover:bg-green-500/10 hover:border-green-500/40 hover:text-green-400 transition-colors flex items-center justify-center gap-1;
   }
 
   .stat-card {
@@ -93,11 +95,11 @@ body {
   }
 
   .input {
-    @apply w-full bg-surface-hover border border-white/10 rounded-lg px-3 py-2 text-sm text-[#d0d4e8] placeholder-[#6b7085] focus:outline-none focus:border-accent/40 transition-colors;
+    @apply w-full bg-surface-hover border border-white/10 rounded-lg px-3 py-2.5 text-sm text-[#d0d4e8] placeholder-[#6b7085] focus:outline-none focus:border-accent/40 transition-colors;
   }
 
   .badge {
-    @apply inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium;
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
   }
 
   .badge-orange { @apply bg-orange-500/15 text-orange-400; }

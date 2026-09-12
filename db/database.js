@@ -354,7 +354,16 @@ function save() {
   if (!db) return;
   const data = db.export();
   const buf = Buffer.from(data);
-  fs.writeFileSync(dbPath, buf);
+  // 原子写：先写临时文件再 rename 覆盖，断电/异常只会丢掉本次写入，不会把 data.db 截断成损坏文件
+  const tmpPath = dbPath + '.tmp';
+  try {
+    fs.writeFileSync(tmpPath, buf);
+    fs.renameSync(tmpPath, dbPath);
+  } catch (e) {
+    try { fs.unlinkSync(tmpPath); } catch (_) {}
+    console.error('[db] save 失败（本次改动未落盘，下次 save 会重试）:', e.message);
+    throw e;
+  }
 }
 
 function exportBuffer() {

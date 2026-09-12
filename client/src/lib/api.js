@@ -43,6 +43,11 @@ export const api = {
   post: (path, body) => request('POST', path, body),
   put: (path, body) => request('PUT', path, body),
   del: (path) => request('DELETE', path),
+  // 供原生 fetch 调用方（OrderAnalyzer / ImageFixPanel）构造带鉴权的 headers
+  authHeaders: (extra = {}) => {
+    const token = getToken();
+    return token ? { Authorization: 'Bearer ' + token, ...extra } : { ...extra };
+  },
 };
 
 export const auth = {

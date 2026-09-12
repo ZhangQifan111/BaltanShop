@@ -86,8 +86,33 @@ router.get('/', async (req, res) => {
     const total_cost_sold = r.total_cost_sold || 0;
     const total_cost_done = r.total_cost_done || 0;
     const total_cost = total_cost_transit + total_cost_stock + total_cost_sold + total_cost_done;
-    const total_sell = r.total_sell || 0;
-    const total_profit = r.total_profit || 0;
+
+    // 总销售额 + 总利润都按 sales 表算（与 SalesLedger 同口径）
+    const salesAgg = await db.get(`
+      SELECT
+        COALESCE(SUM(s.total_revenue), 0) AS sales_revenue,
+        COALESCE(SUM(
+          CASE WHEN COALESCE(t.quantity, 1) > 0 AND COALESCE(t.total_cost, 0) > 0 THEN
+            CASE WHEN s.quantity >= t.quantity THEN t.total_cost
+            ELSE ROUND((t.total_cost * 1.0 / t.quantity) * s.quantity, 2)
+            END
+          ELSE 0 END
+        ), 0) AS sales_cost,
+        COALESCE(SUM(
+          s.total_revenue - s.huabei - s.refund_amount - s.software_service_fee
+          - s.basic_software_service_fee - s.worry_free_service_fee - s.logistics_fee
+          - s.box_fee - s.packing_fee
+          - CASE WHEN COALESCE(t.quantity, 1) > 0 AND COALESCE(t.total_cost, 0) > 0 THEN
+            CASE WHEN s.quantity >= t.quantity THEN t.total_cost
+            ELSE ROUND((t.total_cost * 1.0 / t.quantity) * s.quantity, 2)
+            END
+          ELSE 0 END
+        ), 0) AS sales_profit
+      FROM sales s LEFT JOIN toys t ON s.toy_id = t.id
+      WHERE t.id IS NOT NULL
+    `);
+    const total_sell = salesAgg?.sales_revenue ?? (r.total_sell || 0);
+    const total_profit = salesAgg?.sales_profit ?? (r.total_profit || 0);
     const margin_rate = total_sell > 0 ? (total_profit / total_sell * 100) : 0;
 
     res.json({
@@ -98,6 +123,10 @@ router.get('/', async (req, res) => {
       total_cost_done: round2(total_cost_done),
       total_sell: round2(total_sell),
       total_profit: round2(total_profit),
+      // sales 表视角：与 SalesLedger 总览同口径（total_revenue - 整件成本分摊 - 各项扣费）
+      sales_revenue: round2(salesAgg?.sales_revenue || 0),
+      sales_cost: round2(salesAgg?.sales_cost || 0),
+      sales_profit: round2(salesAgg?.sales_profit ?? total_profit),
       margin_rate: round1(margin_rate),
       counts: {
         stage1: r.stage1 || 0, stage2: r.stage2 || 0, stage3: r.stage3 || 0,

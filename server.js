@@ -39,11 +39,11 @@ app.use('/api/auth', authRouter);
 
 // 全局鉴权中间件：所有 /api/*（除白名单）都要 Bearer token
 // 注意：app.use('/api', ...) 下 req.path 是相对 /api 的部分
+// 白名单收紧：/order-data 与 /fix-renrigou-images 原本在此免鉴权（可任意读写服务器文件），
+// 已移出白名单——前端 OrderAnalyzer.jsx / ImageFixPanel.jsx 的 fetch 已改为携带 Bearer token
 const AUTH_WHITELIST = [
   '/auth/login',
-  '/ingest-renrigou',     // 任你购抓取脚本用（rennigou.jp 跨域 fetch，本地 token 拿不到）
-  '/fix-renrigou-images', // 任你购图片补抓（前端已登录调用，但脚本也能从浏览器直接 fetch）
-  '/order-data',          // 任你购订单 JSON 存档/读取（前端 OrderAnalyzer 用）
+  '/ingest-renrigou',     // 任你购抓取脚本用（rennigou.jp 跨域 fetch，本地 token 拿不到）——路由内部另有 ingest key 校验
 ];
 app.use('/api', (req, res, next) => {
   // 白名单支持前缀匹配（兼容 /order-data 与 /order-data/:name 等子路径）
@@ -122,7 +122,7 @@ if (fs.existsSync(staticPath)) {
 }
 
 // 启动时自动备份
-const { createBackup } = require('./routes/backup');
+const { createBackup, startAutoBackup } = require('./routes/backup');
 
 async function start() {
   await db.getDb(); // 确保 DB 初始化
@@ -142,6 +142,7 @@ async function start() {
     console.log('═══════════════════════════════════════════════════════════');
   }
   createBackup(); // 启动时备份
+  startAutoBackup(); // 每日自动备份
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
   });

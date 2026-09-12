@@ -27,21 +27,34 @@ const useStore = create((set, get) => ({
 
   loadAll: async () => {
     set({ loading: true });
+    // Promise.allSettled：任一接口失败不拖垮其余数据（此前一个失败则全部空白）
+    const results = await Promise.allSettled([
+      api.get('/toys'),
+      api.get('/suppliers'),
+      api.get('/shipments'),
+      api.get('/supplies'),
+      api.get('/fee-rules'),
+      api.get('/shipping-rules'),
+      api.get('/settings'),
+      api.get('/stats'),
+    ]);
+    const [toys, suppliers, shipments, supplies, feeRules, shippingRules, settings, stats] =
+      results.map(r => (r.status === 'fulfilled' ? r.value : null));
+    const failedCount = results.filter(r => r.status === 'rejected').length;
+    if (failedCount > 0) get().setToast(`${failedCount} 项数据加载失败，页面可能不完整`);
+    set({ toys, suppliers, shipments, supplies, feeRules, shippingRules, settings, stats, loading: false });
+  },
+
+  // 轻量刷新：操作后只拉高频变化的两项（toys + stats），比 loadAll 的 8 个接口快得多
+  refreshToys: async () => {
     try {
-      const [toys, suppliers, shipments, supplies, feeRules, shippingRules, settings, stats] = await Promise.all([
-        api.get('/toys'),
-        api.get('/suppliers'),
-        api.get('/shipments'),
-        api.get('/supplies'),
-        api.get('/fee-rules'),
-        api.get('/shipping-rules'),
-        api.get('/settings'),
-        api.get('/stats'),
-      ]);
-      set({ toys, suppliers, shipments, supplies, feeRules, shippingRules, settings, stats, loading: false });
+      const [toys, stats] = await Promise.allSettled([api.get('/toys'), api.get('/stats')]);
+      set({
+        toys: toys.status === 'fulfilled' ? toys.value : get().toys,
+        stats: stats.status === 'fulfilled' ? stats.value : get().stats,
+      });
     } catch (e) {
-      set({ loading: false });
-      get().setToast('加载失败: ' + e.message);
+      get().setToast('刷新失败: ' + e.message);
     }
   },
 

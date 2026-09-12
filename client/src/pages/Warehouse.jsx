@@ -7,6 +7,18 @@ import useStore from '../stores/useStore';
 import { api } from '../lib/api';
 import { sourceLabel, sourceGroup, SOURCES } from '../lib/sources';
 import { findMatchesByPinyin } from '../lib/pinyin';
+import { useIsTouchDevice } from '../lib/useIsTouchDevice';
+import { thumbOf } from '../lib/thumbnail';
+
+// 状态持久化到 localStorage：切页面再回来，搜索词/筛选/视图不丢
+function usePersisted(key, initial) {
+  const [v, setV] = useState(() => {
+    try { const s = localStorage.getItem(key); if (s != null) return JSON.parse(s); } catch {}
+    return initial;
+  });
+  useEffect(() => { try { localStorage.setItem(key, JSON.stringify(v)); } catch {} }, [v]);
+  return [v, setV];
+}
 
 const FILTERS = [
   { key: 'stock', label: '在库' },
@@ -15,6 +27,7 @@ const FILTERS = [
 ];
 
 const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn, onDone, onUnsell, onPoolify, onPreviewImage, onUploadImage, onReconcile }) {
+  const isTouch = useIsTouchDevice(); // 触屏设备没有 hover，换图按钮常显
   const [doneLoading, setDoneLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -60,7 +73,7 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
         <div className="relative group shrink-0">
           {toy.image ? (
             <>
-              <img src={toy.image} alt="" className="w-14 h-14 rounded-lg object-cover bg-white/5 cursor-zoom-in hover:ring-2 hover:ring-accent/50 transition-all" loading="lazy" onError={e => e.target.style.display='none'} onClick={e => { e.stopPropagation(); onPreviewImage && onPreviewImage(toy.image); }} />
+              <img src={thumbOf(toy.image)} data-full={toy.image} alt="" className="w-14 h-14 rounded-lg object-cover bg-white/5 cursor-zoom-in hover:ring-2 hover:ring-accent/50 transition-all" loading="lazy" decoding="async" onError={e => { const f = e.currentTarget.dataset.full; if (f && !e.currentTarget.dataset.fb) { e.currentTarget.dataset.fb = '1'; e.currentTarget.src = f; } else e.currentTarget.style.display = 'none'; }} onClick={e => { e.stopPropagation(); onPreviewImage && onPreviewImage(toy.image); }} />
               <button
                 className="absolute bottom-0 right-0 bg-black/70 rounded-tl-lg px-1.5 py-0.5 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs leading-none transition-opacity"
                 onClick={e => { e.stopPropagation(); onUploadImage && onUploadImage(toy); }}
@@ -79,22 +92,22 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-bold truncate mb-1">{toy.name_zh || toy.name}</div>
-          <span className="inline-block text-[10px] px-2 py-0.5 rounded-full" style={{ background: statusBadge.bg, color: statusBadge.color }}>
+          <span className="inline-block text-xs px-2 py-0.5 rounded-full" style={{ background: statusBadge.bg, color: statusBadge.color }}>
             {statusBadge.label}
           </span>
         </div>
         <div className="text-right space-y-0.5">
-          <div className="text-[10px] text-[#6b7085]">成本</div>
+          <div className="text-xs text-[#6b7085]">成本</div>
           <div className="text-sm font-bold text-accent">¥{toy.total_cost?.toFixed(0) || 0}</div>
           {toy.sell_price > 0 && (
             <>
-              <div className="text-[10px] text-[#6b7085] mt-1">售价</div>
+              <div className="text-xs text-[#6b7085] mt-1">售价</div>
               <div className="text-sm font-bold text-green-400">¥{toy.sell_price}</div>
             </>
           )}
           {toy.profit != null && toy.profit !== 0 && (
             <>
-              <div className="text-[10px] text-[#6b7085]">利润</div>
+              <div className="text-xs text-[#6b7085]">利润</div>
               <div className="text-sm font-bold" style={{ color: toy.profit >= 0 ? '#34d399' : '#f87171' }}>
                 {toy.profit >= 0 ? '+' : ''}¥{toy.profit.toFixed(0)}
               </div>
@@ -103,7 +116,7 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
         </div>
       </div>
 
-      <div className="flex gap-2 flex-wrap text-[10px] text-[#6b7085] mb-3">
+      <div className="flex gap-2 flex-wrap text-xs text-[#6b7085] mb-3">
         <span>{sourceLabel(toy.source)}</span>
         <span>·</span>
         <span>{toy.category_name || toy.category}</span>
@@ -115,13 +128,13 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
         <div className="border-t border-white/5 pt-3 mt-3 space-y-1 text-xs">
           {sourceGroup(toy.source) === 'direct' && (
             <>
-              {toy.japan_price_cny > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">本体价</span><span>¥{toy.japan_price_cny} <span className="text-[10px] text-[#6b7085]">RMB</span></span></div>}
-              {toy.japan_price_jpy > 0 && toy.japan_price_cny !== toy.japan_price_jpy && <div className="flex justify-between"><span className="text-[#6b7085]">本体价(日元)</span><span>¥{toy.japan_price_jpy} <span className="text-[10px] text-[#6b7085]">JPY</span></span></div>}
-              {toy.handling_fee > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">代购手续费</span><span>¥{toy.handling_fee} <span className="text-[10px] text-[#6b7085]">JPY</span></span></div>}
-              {toy.japan_domestic_shipping > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">日本运费</span><span>¥{toy.japan_domestic_shipping} <span className="text-[10px] text-[#6b7085]">JPY</span></span></div>}
-              {toy.japan_consumption_tax > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">日本消费税</span><span>¥{toy.japan_consumption_tax} <span className="text-[10px] text-[#6b7085]">JPY</span></span></div>}
-              {toy.intl_shipping > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">国际运费</span><span>¥{toy.intl_shipping} <span className="text-[10px] text-[#6b7085]">RMB</span></span></div>}
-              {toy.tax > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">税费</span><span>¥{toy.tax} <span className="text-[10px] text-[#6b7085]">RMB</span></span></div>}
+              {toy.japan_price_cny > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">本体价</span><span>¥{toy.japan_price_cny} <span className="text-xs text-[#6b7085]">RMB</span></span></div>}
+              {toy.japan_price_jpy > 0 && toy.japan_price_cny !== toy.japan_price_jpy && <div className="flex justify-between"><span className="text-[#6b7085]">本体价(日元)</span><span>¥{toy.japan_price_jpy} <span className="text-xs text-[#6b7085]">JPY</span></span></div>}
+              {toy.handling_fee > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">代购手续费</span><span>¥{toy.handling_fee} <span className="text-xs text-[#6b7085]">JPY</span></span></div>}
+              {toy.japan_domestic_shipping > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">日本运费</span><span>¥{toy.japan_domestic_shipping} <span className="text-xs text-[#6b7085]">JPY</span></span></div>}
+              {toy.japan_consumption_tax > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">日本消费税</span><span>¥{toy.japan_consumption_tax} <span className="text-xs text-[#6b7085]">JPY</span></span></div>}
+              {toy.intl_shipping > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">国际运费</span><span>¥{toy.intl_shipping} <span className="text-xs text-[#6b7085]">RMB</span></span></div>}
+              {toy.tax > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">税费</span><span>¥{toy.tax} <span className="text-xs text-[#6b7085]">RMB</span></span></div>}
             </>
           )}
           {sourceGroup(toy.source) === 'proxy' && (
@@ -153,13 +166,13 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
           <div className="pt-2 mt-2 border-t border-white/5">
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-[#f0a030]">📊 物流费对账</span>
-                <span className="text-[10px] text-[#6b7085]">
+                <span className="text-xs font-bold text-[#f0a030]">📊 物流费对账</span>
+                <span className="text-xs text-[#6b7085]">
                   {reconciledCount}/{reconciliationFields.length} 已对账
                 </span>
               </div>
               <button
-                className="btn-ghost text-[10px] py-0.5 px-2"
+                className="btn-ghost text-xs py-0.5 px-2"
                 onClick={e => { e.stopPropagation(); onReconcile && onReconcile(toy); }}
               >
                 {reconciledCount > 0 ? '更新对账' : '📝 开始对账'}
@@ -170,7 +183,7 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
                 const diff = f.act > 0 ? f.act - f.est : 0;
                 const color = f.act > 0 ? (diff > 0 ? 'text-red-400' : diff < 0 ? 'text-emerald-400' : 'text-[#6b7085]') : 'text-[#6b7085]';
                 return (
-                  <div key={f.key} className="grid grid-cols-[1fr,auto,auto,auto] gap-2 text-[10px] items-center">
+                  <div key={f.key} className="grid grid-cols-[1fr,auto,auto,auto] gap-2 text-xs items-center">
                     <span className="text-[#8b90a5] truncate">{f.label}</span>
                     <span className="text-[#6b7085] tabular-nums">预估 ¥{f.est.toFixed(0)}</span>
                     <span className="text-[#d0d4e8] tabular-nums">实际 {f.act > 0 ? `¥${f.act.toFixed(0)}` : '—'}</span>
@@ -182,7 +195,7 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
               })}
             </div>
             {totalDiff !== 0 && (
-              <div className={`text-right text-[10px] mt-1.5 font-bold ${totalDiff > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+              <div className={`text-right text-xs mt-1.5 font-bold ${totalDiff > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
                 差异合计 {totalDiff > 0 ? '+' : ''}¥{totalDiff.toFixed(0)}
               </div>
             )}
@@ -210,7 +223,7 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
           {toy.status === 'stock' && (
             <button className="btn-ghost flex-1 text-xs text-orange-400" onClick={e => { e.stopPropagation(); onPoolify(toy); }}>入池</button>
           )}
-          <button className="btn-danger" onClick={e => { e.stopPropagation(); onDelete(toy.id); }}>删除</button>
+          <button className="btn-danger" onClick={e => { e.stopPropagation(); onDelete(toy); }}>删除</button>
           {toy.status === 'sold' && (
             <>
               <button className="btn-ghost flex-1 text-xs text-yellow-400" onClick={e => { e.stopPropagation(); onUnsell(toy.id); }}>退回仓库</button>
@@ -238,6 +251,10 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
   const avgCost = group.totalQty > 0 ? group.totalCost / group.totalQty : 0;
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [poolLogs, setPoolLogs] = useState(null); // null=加载中, []=空, [...]有数据
+  const [soldBatches, setSoldBatches] = useState(null); // null=加载中, []=空, [...]有数据
+  const [sales, setSales] = useState(null); // null=加载中, []=空, [...]有数据（销售单记录）
+  const [showSold, setShowSold] = useState(false); // 已售批次列表默认收起
+  const [expandedLogId, setExpandedLogId] = useState(null); // 操作记录里展开的行（点击展开销售详情）
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({ name_zh: '', name: '', category_id: null });
   const allIds = group.batches.map(b => b.id);
@@ -250,8 +267,20 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
       api.get(`/toys/pool-logs?product_id=${group.product_id}`)
         .then(logs => setPoolLogs(Array.isArray(logs) ? logs : []))
         .catch((e) => { console.error('pool-logs fetch error:', e); setPoolLogs([]); });
+      // 拉已售出批次（product 接口的 sold_batches，已售完/已结算的玩具记录）
+      setSoldBatches(null);
+      api.get(`/products/${group.product_id}`)
+        .then(p => setSoldBatches(Array.isArray(p?.sold_batches) ? p.sold_batches : []))
+        .catch((e) => { console.error('sold-batches fetch error:', e); setSoldBatches([]); });
+      // 拉销售记录（每笔售出单的售价/买家/备注/物流等）
+      setSales(null);
+      api.get(`/sales?product_id=${group.product_id}&limit=200`)
+        .then(s => setSales(Array.isArray(s) ? s : []))
+        .catch((e) => { console.error('sales fetch error:', e); setSales([]); });
     } else {
       setPoolLogs([]);
+      setSoldBatches([]);
+      setSales([]);
     }
   }, [group.product_id]);
 
@@ -284,23 +313,23 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[#1a1d27] rounded-xl border border-orange-500/20 w-full max-w-md flex flex-col" style={{ maxHeight: '85vh' }} onClick={e => e.stopPropagation()}>
+      <div className="bg-[#1a1d27] rounded-xl border border-orange-500/20 w-full max-w-2xl flex flex-col min-h-0" style={{ maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="p-4 border-b border-white/10 shrink-0">
           <div className="flex items-center gap-3">
-            {curProd?.image && <img src={curProd.image} alt="" className="w-12 h-12 rounded-lg object-cover bg-white/5" onError={e => e.target.style.display = 'none'} />}
+            {curProd?.image && <img src={thumbOf(curProd.image)} data-full={curProd.image} alt="" className="w-12 h-12 rounded-lg object-cover bg-white/5" loading="lazy" decoding="async" onError={e => { const f = e.currentTarget.dataset.full; if (f && !e.currentTarget.dataset.fb) { e.currentTarget.dataset.fb = '1'; e.currentTarget.src = f; } else e.currentTarget.style.display = 'none'; }} />}
             <div className="flex-1 min-w-0">
               {editing ? (
                 <div className="space-y-1.5">
                   <div>
-                    <label className="text-[10px] text-[#6b7085] block mb-0.5">名称</label>
+                    <label className="text-xs text-[#6b7085] block mb-0.5">名称</label>
                     <input className="input text-xs w-full" placeholder="输入池名称"
                       value={editForm.name_zh}
                       onChange={e => setEditForm({ ...editForm, name_zh: e.target.value })}
                       lang="zh" spellCheck={false} autoComplete="off" autoFocus />
                   </div>
                   <div>
-                    <label className="text-[10px] text-[#6b7085] block mb-0.5">分类</label>
+                    <label className="text-xs text-[#6b7085] block mb-0.5">分类</label>
                     <CategoryPicker
                       value={editForm.category_id}
                       onChange={v => setEditForm({ ...editForm, category_id: v })}
@@ -308,7 +337,7 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
                     />
                   </div>
                   <div className="flex gap-1.5">
-                    <button className="text-[10px] px-2.5 py-1 rounded bg-accent text-[#0f1117] font-medium"
+                    <button className="text-xs px-2.5 py-1 rounded bg-accent text-[#0f1117] font-medium"
                       onClick={async () => {
                         const newName = editForm.name_zh || curProd?.name_zh || '';
                         await api.put(`/products/${group.product_id}`, {
@@ -323,10 +352,10 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
                           const updated = prods.find(p => p.id === group.product_id);
                           if (updated) setCurProd(updated);
                         }).catch(() => {});
-                        const { loadAll } = useStore.getState();
-                        loadAll();
+                        const { refreshToys } = useStore.getState();
+                        refreshToys();
                       }}>保存</button>
-                    <button className="text-[10px] px-2.5 py-1 rounded border border-white/10 text-[#6b7085]"
+                    <button className="text-xs px-2.5 py-1 rounded border border-white/10 text-[#6b7085]"
                       onClick={() => setEditing(false)}>取消</button>
                   </div>
                 </div>
@@ -334,7 +363,7 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
                 <>
                   <div className="flex items-center gap-2">
                     <h3 className="text-base font-bold truncate">{curProd?.name_zh || curProd?.name || '未命名'}</h3>
-                    <button className="text-[10px] text-[#6b7085] hover:text-white shrink-0"
+                    <button className="text-xs text-[#6b7085] hover:text-white shrink-0"
                       onClick={() => {
                         setEditForm({
                           name_zh: curProd?.name_zh || curProd?.name || '',
@@ -344,14 +373,14 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
                         setEditing(true);
                       }}>✎ 编辑</button>
                   </div>
-                  <div className="text-[10px] text-[#6b7085] mt-0.5">分类：{curProd?.category_name || curProd?.category || '未设置'}　|　批次：{group.batches.length} 批</div>
+                  <div className="text-xs text-[#6b7085] mt-0.5">分类：{curProd?.category_name || curProd?.category || '未设置'}　|　批次：{group.batches.length} 批</div>
                 </>
               )}
             </div>
             <button className="text-[#6b7085] hover:text-white text-lg px-1" onClick={onClose}>✕</button>
           </div>
           {/* 汇总数据卡片 */}
-          <div className="grid grid-cols-3 gap-2 mt-3 text-[10px]">
+          <div className="grid grid-cols-3 gap-2 mt-3 text-xs">
             <div className="bg-white/[0.03] rounded-lg p-2 text-center">
               <div className="text-[#6b7085] mb-0.5">成本均价</div>
               <div className="text-white font-bold text-sm">¥{avgCost.toFixed(0)}</div>
@@ -364,7 +393,7 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
             </div>
             <div className="bg-white/[0.03] rounded-lg p-2 text-center">
               <div className="text-[#6b7085] mb-0.5">当前库存</div>
-              <div className="text-accent font-bold text-sm">{group.totalRemaining}<span className="text-[#6b7085] text-[10px]">/{group.totalQty}</span></div>
+              <div className="text-accent font-bold text-sm">{group.totalRemaining}<span className="text-[#6b7085] text-xs">/{group.totalQty}</span></div>
               <div className="text-[#6b7085]">件在库</div>
             </div>
           </div>
@@ -379,11 +408,11 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
             </label>
             {someSelected && (
               <div className="flex items-center gap-1.5">
-                <button className="text-[11px] px-3 py-1 rounded border border-purple-500/40 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 font-medium"
+                <button className="text-xs px-3 py-1 rounded border border-purple-500/40 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 font-medium"
                   onClick={handleBatchTransferPool}>
                   批量转池 ({selectedIds.size})
                 </button>
-                <button className="text-[11px] px-3 py-1 rounded border border-yellow-500/40 bg-yellow-500/10 text-yellow-300 hover:bg-yellow-500/20 font-medium"
+                <button className="text-xs px-3 py-1 rounded border border-yellow-500/40 bg-yellow-500/10 text-yellow-300 hover:bg-yellow-500/20 font-medium"
                   onClick={handleBatchUnpoolify}>
                   批量退池 ({selectedIds.size})
                 </button>
@@ -392,9 +421,42 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
           </div>
         </div>
 
-        {/* 库存批次列表 */}
-        <div className="p-4 space-y-2 overflow-y-auto flex-1">
-          <div className="text-[10px] text-[#6b7085] mb-1">📦 库存批次（池内每一条商品记录）</div>
+        {/* 库存批次列表 + 已售出 */}
+        <div className="p-4 space-y-2 overflow-y-auto flex-1 min-h-0" style={{ scrollbarWidth: 'thin' }}>
+          {/* 已售出批次汇总条（顶部固定显示，无需滚动） */}
+          {soldBatches && soldBatches.length > 0 && (
+            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-2.5 mb-2">
+              <button type="button"
+                className="flex items-center justify-between w-full text-xs text-emerald-200 font-medium"
+                onClick={() => setShowSold(s => !s)}>
+                <span>💸 已售出批次汇总（{soldBatches.length}）</span>
+                <span className="text-emerald-300/80">{showSold ? '▾ 收起' : '▸ 展开'}</span>
+              </button>
+              {showSold && (
+                <div className="space-y-1.5 mt-2">
+                  {soldBatches.map(b => (
+                    <div key={b.id} className="bg-black/20 rounded p-2 text-xs flex gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between mb-0.5">
+                          <span className="truncate flex-1 mr-2 text-[#d0d4e8]">{b.name_zh || b.name}</span>
+                          <span className="text-emerald-300 shrink-0 font-semibold">售出 {b.quantity} 件</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-[#6b7085]">
+                          <span>批次成本 ¥{(b.total_cost || 0).toFixed(0)} · 单价 ¥{(b.unit_cost || 0).toFixed(0)}/件</span>
+                          <span>{b.purchase_date || b.created_at?.slice(0, 10)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {soldBatches === null && (
+            <div className="text-xs text-[#6b7085] mb-2">已售出记录加载中...</div>
+          )}
+
+          <div className="text-xs text-[#6b7085] mb-1">📦 库存批次（池内每一条商品记录）</div>
           {group.batches.map(b => (
             <div key={b.id} className={`bg-white/[0.03] rounded-lg p-3 text-xs flex gap-3 ${selectedIds.has(b.id) ? 'ring-1 ring-yellow-500/50 bg-yellow-500/[0.05]' : ''}`}>
               {/* 选择框 */}
@@ -405,27 +467,27 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
                 />
               </div>
               {b.image && (
-                <img src={b.image} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 bg-white/5 cursor-zoom-in hover:ring-2 hover:ring-accent/50 transition-all" onError={e => e.target.style.display = 'none'} onClick={e => { e.stopPropagation(); onPreviewImage && onPreviewImage(b.image); }} />
+                <img src={thumbOf(b.image)} data-full={b.image} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 bg-white/5 cursor-zoom-in hover:ring-2 hover:ring-accent/50 transition-all" loading="lazy" decoding="async" onError={e => { const f = e.currentTarget.dataset.full; if (f && !e.currentTarget.dataset.fb) { e.currentTarget.dataset.fb = '1'; e.currentTarget.src = f; } else e.currentTarget.style.display = 'none'; }} onClick={e => { e.stopPropagation(); onPreviewImage && onPreviewImage(b.image); }} />
               )}
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between mb-1">
                   <span className="truncate flex-1 mr-2 font-medium">商品：{b.name_zh || b.name}</span>
                   <span className="font-bold text-accent shrink-0">在库 {b.remaining}/{b.quantity}</span>
                 </div>
-                <div className="flex justify-between text-[10px] text-[#6b7085] mb-2">
+                <div className="flex justify-between text-xs text-[#6b7085] mb-2">
                   <span>批次成本 ¥{(b.total_cost || 0).toFixed(0)}　|　单价 ¥{(b.unit_cost || 0).toFixed(0)}/件</span>
                   <span>入库日 {b.purchase_date || b.created_at?.slice(0, 10)}</span>
                 </div>
                 <div className="flex justify-end gap-1.5">
-                  <button className="text-[10px] px-2 py-0.5 rounded border border-accent/40 bg-accent/10 text-accent hover:bg-accent/20"
+                  <button className="text-xs px-2.5 py-1.5 rounded border border-accent/40 bg-accent/10 text-accent hover:bg-accent/20"
                     onClick={() => onSell(group, b.id)}>
                     出售
                   </button>
-                  <button className="text-[10px] px-2 py-0.5 rounded border border-purple-500/40 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20"
+                  <button className="text-xs px-2.5 py-1.5 rounded border border-purple-500/40 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20"
                     onClick={() => onTransferPool(b)}>
                     转池
                   </button>
-                  <button className="text-[10px] px-2 py-0.5 rounded border border-yellow-500/40 bg-yellow-500/10 text-yellow-300 hover:bg-yellow-500/20"
+                  <button className="text-xs px-2.5 py-1.5 rounded border border-yellow-500/40 bg-yellow-500/10 text-yellow-300 hover:bg-yellow-500/20"
                     onClick={() => onUnpoolify(b)}>
                     退池
                   </button>
@@ -435,32 +497,173 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
           ))}
         </div>
 
-        {/* 操作记录 */}
+        {/* 操作记录 + 销售详情（统一时间线，售出行可展开看 sales 详情） */}
         <div className="border-t border-white/10 p-4 shrink-0 bg-white/[0.02]">
           <h4 className="text-xs font-bold text-white mb-3">📋 操作记录</h4>
           {poolLogs === null ? (
-            <p className="text-[11px] text-[#6b7085]">加载中...</p>
+            <p className="text-xs text-[#6b7085]">加载中...</p>
           ) : poolLogs.length === 0 ? (
-            <p className="text-[11px] text-[#6b7085]">暂无记录 · 入池/退池/售出操作将自动记录在此</p>
+            <p className="text-xs text-[#6b7085]">暂无记录 · 入池/退池/售出操作将自动记录在此</p>
           ) : (
-            <div className="space-y-2 max-h-40 overflow-y-auto">
+            <div className="space-y-1.5 max-h-48 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
               {poolLogs.map(log => {
                 const actionColor = log.action === '入池' ? 'bg-green-400' : log.action === '退池' ? 'bg-yellow-400' : 'bg-blue-400';
                 const actionTextColor = log.action === '入池' ? 'text-green-300' : log.action === '退池' ? 'text-yellow-300' : 'text-blue-300';
+                // 售出动作：按 toy_id + 数量 + 时间接近找对应 sales
+                const linkedSale = (log.action === '售出' && sales) ? sales.find(s =>
+                  s.toy_id === log.toy_id &&
+                  s.quantity === log.quantity &&
+                  Math.abs(new Date(s.created_at) - new Date(log.created_at)) < 60 * 1000
+                ) : null;
+                // 入池动作：log 自身已被后端 JOIN 带上费用明细（stage1/2/3、各项物流等）
+                const hasStockinDetail = log.action === '入池' && log.toy_id && (
+                  log.stage1_amount > 0 || log.stage2_amount > 0 || log.stage3_amount > 0 ||
+                  log.logistics_fee > 0 || log.box_fee > 0 || log.packing_fee > 0 ||
+                  log.japan_price_cny > 0 || log.japan_domestic_shipping > 0 ||
+                  log.proxy_price > 0 || log.proxy_intl_shipping > 0 || log.proxy_domestic_shipping > 0 ||
+                  log.domestic_price > 0 || log.domestic_shipping > 0 ||
+                  log.intl_shipping > 0 || log.import_duty > 0 ||
+                  log.handling_fee > 0 || log.japan_consumption_tax > 0 ||
+                  log.stage1_note || log.stage2_note || log.stage3_note ||
+                  log.toy_notes || log.source
+                );
+                const isExpandable = !!linkedSale || hasStockinDetail;
+                const isExpanded = expandedLogId === log.id;
                 return (
-                <div key={log.id} className="bg-white/[0.04] rounded-md px-2.5 py-1.5 space-y-0.5">
-                  <div className="flex items-center gap-2 text-[11px]">
+                <div key={log.id} className={`bg-white/[0.04] rounded-md px-2.5 py-1.5 ${isExpandable ? 'cursor-pointer hover:bg-white/[0.08]' : ''}`}
+                  onClick={() => isExpandable && setExpandedLogId(isExpanded ? null : log.id)}>
+                  <div className="flex items-center gap-2 text-xs">
                     <span className={`shrink-0 w-2 h-2 rounded-full ${actionColor}`} />
-                    <span className="text-[#9ba0b5] w-28 shrink-0">{log.created_at?.slice(0, 16) || ''}</span>
+                    {/* 时间列缩略为 MM-DD HH:mm，给手机留出空间 */}
+                    <span className="text-[#9ba0b5] w-[72px] shrink-0">{log.created_at?.slice(5, 16) || ''}</span>
                     <span className={`font-semibold ${actionTextColor}`}>{log.action}</span>
                     <span className="text-white/80 truncate flex-1">{log.toy_name}</span>
                     <span className="text-white/60 shrink-0">{log.quantity || 0}件</span>
                     {log.unit_cost != null && (
                       <span className="text-[#9ba0b5] shrink-0">¥{Number(log.unit_cost).toFixed(0)}/件</span>
                     )}
+                    {isExpandable && <span className="text-xs text-blue-300/80 shrink-0">{isExpanded ? '▾' : '▸'}</span>}
                   </div>
                   {log.notes && (
-                    <div className="text-[11px] text-[#9ba0b5] pl-5">备注：{log.notes}</div>
+                    <div className="text-xs text-[#9ba0b5] pl-5">备注：{log.notes}</div>
+                  )}
+                  {/* 展开：销售详情（售出动作） */}
+                  {isExpanded && linkedSale && (
+                    <div className="mt-1.5 ml-5 bg-blue-500/10 border border-blue-500/30 rounded p-2 text-xs space-y-0.5">
+                      {linkedSale.sell_price > 0 && (
+                        <div className="flex justify-between"><span className="text-[#9ba0b5]">单价</span><span className="text-blue-200 font-semibold">¥{Number(linkedSale.sell_price).toFixed(0)}/件</span></div>
+                      )}
+                      {linkedSale.total_revenue > 0 && (
+                        <div className="flex justify-between"><span className="text-[#9ba0b5]">收入</span><span className="text-blue-200 font-semibold">¥{Number(linkedSale.total_revenue).toFixed(0)}</span></div>
+                      )}
+                      {/* 盈亏：购入单价 vs 售出单价，按件数算毛利，颜色区分 */}
+                      {(() => {
+                        // 购入单价优先用 log.unit_cost（售出时写入），没有则用 toys 表对应记录的 unit_cost 兜底
+                        const buyUnit = (log.unit_cost != null && Number(log.unit_cost) > 0)
+                          ? Number(log.unit_cost)
+                          : (() => {
+                              const t = group.batches.find(b => Number(b.id) === Number(log.toy_id));
+                              return t ? Number(t.unit_cost || 0) : 0;
+                            })();
+                        if (buyUnit <= 0 || linkedSale.sell_price <= 0 || linkedSale.quantity <= 0) return null;
+                        const sellUnit = Number(linkedSale.sell_price);
+                        const qty = Number(linkedSale.quantity);
+                        const unitProfit = sellUnit - buyUnit;
+                        const totalProfit = unitProfit * qty;
+                        const isProfit = unitProfit >= 0;
+                        const colorCls = isProfit ? 'text-emerald-300' : 'text-red-300';
+                        const sign = isProfit ? '+' : '';
+                        return (
+                          <>
+                            <div className="flex justify-between border-t border-white/10 pt-0.5 mt-1"><span className="text-[#9ba0b5]">购入单价</span><span className="text-[#d0d4e8]">¥{buyUnit.toFixed(0)}/件</span></div>
+                            <div className={`flex justify-between font-semibold`}><span className="text-[#9ba0b5]">单件盈亏</span><span className={colorCls}>{sign}¥{Math.abs(unitProfit).toFixed(0)}/件</span></div>
+                            <div className={`flex justify-between font-semibold`}><span className="text-[#9ba0b5]">本笔盈亏 ×{qty}</span><span className={colorCls}>{sign}¥{Math.abs(totalProfit).toFixed(0)}</span></div>
+                          </>
+                        );
+                      })()}
+                      {(linkedSale.logistics_region || linkedSale.logistics_weight > 0 || linkedSale.logistics_fee > 0) && (
+                        <div className="flex justify-between"><span className="text-[#9ba0b5]">物流</span>
+                          <span className="text-[#d0d4e8]">
+                            {linkedSale.logistics_region || ''}
+                            {linkedSale.logistics_weight > 0 ? ` · ${linkedSale.logistics_weight}kg` : ''}
+                            {linkedSale.logistics_fee > 0 ? ` · ¥${Number(linkedSale.logistics_fee).toFixed(0)}` : ''}
+                          </span>
+                        </div>
+                      )}
+                      {(linkedSale.huabei > 0 || linkedSale.software_service_fee > 0 || linkedSale.refund_amount > 0) && (
+                        <div className="flex justify-between"><span className="text-[#9ba0b5]">其他费用</span>
+                          <span className="text-[#d0d4e8]">
+                            {linkedSale.huabei > 0 ? `花呗 ¥${Number(linkedSale.huabei).toFixed(0)} ` : ''}
+                            {linkedSale.software_service_fee > 0 ? `服务费 ¥${Number(linkedSale.software_service_fee).toFixed(0)} ` : ''}
+                            {linkedSale.refund_amount > 0 ? `退款 ¥${Number(linkedSale.refund_amount).toFixed(0)}` : ''}
+                          </span>
+                        </div>
+                      )}
+                      {linkedSale.notes && (
+                        <div className="text-yellow-300/80 bg-yellow-500/10 rounded px-1.5 py-1 mt-1">📝 {linkedSale.notes}</div>
+                      )}
+                    </div>
+                  )}
+                  {/* 展开：入库费用明细（入池动作） */}
+                  {isExpanded && hasStockinDetail && !linkedSale && (
+                    <div className="mt-1.5 ml-5 bg-green-500/10 border border-green-500/30 rounded p-2 text-xs space-y-0.5">
+                      {log.source && (
+                        <div className="flex justify-between"><span className="text-[#9ba0b5]">来源</span><span className="text-[#d0d4e8]">{log.source}</span></div>
+                      )}
+                      {log.purchase_date && (
+                        <div className="flex justify-between"><span className="text-[#9ba0b5]">进货日</span><span className="text-[#d0d4e8]">{log.purchase_date}</span></div>
+                      )}
+                      {log.supplier_name && (
+                        <div className="flex justify-between"><span className="text-[#9ba0b5]">供应商</span><span className="text-[#d0d4e8]">{log.supplier_name}</span></div>
+                      )}
+                      {(log.japan_price_cny > 0 || log.proxy_price > 0 || log.domestic_price > 0) && (
+                        <div className="flex justify-between"><span className="text-[#9ba0b5]">进货基准</span><span className="text-green-200 font-semibold">
+                          ¥{(Number(log.japan_price_cny||0) + Number(log.proxy_price||0) + Number(log.domestic_price||0)).toFixed(0)}
+                        </span></div>
+                      )}
+                      {log.stage1_amount > 0 && (
+                        <div className="flex justify-between"><span className="text-[#9ba0b5]">①阶段 {log.stage1_date || ''}</span><span className="text-green-200">¥{Number(log.stage1_amount).toFixed(0)}</span></div>
+                      )}
+                      {log.stage2_amount > 0 && (
+                        <div className="flex justify-between"><span className="text-[#9ba0b5]">②阶段 {log.stage2_date || ''}</span><span className="text-green-200">¥{Number(log.stage2_amount).toFixed(0)}</span></div>
+                      )}
+                      {log.stage3_amount > 0 && (
+                        <div className="flex justify-between"><span className="text-[#9ba0b5]">③阶段 {log.stage3_date || ''}</span><span className="text-green-200">¥{Number(log.stage3_amount).toFixed(0)}</span></div>
+                      )}
+                      {(log.handling_fee > 0 || log.japan_domestic_shipping > 0 || log.japan_consumption_tax > 0) && (
+                        <div className="flex justify-between"><span className="text-[#9ba0b5]">日本端费用</span><span className="text-[#d0d4e8]">
+                          ¥{((log.handling_fee||0) + (log.japan_domestic_shipping||0) + (log.japan_consumption_tax||0)).toFixed(0)}
+                        </span></div>
+                      )}
+                      {(log.proxy_intl_shipping > 0 || log.proxy_domestic_shipping > 0) && (
+                        <div className="flex justify-between"><span className="text-[#9ba0b5]">代购运费</span><span className="text-[#d0d4e8]">
+                          ¥{((log.proxy_intl_shipping||0) + (log.proxy_domestic_shipping||0)).toFixed(0)}
+                        </span></div>
+                      )}
+                      {(log.domestic_shipping > 0) && (
+                        <div className="flex justify-between"><span className="text-[#9ba0b5]">国内运费</span><span className="text-[#d0d4e8]">¥{Number(log.domestic_shipping).toFixed(0)}</span></div>
+                      )}
+                      {(log.intl_shipping > 0 || log.import_duty > 0) && (
+                        <div className="flex justify-between"><span className="text-[#9ba0b5]">国际段</span><span className="text-[#d0d4e8]">
+                          运费 ¥{Number(log.intl_shipping).toFixed(0)} · 关税 ¥{Number(log.import_duty).toFixed(0)}
+                        </span></div>
+                      )}
+                      {(log.logistics_fee > 0 || log.box_fee > 0 || log.packing_fee > 0) && (
+                        <div className="flex justify-between"><span className="text-[#9ba0b5]">物流/纸箱/打包</span><span className="text-[#d0d4e8]">
+                          ¥{((log.logistics_fee||0) + (log.box_fee||0) + (log.packing_fee||0)).toFixed(0)}
+                        </span></div>
+                      )}
+                      {(log.stage1_note || log.stage2_note || log.stage3_note) && (
+                        <div className="text-xs text-[#9ba0b5] mt-1 space-y-0.5">
+                          {log.stage1_note && <div>①备注：{log.stage1_note}</div>}
+                          {log.stage2_note && <div>②备注：{log.stage2_note}</div>}
+                          {log.stage3_note && <div>③备注：{log.stage3_note}</div>}
+                        </div>
+                      )}
+                      {log.toy_notes && (
+                        <div className="text-yellow-300/80 bg-yellow-500/10 rounded px-1.5 py-1 mt-1">📝 {log.toy_notes}</div>
+                      )}
+                    </div>
                   )}
                 </div>
                 );
@@ -583,25 +786,25 @@ function TransferPoolModal({ batch, batches, products, categories, onConfirm, on
         <div className="bg-white/[0.03] rounded-lg p-3 space-y-1 text-xs">
           {isMulti ? (
             <>
-              <div className="text-[10px] text-[#6b7085]">待转批次（每个整批转出）</div>
+              <div className="text-xs text-[#6b7085]">待转批次（每个整批转出）</div>
               <div className="max-h-32 overflow-y-auto space-y-0.5 mt-1">
                 {batchList.map(b => (
-                  <div key={b.id} className="flex justify-between text-[11px]">
+                  <div key={b.id} className="flex justify-between text-xs">
                     <span className="truncate flex-1 mr-2 text-[#9ba0b5]">{b.name_zh || b.name}</span>
                     <span className="text-white font-medium shrink-0">{b.remaining}/{b.quantity} 件</span>
                   </div>
                 ))}
               </div>
-              <div className="flex justify-between text-[11px] text-[#9ba0b5] pt-1.5 mt-1.5 border-t border-white/5">
+              <div className="flex justify-between text-xs text-[#9ba0b5] pt-1.5 mt-1.5 border-t border-white/5">
                 <span>合计 <b className="text-white">{totalRemaining}</b> 件 · {batchList.length} 批</span>
                 <span>· 整批转出</span>
               </div>
             </>
           ) : (
             <>
-              <div className="text-[10px] text-[#6b7085]">当前批次</div>
+              <div className="text-xs text-[#6b7085]">当前批次</div>
               <div className="font-medium truncate">{firstBatch.name_zh || firstBatch.name}</div>
-              <div className="flex justify-between text-[11px] text-[#9ba0b5] mt-1">
+              <div className="flex justify-between text-xs text-[#9ba0b5] mt-1">
                 <span>剩余 <b className="text-white">{srcRemaining}</b> / {srcQty} 件</span>
                 <span>单价 ¥{unitCost.toFixed(0)}/件</span>
               </div>
@@ -613,7 +816,7 @@ function TransferPoolModal({ batch, batches, products, categories, onConfirm, on
           {/* 转出数量（单 batch 才显示） */}
           {!isMulti && (
           <div>
-            <label className="text-[10px] text-[#6b7085] block mb-1">
+            <label className="text-xs text-[#6b7085] block mb-1">
               转出数量（最多 {srcRemaining} 件）
               {Number(quantity) === srcRemaining && srcRemaining === srcQty && (
                 <span className="ml-1 text-purple-300">· 整批转</span>
@@ -631,22 +834,22 @@ function TransferPoolModal({ batch, batches, products, categories, onConfirm, on
                 lang="zh" spellCheck={false} autoComplete="off"
                 autoFocus
               />
-              <span className="text-[11px] text-[#6b7085] flex-1">
+              <span className="text-xs text-[#6b7085] flex-1">
                 / {srcRemaining} 件可转
               </span>
               <button type="button"
-                className="text-[10px] px-2 py-0.5 rounded border border-white/10 text-[#9ba0b5] hover:bg-white/5"
+                className="text-xs px-2 py-0.5 rounded border border-white/10 text-[#9ba0b5] hover:bg-white/5"
                 onClick={() => setQuantity(srcRemaining)}>
                 全部
               </button>
               <button type="button"
-                className="text-[10px] px-2 py-0.5 rounded border border-white/10 text-[#9ba0b5] hover:bg-white/5"
+                className="text-xs px-2 py-0.5 rounded border border-white/10 text-[#9ba0b5] hover:bg-white/5"
                 onClick={() => setQuantity(1)}>
                 1 件
               </button>
             </div>
             {Number(quantity) > 0 && Number(quantity) <= srcRemaining && (
-              <div className="text-[10px] text-[#6b7085] mt-1">
+              <div className="text-xs text-[#6b7085] mt-1">
                 转出 ¥{(unitCost * Number(quantity)).toFixed(0)} 成本 · 原池剩 <b className="text-white">{srcRemaining - Number(quantity)}</b> 件
               </div>
             )}
@@ -655,12 +858,12 @@ function TransferPoolModal({ batch, batches, products, categories, onConfirm, on
 
           {/* 目标池选择 */}
           <div>
-            <label className="text-[10px] text-[#6b7085] block mb-1">目标池（搜索名称或分类）</label>
+            <label className="text-xs text-[#6b7085] block mb-1">目标池（搜索名称或分类）</label>
             {targetProd ? (
               <div className="flex items-center gap-1.5 bg-purple-500/10 border border-purple-500/40 rounded-lg px-3 py-2">
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-medium truncate">{targetProd.name_zh || targetProd.name}</div>
-                  <div className="text-[10px] text-[#9ba0b5]">分类：{targetProd.category_name || targetProd.category}　|　库存 {targetProd.total_remaining}/{targetProd.total_qty}</div>
+                  <div className="text-xs text-[#9ba0b5]">分类：{targetProd.category_name || targetProd.category}　|　库存 {targetProd.total_remaining}/{targetProd.total_qty}</div>
                 </div>
                 <button type="button"
                   className="text-[#6b7085] hover:text-white text-sm shrink-0"
@@ -687,7 +890,7 @@ function TransferPoolModal({ batch, batches, products, categories, onConfirm, on
                         className="w-full text-left px-3 py-1.5 text-xs hover:bg-purple-500/10 border-b border-gray-700/50 last:border-b-0"
                         onPointerDown={() => { setTargetProductId(String(p.id)); setSearch(''); setShowDropdown(false); }}>
                         <div className="font-medium truncate">{p.name_zh || p.name}</div>
-                        <div className="text-[10px] text-[#6b7085]">分类：{p.category_name || p.category}　|　库存 {p.total_remaining}/{p.total_qty}</div>
+                        <div className="text-xs text-[#6b7085]">分类：{p.category_name || p.category}　|　库存 {p.total_remaining}/{p.total_qty}</div>
                       </button>
                     ))}
                     {/* 新建目标池按钮 */}
@@ -701,7 +904,7 @@ function TransferPoolModal({ batch, batches, products, categories, onConfirm, on
                     {/* 新建目标池表单 */}
                     {showNewPoolInput && (
                       <div className="px-3 py-2 space-y-1.5 border-t border-gray-600 bg-purple-500/[0.05]" onPointerDown={e => e.stopPropagation()}>
-                        <div className="text-[10px] text-purple-300 font-medium">新建目标池</div>
+                        <div className="text-xs text-purple-300 font-medium">新建目标池</div>
                         <input className="input text-xs w-full" placeholder="池名（必填）"
                           value={newPoolName}
                           onChange={e => setNewPoolName(e.target.value)}
@@ -713,12 +916,12 @@ function TransferPoolModal({ batch, batches, products, categories, onConfirm, on
                         />
                         <div className="flex gap-1.5">
                           <button type="button"
-                            className="text-[10px] px-2 py-0.5 rounded border border-white/10 text-[#9ba0b5] hover:bg-white/5 flex-1"
+                            className="text-xs px-2 py-0.5 rounded border border-white/10 text-[#9ba0b5] hover:bg-white/5 flex-1"
                             onClick={() => { setShowNewPoolInput(false); setNewPoolName(''); setNewPoolCategoryId(null); }}>
                             取消
                           </button>
                           <button type="button"
-                            className="text-[10px] px-2 py-0.5 rounded bg-purple-500 text-white font-medium hover:bg-purple-600 flex-1 disabled:opacity-50"
+                            className="text-xs px-2 py-0.5 rounded bg-purple-500 text-white font-medium hover:bg-purple-600 flex-1 disabled:opacity-50"
                             disabled={!newPoolName.trim() || creatingPool}
                             onClick={handleCreatePool}>
                             {creatingPool ? '建池中…' : '建池并选中'}
@@ -734,7 +937,7 @@ function TransferPoolModal({ batch, batches, products, categories, onConfirm, on
 
           {/* 备注 */}
           <div>
-            <label className="text-[10px] text-[#6b7085] block mb-1">备注（可选）</label>
+            <label className="text-xs text-[#6b7085] block mb-1">备注（可选）</label>
             <input
               className="input text-xs w-full"
               placeholder="比如：跟 A 套装合并"
@@ -904,7 +1107,7 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
             return (
               <div key={idx} className="bg-white/[0.03] rounded-lg p-3 space-y-2">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-[#6b7085] shrink-0">#{idx + 1}</span>
+                  <span className="text-xs text-[#6b7085] shrink-0">#{idx + 1}</span>
                   <div className="relative flex-1">
                     {selectedProd ? (
                       <div className="flex items-center gap-1">
@@ -912,7 +1115,7 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
                           <span className="truncate">{selectedProd.name_zh || selectedProd.name}</span>
                           <span className="text-xs text-[#6b7085] shrink-0">[{selectedProd.category_name || selectedProd.category}]</span>
                         </div>
-                        <button type="button" className="text-[10px] text-[#6b7085] hover:text-white px-1 shrink-0"
+                        <button type="button" className="text-xs text-[#6b7085] hover:text-white px-1 shrink-0"
                           onClick={() => updateLine(idx, 'product_id', '')}>✕</button>
                       </div>
                     ) : isNew ? (
@@ -923,18 +1126,18 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
                             value={line.custom_name || ''}
                             onChange={e => updateLine(idx, 'custom_name', e.target.value)}
                             lang="zh" spellCheck={false} autoComplete="off" />
-                          <button type="button" className="text-[10px] text-[#6b7085] hover:text-white px-1 shrink-0"
+                          <button type="button" className="text-xs text-[#6b7085] hover:text-white px-1 shrink-0"
                             onClick={() => updateLine(idx, 'product_id', '')}>✕</button>
                         </div>
                         <div className="flex items-start gap-1">
-                          <span className="text-[10px] text-[#6b7085] shrink-0 pt-1.5">分类：</span>
+                          <span className="text-xs text-[#6b7085] shrink-0 pt-1.5">分类：</span>
                           <div className="flex-1 space-y-1">
                             <CategoryPicker
                               value={line.custom_category_id}
                               onChange={v => updateLine(idx, 'custom_category_id', v)}
                               categories={categories || []}
                             />
-                            <button type="button" className="text-[10px] text-orange-400 hover:text-orange-300 px-1"
+                            <button type="button" className="text-xs text-orange-400 hover:text-orange-300 px-1"
                               onClick={() => setShowNewCatInput(true)}>
                               + 新建分类
                             </button>
@@ -942,7 +1145,7 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
                         </div>
                         {showNewCatInput && (
                           <div className="flex items-center gap-1 pl-1">
-                            <input className="input text-[11px] flex-1 py-1"
+                            <input className="input text-xs flex-1 py-1"
                               placeholder="新分类名"
                               value={newCategory}
                               onChange={e => setNewCategory(e.target.value)}
@@ -952,9 +1155,9 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
                                 if (e.key === 'Enter') { e.preventDefault(); handleCreateCategory(); }
                                 if (e.key === 'Escape') { setShowNewCatInput(false); setNewCategory(''); }
                               }} />
-                            <button type="button" className="btn-primary text-[10px] px-2 py-1 shrink-0"
+                            <button type="button" className="btn-primary text-xs px-2 py-1 shrink-0"
                               onClick={handleCreateCategory}>建</button>
-                            <button type="button" className="text-[10px] text-[#6b7085] hover:text-white px-1"
+                            <button type="button" className="text-xs text-[#6b7085] hover:text-white px-1"
                               onClick={() => { setShowNewCatInput(false); setNewCategory(''); }}>✕</button>
                           </div>
                         )}
@@ -988,7 +1191,7 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
                               ) : (
                                 <>
                                 {!line.search?.trim() && (
-                                  <div className="px-3 py-2 text-[10px] text-[#6b7085] bg-white/[0.02] border-b border-white/[0.04]">
+                                  <div className="px-3 py-2 text-xs text-[#6b7085] bg-white/[0.02] border-b border-white/[0.04]">
                                     共 {filtered.length} 个池 · 输入名称 / 拼音快速查找
                                   </div>
                                 )}
@@ -1072,11 +1275,11 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
             );
           })}
 
-          <button type="button" className="text-[11px] text-accent font-medium hover:text-white border border-accent/40 rounded-lg px-3 py-1.5 w-full bg-accent/5 hover:bg-accent/10"
+          <button type="button" className="text-xs text-accent font-medium hover:text-white border border-accent/40 rounded-lg px-3 py-1.5 w-full bg-accent/5 hover:bg-accent/10"
             onClick={addLine}>＋ 添加商品行</button>
 
           {totalQty > 0 && (
-            <div className="text-[10px] text-[#6b7085] space-y-0.5 pt-1 border-t border-white/5">
+            <div className="text-xs text-[#6b7085] space-y-0.5 pt-1 border-t border-white/5">
               <div className="flex justify-between">
                 <span>分配 {totalQty} / 原 {toyQty} 件</span>
                 <span>参考总成本 ¥{totalRefCost.toFixed(0)}</span>
@@ -1216,7 +1419,7 @@ function SellModal({ toy, onConfirm, onCancel }) {
         <form className="space-y-3" onSubmit={handleSubmit}>
           {/* 售出价格 */}
           <div>
-            <label className="text-[10px] text-[#6b7085] block mb-1">售出价格 (¥)</label>
+            <label className="text-xs text-[#6b7085] block mb-1">售出价格 (¥)</label>
             <input className="input" type="text" inputmode="decimal" placeholder="输入售价" value={form.sell_price}
               onChange={e => setForm({ ...form, sell_price: e.target.value })} autoFocus />
           </div>
@@ -1240,7 +1443,7 @@ function SellModal({ toy, onConfirm, onCancel }) {
                 <>
                   {/* 快递选择 */}
                   <div>
-                    <label className="text-[10px] text-[#6b7085] block mb-1">快递平台</label>
+                    <label className="text-xs text-[#6b7085] block mb-1">快递平台</label>
                     <div className="flex gap-2">
                       <button type="button"
                         onClick={() => setForm(f => ({ ...f, carrier: 'zto' }))}
@@ -1268,7 +1471,7 @@ function SellModal({ toy, onConfirm, onCancel }) {
                     <>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="text-[10px] text-[#6b7085] block mb-1">目的地省份</label>
+                          <label className="text-xs text-[#6b7085] block mb-1">目的地省份</label>
                           <select className="input text-xs" value={form.logistics_region}
                             onChange={e => setForm(f => ({ ...f, logistics_region: e.target.value }))}>
                             <option value="">— 选择省份 —</option>
@@ -1280,7 +1483,7 @@ function SellModal({ toy, onConfirm, onCancel }) {
                           </select>
                         </div>
                         <div>
-                          <label className="text-[10px] text-[#6b7085] block mb-1">重量 (kg)</label>
+                          <label className="text-xs text-[#6b7085] block mb-1">重量 (kg)</label>
                           <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.1" placeholder="0"
                             value={form.logistics_weight}
                             onChange={e => setForm(f => ({ ...f, logistics_weight: e.target.value }))} />
@@ -1297,17 +1500,17 @@ function SellModal({ toy, onConfirm, onCancel }) {
 
                   {/* 顺丰：待设置提示 */}
                   {form.carrier === 'sf' && (
-                    <div className="text-[10px] text-[#6b7085] italic">顺丰计价规则待录入，暂时手动填写下方费用</div>
+                    <div className="text-xs text-[#6b7085] italic">顺丰计价规则待录入，暂时手动填写下方费用</div>
                   )}
 
                   {/* 箱型勾选 */}
                   {boxSupplies.length > 0 && (
                     <div>
-                      <label className="text-[10px] text-[#6b7085] block mb-1">选择箱型</label>
+                      <label className="text-xs text-[#6b7085] block mb-1">选择箱型</label>
                       <div className="flex flex-wrap gap-1.5">
                         {boxSupplies.map(s => (
                           <button key={s.id} type="button" onClick={() => toggleBox(s.id)}
-                            className={`text-[10px] px-2 py-1 rounded border transition-colors ${
+                            className={`text-xs px-2 py-1 rounded border transition-colors ${
                               form.selected_boxes.includes(s.id)
                                 ? 'border-orange-500 bg-orange-500/20 text-[#d0d4e8]'
                                 : 'border-white/10 text-[#6b7085]'
@@ -1325,7 +1528,7 @@ function SellModal({ toy, onConfirm, onCancel }) {
 
                   {/* 打包费（手动填） */}
                   <div>
-                    <label className="text-[10px] text-[#6b7085] block mb-1">打包费 (¥)</label>
+                    <label className="text-xs text-[#6b7085] block mb-1">打包费 (¥)</label>
                     <input className="input text-xs" type="text" inputmode="decimal" min="0" placeholder="0"
                       value={packingFee || ''}
                       onChange={e => setPackingFee(+e.target.value || 0)} />
@@ -1343,24 +1546,24 @@ function SellModal({ toy, onConfirm, onCancel }) {
 
           {/* 平台扣费明细（可编辑） */}
           <div className="bg-black/30 rounded-lg p-3 space-y-2 text-xs">
-            <div className="text-[10px] text-[#6b7085] font-bold mb-1">平台扣费明细（可手动改实际扣款）</div>
+            <div className="text-xs text-[#6b7085] font-bold mb-1">平台扣费明细（可手动改实际扣款）</div>
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-0.5">软件服务费（1%）</label>
+              <label className="text-xs text-[#6b7085] block mb-0.5">软件服务费（1%）</label>
               <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                 value={form.software_service_fee} onChange={e => setForm({ ...form, software_service_fee: e.target.value })} />
             </div>
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-0.5">基础软件服务费（0.6%）</label>
+              <label className="text-xs text-[#6b7085] block mb-0.5">基础软件服务费（0.6%）</label>
               <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                 value={form.basic_software_service_fee} onChange={e => setForm({ ...form, basic_software_service_fee: e.target.value })} />
             </div>
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-0.5">无忧卖服务费（2.5%，默认 0）</label>
+              <label className="text-xs text-[#6b7085] block mb-0.5">无忧卖服务费（2.5%，默认 0）</label>
               <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                 value={form.worry_free_service_fee} onChange={e => setForm({ ...form, worry_free_service_fee: e.target.value })} />
             </div>
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-0.5">花呗扣款（3%，默认 0）</label>
+              <label className="text-xs text-[#6b7085] block mb-0.5">花呗扣款（3%，默认 0）</label>
               <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                 value={form.huabei} onChange={e => setForm({ ...form, huabei: e.target.value })} />
             </div>
@@ -1373,7 +1576,7 @@ function SellModal({ toy, onConfirm, onCancel }) {
           {/* 纠纷退款（可选） */}
           {(toy.status === 'sold' || toy.status === 'done') && (
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">纠纷退款 (¥)（可选）</label>
+              <label className="text-xs text-[#6b7085] block mb-1">纠纷退款 (¥)（可选）</label>
               <input className="input" type="text" inputmode="decimal" placeholder="如有纠纷退款，填写金额"
                 value={form.dispute_fee}
                 onChange={e => setForm({ ...form, dispute_fee: e.target.value })} />
@@ -1390,10 +1593,10 @@ function SellModal({ toy, onConfirm, onCancel }) {
                 </span>
               </div>
               {totalLogistics > 0 && (
-                <div className="text-[9px] text-[#6b7085] text-right">含物流支出 ¥{totalLogistics.toFixed(2)}</div>
+                <div className="text-xs text-[#6b7085] text-right">含物流支出 ¥{totalLogistics.toFixed(2)}</div>
               )}
               {disputeFee > 0 && (
-                <div className="text-[9px] text-[#6b7085] text-right">含纠纷退款 ¥{disputeFee}</div>
+                <div className="text-xs text-[#6b7085] text-right">含纠纷退款 ¥{disputeFee}</div>
               )}
             </div>
           )}
@@ -1461,26 +1664,26 @@ function HistoricalSaleModal({ onCancel, categories }) {
       <div className="bg-[#1a1d27] rounded-xl border border-white/10 p-6 w-full max-w-sm space-y-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div>
           <h3 className="text-base font-bold">录入历史销售</h3>
-          <p className="text-[10px] text-[#6b7085] mt-1">快速补录一笔已售出商品的出售记录。购入价留空，对账时到「已售」tab 点编辑补 stage1/2/3 即可。</p>
+          <p className="text-xs text-[#6b7085] mt-1">快速补录一笔已售出商品的出售记录。购入价留空，对账时到「已售」tab 点编辑补 stage1/2/3 即可。</p>
         </div>
 
         <form className="space-y-3" onSubmit={handleSubmit}>
           <div>
-            <label className="text-[10px] text-[#6b7085] block mb-1">商品名称 *</label>
+            <label className="text-xs text-[#6b7085] block mb-1">商品名称 *</label>
             <input className="input" placeholder="例: M1号巴尔坦" value={form.name}
               onChange={e => setForm({ ...form, name: e.target.value })} autoFocus />
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">品类</label>
+              <label className="text-xs text-[#6b7085] block mb-1">品类</label>
               <select className="input text-xs" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
                 <option value="">未指定</option>
                 {categories.map(c => <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">来源</label>
+              <label className="text-xs text-[#6b7085] block mb-1">来源</label>
               <select className="input text-xs" value={form.source} onChange={e => setForm({ ...form, source: e.target.value })}>
                 <option value="">未指定</option>
                 <option value="direct">直购</option>
@@ -1502,19 +1705,19 @@ function HistoricalSaleModal({ onCancel, categories }) {
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">售出价格 * (¥)</label>
+              <label className="text-xs text-[#6b7085] block mb-1">售出价格 * (¥)</label>
               <input className="input" type="text" inputmode="decimal" placeholder="0" value={form.sell_price}
                 onChange={e => setForm({ ...form, sell_price: e.target.value })} />
             </div>
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">卖出日</label>
+              <label className="text-xs text-[#6b7085] block mb-1">卖出日</label>
               <input className="input text-xs" type="date" value={form.sell_date}
                 onChange={e => setForm({ ...form, sell_date: e.target.value })} />
             </div>
           </div>
 
           <div className="bg-black/30 rounded-lg p-3 space-y-1.5 text-xs">
-            <div className="text-[10px] text-[#6b7085] mb-1">平台费（自动按售价算）</div>
+            <div className="text-xs text-[#6b7085] mb-1">平台费（自动按售价算）</div>
             <div className="flex justify-between text-[#6b7085]"><span>软件服务费 (1%)</span><span>¥{softwareFee.toFixed(2)}</span></div>
             <div className="flex justify-between text-[#6b7085]"><span>基础软件服务费 (0.6%)</span><span>¥{basicFee.toFixed(2)}</span></div>
             <div className="border-t border-white/5 my-1" />
@@ -1632,11 +1835,11 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
 
         <form className="space-y-3" onSubmit={handleSubmit}>
           <div>
-            <label className="text-[10px] text-[#6b7085] block mb-1">商品名称</label>
+            <label className="text-xs text-[#6b7085] block mb-1">商品名称</label>
             <input className="input text-xs" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
           </div>
           <div>
-            <label className="text-[10px] text-[#6b7085] block mb-1">品类</label>
+            <label className="text-xs text-[#6b7085] block mb-1">品类</label>
             <select className="input text-xs" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
               <option value="">选择分类</option>
               {categories.map(c => <option key={c.id} value={c.name}>{c.parent_id ? '└ ' : ''}{c.name}</option>)}
@@ -1646,24 +1849,24 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
           {/* 阶段成本（可编辑） */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">①买价</label>
+              <label className="text-xs text-[#6b7085] block mb-1">①买价</label>
               <input className="input text-xs" type="text" inputmode="decimal" placeholder="0" value={form.stage1_amount} onChange={e => setForm({ ...form, stage1_amount: e.target.value })} />
             </div>
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">②转运</label>
+              <label className="text-xs text-[#6b7085] block mb-1">②转运</label>
               <input className="input text-xs" type="text" inputmode="decimal" placeholder="0" value={form.stage2_amount} onChange={e => setForm({ ...form, stage2_amount: e.target.value })} />
             </div>
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">③国际运费</label>
+              <label className="text-xs text-[#6b7085] block mb-1">③国际运费</label>
               <input className="input text-xs" type="text" inputmode="decimal" placeholder="0" value={form.stage3_intl_ship} onChange={e => setForm({ ...form, stage3_intl_ship: e.target.value })} />
             </div>
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">③税费</label>
+              <label className="text-xs text-[#6b7085] block mb-1">③税费</label>
               <input className="input text-xs" type="text" inputmode="decimal" placeholder="0" value={form.stage3_tax} onChange={e => setForm({ ...form, stage3_tax: e.target.value })} />
             </div>
             {sourceGroup(toy.source) !== 'proxy' && (
               <div className="col-span-2 mt-1">
-                <label className="text-[10px] text-[#6b7085] block mb-1">运输方式</label>
+                <label className="text-xs text-[#6b7085] block mb-1">运输方式</label>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -1689,29 +1892,29 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
             <>
               {/* 购入成本明细（可编辑） */}
               <div className="bg-black/20 rounded-lg p-3 space-y-2 text-xs">
-                <div className="text-[10px] text-[#6b7085] font-bold mb-1">购入成本明细</div>
+                <div className="text-xs text-[#6b7085] font-bold mb-1">购入成本明细</div>
                 <div>
-                  <label className="text-[10px] text-[#6b7085] block mb-0.5">①买价</label>
+                  <label className="text-xs text-[#6b7085] block mb-0.5">①买价</label>
                   <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.stage1_amount} onChange={e => setForm({ ...form, stage1_amount: e.target.value })} />
                 </div>
                 <div>
-                  <label className="text-[10px] text-[#6b7085] block mb-0.5 pl-2">②手续费</label>
+                  <label className="text-xs text-[#6b7085] block mb-0.5 pl-2">②手续费</label>
                   <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.stage2_handling} onChange={e => setForm({ ...form, stage2_handling: e.target.value })} />
                 </div>
                 <div>
-                  <label className="text-[10px] text-[#6b7085] block mb-0.5 pl-2">②国内物流费</label>
+                  <label className="text-xs text-[#6b7085] block mb-0.5 pl-2">②国内物流费</label>
                   <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.stage2_domestic_ship} onChange={e => setForm({ ...form, stage2_domestic_ship: e.target.value })} />
                 </div>
                 <div>
-                  <label className="text-[10px] text-[#6b7085] block mb-0.5 pl-2">③国际运费</label>
+                  <label className="text-xs text-[#6b7085] block mb-0.5 pl-2">③国际运费</label>
                   <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.stage3_intl_ship} onChange={e => setForm({ ...form, stage3_intl_ship: e.target.value })} />
                 </div>
                 <div>
-                  <label className="text-[10px] text-[#6b7085] block mb-0.5 pl-2">③税费</label>
+                  <label className="text-xs text-[#6b7085] block mb-0.5 pl-2">③税费</label>
                   <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.stage3_tax} onChange={e => setForm({ ...form, stage3_tax: e.target.value })} />
                 </div>
@@ -1720,7 +1923,7 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
                   <span>¥{totalCost.toFixed(2)}</span>
                 </div>
                 <div>
-                  <label className="text-[10px] text-[#6b7085] block mb-0.5">退换货成本</label>
+                  <label className="text-xs text-[#6b7085] block mb-0.5">退换货成本</label>
                   <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.return_cost} onChange={e => setForm({ ...form, return_cost: e.target.value })} />
                 </div>
@@ -1728,24 +1931,24 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
 
               {/* 平台扣费明细（可编辑） */}
               <div className="bg-black/20 rounded-lg p-3 space-y-2 text-xs">
-                <div className="text-[10px] text-[#6b7085] font-bold mb-1">平台扣费明细</div>
+                <div className="text-xs text-[#6b7085] font-bold mb-1">平台扣费明细</div>
                 <div>
-                  <label className="text-[10px] text-[#6b7085] block mb-0.5">软件服务费（1%）</label>
+                  <label className="text-xs text-[#6b7085] block mb-0.5">软件服务费（1%）</label>
                   <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.software_service_fee} onChange={e => setForm({ ...form, software_service_fee: e.target.value })} />
                 </div>
                 <div>
-                  <label className="text-[10px] text-[#6b7085] block mb-0.5">基础软件服务费（0.6%）</label>
+                  <label className="text-xs text-[#6b7085] block mb-0.5">基础软件服务费（0.6%）</label>
                   <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.basic_software_service_fee} onChange={e => setForm({ ...form, basic_software_service_fee: e.target.value })} />
                 </div>
                 <div>
-                  <label className="text-[10px] text-[#6b7085] block mb-0.5">无忧卖服务费（2.5%）</label>
+                  <label className="text-xs text-[#6b7085] block mb-0.5">无忧卖服务费（2.5%）</label>
                   <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.worry_free_service_fee} onChange={e => setForm({ ...form, worry_free_service_fee: e.target.value })} />
                 </div>
                 <div>
-                  <label className="text-[10px] text-[#6b7085] block mb-0.5">花呗扣款（3%）</label>
+                  <label className="text-xs text-[#6b7085] block mb-0.5">花呗扣款（3%）</label>
                   <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.01" placeholder="0"
                     value={form.huabei} onChange={e => setForm({ ...form, huabei: e.target.value })} />
                 </div>
@@ -1754,7 +1957,7 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
               {/* 物流支出明细（可编辑） */}
               {(toy.logistics_fee > 0 || toy.box_fee > 0 || toy.packing_fee > 0) && (
                 <div className="bg-black/20 rounded-lg p-3 space-y-1.5 text-xs">
-                  <div className="text-[10px] text-[#6b7085] font-bold mb-1">物流支出</div>
+                  <div className="text-xs text-[#6b7085] font-bold mb-1">物流支出</div>
                   {toy.logistics_fee > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">快递费</span><span className="text-[#d0d4e8]">¥{toy.logistics_fee}</span></div>}
                   {toy.box_fee > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">箱规费</span><span className="text-[#d0d4e8]">¥{toy.box_fee}</span></div>}
                   {toy.packing_fee > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">打包费</span><span className="text-[#d0d4e8]">¥{toy.packing_fee}</span></div>}
@@ -1764,11 +1967,11 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
 
               {/* 售价（可编辑） */}
               <div>
-                <label className="text-[10px] text-[#6b7085] block mb-1">售出价格 (¥)</label>
+                <label className="text-xs text-[#6b7085] block mb-1">售出价格 (¥)</label>
                 <input className="input text-xs" type="text" inputmode="decimal" placeholder="0" value={form.sell_price} onChange={e => setForm({ ...form, sell_price: e.target.value })} />
               </div>
               <div>
-                <label className="text-[10px] text-[#6b7085] block mb-1">售出日期</label>
+                <label className="text-xs text-[#6b7085] block mb-1">售出日期</label>
                 <input className="input text-xs" type="date" value={form.sell_date} onChange={e => setForm({ ...form, sell_date: e.target.value })} />
               </div>
 
@@ -1777,20 +1980,20 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
                 <div className={`rounded-lg p-3 text-center font-bold text-lg ${profit >= 0 ? 'text-green-400' : 'text-red-400'}`}
                   style={{ background: profit >= 0 ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)' }}>
                   {profit >= 0 ? '+' : ''}¥{profit.toFixed(2)}
-                  <div className="text-[10px] font-normal text-[#6b7085] mt-0.5">预计利润</div>
+                  <div className="text-xs font-normal text-[#6b7085] mt-0.5">预计利润</div>
                 </div>
               )}
             </>
           )}
 
           <div>
-            <label className="text-[10px] text-[#6b7085] block mb-1">备注</label>
+            <label className="text-xs text-[#6b7085] block mb-1">备注</label>
             <input className="input text-xs" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
           </div>
 
           {toy.return_cost > 0 && (
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">退换货成本 (¥)</label>
+              <label className="text-xs text-[#6b7085] block mb-1">退换货成本 (¥)</label>
               <input className="input text-xs" type="text" inputmode="decimal" placeholder="0" value={form.return_cost} onChange={e => setForm({ ...form, return_cost: e.target.value })} />
             </div>
           )}
@@ -1835,7 +2038,7 @@ function ReturnModal({ toy, onConfirm, onCancel }) {
         <h3 className="text-base font-bold">退换货 {toy.name_zh || toy.name}</h3>
         <form className="space-y-3" onSubmit={handleSubmit}>
           <div>
-            <label className="text-[10px] text-[#6b7085] block mb-1">回收成本 (¥)</label>
+            <label className="text-xs text-[#6b7085] block mb-1">回收成本 (¥)</label>
             <input
               className="input"
               type="text" inputmode="decimal"
@@ -1846,7 +2049,7 @@ function ReturnModal({ toy, onConfirm, onCancel }) {
             />
           </div>
           <div>
-            <label className="text-[10px] text-[#6b7085] block mb-1">备注</label>
+            <label className="text-xs text-[#6b7085] block mb-1">备注</label>
             <input
               className="input text-xs"
               placeholder="退换货原因等"
@@ -1974,7 +2177,7 @@ function PoolSellModal({ group, onConfirm, onCancel, shippingRules, supplies, pr
         <div className="text-xs text-[#6b7085]">库存 {group.totalRemaining} 件 · 均价 ¥{avgCost.toFixed(0)} · {group.batches.length} 批次</div>
 
         <div>
-          <label className="text-[10px] text-[#6b7085] block mb-1">指定批次（可选，不选则 FIFO 自动扣）</label>
+          <label className="text-xs text-[#6b7085] block mb-1">指定批次（可选，不选则 FIFO 自动扣）</label>
           <select className="input text-xs" value={form.toy_id}
             onChange={e => setForm({ ...form, toy_id: e.target.value })}>
             <option value="">— 全部批次（FIFO）—</option>
@@ -1989,12 +2192,12 @@ function PoolSellModal({ group, onConfirm, onCancel, shippingRules, supplies, pr
         <form className="space-y-3" onSubmit={handleSubmit}>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">卖出数量</label>
+              <label className="text-xs text-[#6b7085] block mb-1">卖出数量</label>
               <input className="input text-xs" type="text" inputmode="decimal" value={form.quantity}
                 onChange={e => setForm({ ...form, quantity: e.target.value })} autoFocus />
             </div>
             <div>
-              <label className="text-[10px] text-[#6b7085] block mb-1">单价 (¥)</label>
+              <label className="text-xs text-[#6b7085] block mb-1">单价 (¥)</label>
               <input className="input text-xs" type="text" inputmode="decimal" placeholder="0"
                 value={form.sell_price} onChange={e => setForm({ ...form, sell_price: e.target.value })} />
             </div>
@@ -2041,17 +2244,17 @@ function PoolSellModal({ group, onConfirm, onCancel, shippingRules, supplies, pr
 
           {/* 平台费 */}
           <div className="bg-black/30 rounded-lg p-3 space-y-2 text-xs">
-            <div className="text-[10px] text-[#6b7085]">软件服务费 1%</div>
+            <div className="text-xs text-[#6b7085]">软件服务费 1%</div>
             <input className="input text-xs" type="text" inputmode="decimal" value={form.software_service_fee}
               onChange={e => setForm({ ...form, software_service_fee: e.target.value })} />
-            <div className="text-[10px] text-[#6b7085]">基础服务费 0.6%</div>
+            <div className="text-xs text-[#6b7085]">基础服务费 0.6%</div>
             <input className="input text-xs" type="text" inputmode="decimal" value={form.basic_software_service_fee}
               onChange={e => setForm({ ...form, basic_software_service_fee: e.target.value })} />
           </div>
 
           {/* 备注 */}
           <div>
-            <label className="text-[10px] text-[#6b7085] block mb-1">备注（出售内容说明）</label>
+            <label className="text-xs text-[#6b7085] block mb-1">备注（出售内容说明）</label>
             <input className="input text-xs" placeholder="例如：闲鱼卖出、送朋友..."
               value={form.notes}
               onChange={e => setForm({ ...form, notes: e.target.value })}
@@ -2076,10 +2279,11 @@ function PoolSellModal({ group, onConfirm, onCancel, shippingRules, supplies, pr
 
 export default function Warehouse() {
   const { toys, updateToy, deleteToy, setToast, shippingRules, supplies } = useStore();
-  const [filter, setFilter] = useState('stock');
-  const [sourceFilter, setSourceFilter] = useState('');
-  const [search, setSearch] = useState('');
-  const [poolSearch, setPoolSearch] = useState('');
+  const isTouch = useIsTouchDevice(); // 触屏设备没有 hover，换图按钮常显
+  const [filter, setFilter] = usePersisted('wh_filter', 'stock');
+  const [sourceFilter, setSourceFilter] = usePersisted('wh_sourceFilter', '');
+  const [search, setSearch] = usePersisted('wh_search', '');
+  const [poolSearch, setPoolSearch] = usePersisted('wh_poolSearch', '');
   const [selling, setSelling] = useState(null);
   const [editing, setEditing] = useState(null);
   const [returning, setReturning] = useState(null);
@@ -2104,10 +2308,10 @@ export default function Warehouse() {
   }, []);
 
   const [page, setPage] = useState(1);
-  const [sortNewest, setSortNewest] = useState(true);
+  const [sortNewest, setSortNewest] = usePersisted('wh_sortNewest', true);
   const [previewImage, setPreviewImage] = useState(null);
   const [previewZoom, setPreviewZoom] = useState(1);
-  const [view, setView] = useState('pool'); // 'pool' | 'single'
+  const [view, setView] = usePersisted('wh_view', 'pool'); // 'pool' | 'single'
   const [collapsedCats, setCollapsedCats] = useState(() => {
     // 默认折叠空 / 库存为 0 的分类，活跃的展开
     try {
@@ -2183,10 +2387,37 @@ export default function Warehouse() {
 
   // 搜素/切 tab 重置页码
   useEffect(() => { setPage(1); }, [filter, search, sourceFilter]);
+  // 数据变化（如删除商品）后页码可能超出总页数，自动收回到最后一页，避免整页空白
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [totalPages, page]);
 
   const handleSell = async (updates) => {
     try {
-      await updateToy(selling.id, { ...selling, ...updates });
+      // 单品售卖：补 quantity + unit_cost，让 /sales 总览能算成本盈亏
+      // 件数优先取在库数 remaining（老数据 quantity 可能为 null 或代表"整箱 1 件"，按 quantity 兜底会把多余库存卖丢）
+      const sellQty = Number(updates.quantity) || Number(selling.remaining) || Number(selling.quantity) || 1;
+      const sellPrice = Number(updates.sell_price);
+      // 玩具的当前 total_cost（已有费用明细，没费用就是 0）
+      const totalCost = Number(selling.total_cost) || Number(updates.total_cost) || 0;
+      const enrichedUpdates = {
+        ...updates,
+        quantity: sellQty,
+        remaining: 0,
+        unit_cost: sellQty > 0 ? Math.round((totalCost / sellQty) * 100) / 100 : 0,
+      };
+      // 1) 更新玩具本身（status=done/sold, sell_price/quantity/unit_cost）
+      await updateToy(selling.id, { ...selling, ...enrichedUpdates });
+      // 2) 写 sales 表（与池商品出售保持一致，让 /sales 总览能查到）
+      //    单品路径：product_id=null + toy_id 必填（后端会校验该 toy 不属于任何池）
+      if (sellPrice > 0) {
+        api.post('/sales', {
+          product_id: null,
+          toy_id: selling.id,
+          quantity: sellQty,
+          sell_price: sellPrice,
+          sell_date: updates.sell_date || new Date().toISOString().slice(0, 10),
+          notes: updates.notes || '',
+        }).catch(e => console.warn('单品销售记录写入失败（不影响主流程）:', e?.message || e));
+      }
       setSelling(null);
     } catch (e) {
       setToast('出售失败: ' + e.message);
@@ -2206,34 +2437,41 @@ export default function Warehouse() {
     const toy = toys.find(t => t.id === id);
     await updateToy(id, { ...toy, ...updates });
     setEditing(null);
-
-    // 自动入池：有分类但未入池的，自动匹配已有池或新建
-    const newCat = updates.category || toy?.category;
-    if (!toy?.product_id && newCat) {
-      try {
-        const existing = await api.get(`/products?category=${encodeURIComponent(newCat)}`);
-        let pid;
-        if (existing.length > 0) {
-          pid = existing[0].id;
-        } else {
-          const created = await api.post('/products', {
-            name: newCat,
-            name_zh: toy.name_zh || toy.name || newCat,
-            category: newCat,
-            source: toy.source || 'direct',
-          });
-          pid = created.id;
-        }
-        const tc = toy.total_cost || 0;
-        await updateToy(id, { product_id: pid, quantity: 1, remaining: 1, unit_cost: tc });
-      } catch (_) { /* 入池失败不影响编辑 */ }
-    }
+    // 注意：编辑不再自动入池——之前改个名字/分类会悄悄把商品挂进池里，
+    // 单品视图又默认隐藏已入池商品，用户以为商品被删了。入池只走显式的「入池」按钮。
   };
 
   // 池模式卖出
   const handlePoolSell = async (formData) => {
     try {
       await api.post('/sales', formData);
+      // 立即本地扣减库存：卖空的批次马上从系列消失，不等 loadAll 全部接口返回
+      // 扣减规则与后端一致：指定 toy_id 只扣该批次；未指定按 created_at 升序（FIFO）依次扣
+      useStore.setState(s => {
+        const pid = Number(formData.product_id);
+        const sellQty = Number(formData.quantity) || 0;
+        const candidates = s.toys
+          .filter(t => Number(t.product_id) === pid && t.status === 'stock' && (t.remaining || 0) > 0)
+          .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
+        const targets = formData.toy_id
+          ? candidates.filter(t => Number(t.id) === Number(formData.toy_id))
+          : candidates;
+        let need = sellQty;
+        const changes = {};
+        for (const t of targets) {
+          if (need <= 0) break;
+          const take = Math.min(t.remaining || 0, need);
+          need -= take;
+          changes[t.id] = (t.remaining || 0) - take;
+        }
+        return {
+          toys: s.toys.map(t => {
+            if (!(t.id in changes)) return t;
+            const newRem = changes[t.id];
+            return { ...t, remaining: newRem, status: newRem <= 0 ? 'sold' : t.status };
+          }),
+        };
+      });
       // 售出日志
       const selectedToy = formData.toy_id ? toys.find(t => Number(t.id) === Number(formData.toy_id)) : null;
       api.post('/toys/pool-logs', {
@@ -2242,6 +2480,7 @@ export default function Warehouse() {
         action: '售出',
         toy_name: selectedToy ? (selectedToy.name_zh || selectedToy.name) : (poolSelling?.product?.name_zh || poolSelling?.product?.name || ''),
         quantity: formData.quantity,
+        unit_cost: selectedToy ? Number(selectedToy.unit_cost) : 0,  // 购入单价，盈亏计算需要
         total_cost: formData.total_revenue,
         notes: formData.notes || '',
       }).catch(() => {});
@@ -2250,8 +2489,8 @@ export default function Warehouse() {
       // 刷新 products 列表
       api.get('/products').then(prods => setProducts(prods)).catch(() => {});
       // 刷新 toys（通过 loadAll 或直接重新拉取）
-      const { loadAll } = useStore.getState();
-      loadAll();
+      const { refreshToys } = useStore.getState();
+      refreshToys();
     } catch (e) {
       setToast('出售失败: ' + (e.message || JSON.stringify(e)));
     }
@@ -2302,8 +2541,8 @@ export default function Warehouse() {
         setPoolifying(null);
         setToast(`已入池「${catName}」× ${qty}`);
         api.get('/products').then(prods => setProducts(prods)).catch(() => {});
-        const { loadAll } = useStore.getState();
-        loadAll();
+        const { refreshToys } = useStore.getState();
+        refreshToys();
         return;
       }
       // 模式 B：入具体池（正常逻辑）
@@ -2397,8 +2636,8 @@ export default function Warehouse() {
       setPoolifying(null);
       setToast(lines.length > 1 ? `已拆分入池：${lines.length} 个商品` : '已入池');
       api.get('/products').then(prods => setProducts(prods)).catch(() => {});
-      const { loadAll } = useStore.getState();
-      loadAll();
+      const { refreshToys } = useStore.getState();
+      refreshToys();
     } catch (e) {
       setToast('入池失败: ' + (e.message || ''));
     }
@@ -2439,8 +2678,8 @@ export default function Warehouse() {
       setUnpoolifying(null);
       setToast(done > 1 ? `已退出 ${done} 件商品（同名全部退出）` : '已退出池模式');
       api.get('/products').then(prods => setProducts(prods)).catch(() => {});
-      const { loadAll } = useStore.getState();
-      loadAll();
+      const { refreshToys } = useStore.getState();
+      refreshToys();
     } catch (e) {
       setToast('退池失败: ' + (e.message || ''));
     }
@@ -2530,8 +2769,8 @@ export default function Warehouse() {
         setTransferPool(null);
         setToast(fail > 0 ? `批量转池完成：${done} 成功 / ${fail} 失败` : `批量转池完成：${done} 个批次 → ${targetName}`);
         api.get('/products').then(prods => setProducts(prods)).catch(() => {});
-        const { loadAll } = useStore.getState();
-        loadAll();
+        const { refreshToys } = useStore.getState();
+        refreshToys();
       } catch (e) {
         setToast('批量转池失败: ' + (e.message || JSON.stringify(e)));
       }
@@ -2612,8 +2851,8 @@ export default function Warehouse() {
       setTransferPool(null);
       setToast(`已转池 ${quantity} 件 → ${targetName}`);
       api.get('/products').then(prods => setProducts(prods)).catch(() => {});
-      const { loadAll } = useStore.getState();
-      loadAll();
+      const { refreshToys } = useStore.getState();
+      refreshToys();
     } catch (e) {
       setToast('转池失败: ' + (e.message || JSON.stringify(e)));
     }
@@ -2677,7 +2916,7 @@ export default function Warehouse() {
     });
   })();
 
-  // 池搜索：按池名/分类名过滤分组（搜索词为空时原样返回）
+  // 池搜索：按池名/分类名过滤分组（搜索词为空时原样返回；支持拼音，与入池弹窗搜索一致）
   const poolGroups = (() => {
     const s = poolSearch.trim().toLowerCase();
     if (!s) return poolsByCategory;
@@ -2685,8 +2924,12 @@ export default function Warehouse() {
       .map(([cat, pools]) => [
         cat,
         pools.filter(g => {
-          const name = (g.product?.name_zh || g.product?.name || '').toLowerCase();
-          return name.includes(s) || cat.toLowerCase().includes(s);
+          const name = (g.product?.name_zh || g.product?.name || '');
+          const cname = (g.product?.category_name || g.product?.category || '');
+          if (name.toLowerCase().includes(s) || cat.toLowerCase().includes(s) || cname.toLowerCase().includes(s)) return true;
+          // 拼音匹配（输入纯字母时）
+          if (/^[a-z]+$/.test(s) && findMatchesByPinyin(s, [name, cname, cat]).length > 0) return true;
+          return false;
         }),
       ])
       .filter(([, pools]) => pools.length > 0);
@@ -2715,12 +2958,12 @@ export default function Warehouse() {
       <div className="card flex items-center gap-4 px-4 py-2.5 flex-wrap">
         <div className="flex items-baseline gap-1.5">
           <span className="text-2xl font-bold text-[#d0d4e8]">{stockToys.length}</span>
-          <span className="text-[10px] text-[#6b7085]">在库总数</span>
+          <span className="text-xs text-[#6b7085]">在库总数</span>
         </div>
         <div className="h-8 w-px bg-white/10" />
         <div className="flex items-baseline gap-1.5">
           <span className="text-xl font-bold text-emerald-400">{stockWithImg}</span>
-          <span className="text-[10px] text-[#6b7085]">有图（{imgCoveragePct}%）</span>
+          <span className="text-xs text-[#6b7085]">有图（{imgCoveragePct}%）</span>
         </div>
         {stockNoImg > 0 && <div className="h-8 w-px bg-white/10" />}
         {stockNoImg > 0 && (
@@ -2735,14 +2978,14 @@ export default function Warehouse() {
             title={imageFilter === 'noImage' ? '点此清除筛选' : '点此查看无图商品'}
           >
             <span className="text-xl font-bold text-red-400">{stockNoImg}</span>
-            <span className="text-[10px] text-red-400/70">无图待补充{imageFilter === 'noImage' ? ' ✕' : ' →'}</span>
+            <span className="text-xs text-red-400/70">无图待补充{imageFilter === 'noImage' ? ' ✕' : ' →'}</span>
           </button>
         )}
       </div>
 
       {/* 池级视角（按 product 去重） */}
       {stockPoolIds.length > 0 && (
-        <div className="text-[10px] text-[#6b7085] -mt-2 px-1 flex items-center gap-3 flex-wrap">
+        <div className="text-xs text-[#6b7085] -mt-2 px-1 flex items-center gap-3 flex-wrap">
           <span>· 池视角：</span>
           <span><b className="text-[#d0d4e8]">{stockPoolIds.length}</b> 款入池</span>
           <span>·</span>
@@ -2783,7 +3026,7 @@ export default function Warehouse() {
           >
             <span className="text-base">🟠</span>
             <span className="text-sm font-bold tracking-wide">池商品</span>
-            <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold flex items-center justify-center ${
+            <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold flex items-center justify-center ${
               view === 'pool'
                 ? 'bg-orange-500 text-white shadow-sm'
                 : 'bg-white/10 text-[#6b7085]'
@@ -2799,7 +3042,7 @@ export default function Warehouse() {
           >
             <span className="text-base">📦</span>
             <span className="text-sm font-bold tracking-wide">单品</span>
-            <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold flex items-center justify-center ${
+            <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold flex items-center justify-center ${
               view === 'single'
                 ? 'bg-accent text-bg shadow-sm'
                 : 'bg-white/10 text-[#6b7085]'
@@ -2816,11 +3059,11 @@ export default function Warehouse() {
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-4 rounded-full bg-orange-500" />
             <h3 className="text-sm font-bold">池商品</h3>
-            <span className="text-[10px] text-[#6b7085]">{poolGrouped.length} 款 · {poolsByCategory.length} 个系列 · 库存 {poolGrouped.reduce((s,g) => s+g.totalRemaining,0)} 件</span>
+            <span className="text-xs text-[#6b7085]">{poolGrouped.length} 款 · {poolsByCategory.length} 个系列 · 库存 {poolGrouped.reduce((s,g) => s+g.totalRemaining,0)} 件</span>
             <div className="flex-1" />
             <button
               onClick={collapsedCats.size === poolsByCategory.length ? expandAll : collapseAll}
-              className="text-[10px] px-2 py-0.5 rounded border border-white/10 text-[#9ba0b5] hover:bg-white/5"
+              className="text-xs px-2 py-0.5 rounded border border-white/10 text-[#9ba0b5] hover:bg-white/5"
               title={collapsedCats.size === poolsByCategory.length ? '全部展开' : '全部折叠'}
             >
               {collapsedCats.size === poolsByCategory.length ? '全部展开' : '全部折叠'}
@@ -2851,7 +3094,7 @@ export default function Warehouse() {
                 >▶</span>
                 <div className="w-1.5 h-5 rounded-full bg-orange-500" />
                 <h4 className="text-base font-bold text-white">系列：{cat}</h4>
-                <span className="px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/30 text-[11px] font-bold text-orange-300">
+                <span className="px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/30 text-xs font-bold text-orange-300">
                   {pools.length} 款 · {pools.reduce((s,p) => s+p.totalRemaining, 0)} 件
                 </span>
               </button>
@@ -2876,9 +3119,9 @@ export default function Warehouse() {
                     <div className="relative group shrink-0">
                       {poolImage ? (
                         <>
-                          <img src={poolImage} alt="" className="w-10 h-10 rounded-lg object-cover bg-white/5 cursor-zoom-in hover:ring-2 hover:ring-accent/50 transition-all" loading="lazy" onError={e => e.target.style.display='none'} onClick={e => { e.stopPropagation(); setPreviewImage(poolImage); }} />
+                          <img src={thumbOf(poolImage)} data-full={poolImage} alt="" className="w-10 h-10 rounded-lg object-cover bg-white/5 cursor-zoom-in hover:ring-2 hover:ring-accent/50 transition-all" loading="lazy" decoding="async" onError={e => { const f = e.currentTarget.dataset.full; if (f && !e.currentTarget.dataset.fb) { e.currentTarget.dataset.fb = '1'; e.currentTarget.src = f; } else e.currentTarget.style.display = 'none'; }} onClick={e => { e.stopPropagation(); setPreviewImage(poolImage); }} />
                           <button
-                            className="absolute bottom-0 right-0 bg-black/70 rounded-tl-lg px-1.5 py-0.5 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs leading-none transition-opacity"
+                            className={`absolute bottom-0 right-0 bg-black/70 rounded-tl-lg px-1.5 py-0.5 ${isTouch ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} flex items-center justify-center text-white text-xs leading-none transition-opacity`}
                             onClick={(e) => {
                               e.stopPropagation();
                               setImageUploadTarget({
@@ -2913,19 +3156,26 @@ export default function Warehouse() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-base font-bold truncate text-white">{prod?.name_zh || prod?.name || '未命名'}</div>
-                      <div className="text-[11px] text-[#8b90a5]">{prod?.category || ''} · {g.batches.length} 批次</div>
+                      <div className="text-xs text-[#8b90a5]">{prod?.category || ''} · {g.batches.length} 批次</div>
                     </div>
                     <span className="text-lg font-bold text-accent shrink-0 ml-2">{g.totalRemaining}</span>
                   </div>
-                  <div className="flex justify-between text-[11px] text-[#9ba0b5] mb-0.5">
+                  <div className="flex justify-between text-xs text-[#9ba0b5] mb-0.5">
                     <span className="font-semibold text-white/80">总成本 ¥{g.totalCost.toFixed(0)}</span>
                     <span>{g.totalQty} 件 · 在库 <span className="text-accent font-semibold">{g.totalRemaining}</span> 件</span>
                   </div>
+                  {/* 已售指示：池卡片直接显示已售件数和收入，不用进弹窗就知道哪些卖过 */}
+                  {prod && prod.sold_qty > 0 && (
+                    <div className="flex justify-between items-center text-xs px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/25 mb-1.5">
+                      <span className="text-emerald-300 font-medium">💸 已售 {prod.sold_qty} 件</span>
+                      <span className="text-emerald-200 font-bold">¥{(prod.total_revenue || 0).toFixed(0)}</span>
+                    </div>
+                  )}
 
                   <div className="space-y-1.5 mt-2 p-2.5 rounded-lg bg-gradient-to-br from-orange-500/10 to-green-500/5 border border-orange-500/15">
                     <div className="flex justify-between text-[12px]">
                       <span className="text-white font-medium">📦 成本均价</span>
-                      <span className="text-white font-bold">¥{avgCost.toFixed(0)}<span className="text-[10px] font-normal text-[#6b7085]">/件</span></span>
+                      <span className="text-white font-bold">¥{avgCost.toFixed(0)}<span className="text-xs font-normal text-[#6b7085]">/件</span></span>
                     </div>
                     {g.totalRemaining > 0 && (() => {
                       const breakeven = g.totalRemaining > 0 ? unrecovered / g.totalRemaining : 0;
@@ -2943,15 +3193,15 @@ export default function Warehouse() {
                             <>
                               <div className="flex justify-between text-[12px]">
                                 <span className="text-orange-300 font-medium">🎯 回本价</span>
-                                <span className="text-orange-300 font-bold">¥{breakeven.toFixed(0)}<span className="text-[10px] font-normal">/件</span></span>
+                                <span className="text-orange-300 font-bold">¥{breakeven.toFixed(0)}<span className="text-xs font-normal">/件</span></span>
                               </div>
                               <div className="flex justify-between text-[12px]">
                                 <span className="text-green-300 font-medium">💰 +10%利润</span>
-                                <span className="text-green-300 font-bold">¥{profit10.toFixed(0)}<span className="text-[10px] font-normal">/件</span></span>
+                                <span className="text-green-300 font-bold">¥{profit10.toFixed(0)}<span className="text-xs font-normal">/件</span></span>
                               </div>
                               <div className="flex justify-between text-[12px]">
                                 <span className="text-emerald-300 font-medium">💰 +20%利润</span>
-                                <span className="text-emerald-300 font-bold">¥{profit20.toFixed(0)}<span className="text-[10px] font-normal">/件</span></span>
+                                <span className="text-emerald-300 font-bold">¥{profit20.toFixed(0)}<span className="text-xs font-normal">/件</span></span>
                               </div>
                             </>
                           )}
@@ -3026,7 +3276,14 @@ export default function Warehouse() {
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-3 py-1">
           <button className="btn-ghost text-xs px-3 py-1" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>◀ 上一页</button>
-          <span className="text-xs text-[#6b7085]">{page} / {totalPages}</span>
+          <span className="flex items-center gap-1.5 text-xs text-[#6b7085]">
+            {page} / {totalPages}
+            <input
+              className="w-14 bg-white/5 border border-white/10 rounded px-1.5 py-1 text-center text-xs text-white"
+              type="number" min={1} max={totalPages} placeholder="跳页"
+              onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(e.target.value, 10); if (v >= 1 && v <= totalPages) setPage(v); e.target.value = ''; } }}
+            />
+          </span>
           <button className="btn-ghost text-xs px-3 py-1" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>下一页 ▶</button>
         </div>
       )}
@@ -3041,7 +3298,7 @@ export default function Warehouse() {
             onReturn={toy => setReturning(toy)}
             onDone={id => updateToy(id, { ...toys.find(t => t.id === id), status: 'done' })}
             onUnsell={id => setPendingUnsell(id)}
-            onDelete={id => setPendingDelete(id)}
+            onDelete={toy => setPendingDelete(toy)}
             onPoolify={toy => setPoolifying(toy)}
             onPreviewImage={setPreviewImage}
             onUploadImage={toy => setImageUploadTarget({
@@ -3049,7 +3306,7 @@ export default function Warehouse() {
               id: toy.id,
               label: '商品图',
               currentImage: toy.image,
-              onDone: () => { useStore.getState().loadAll(); },
+              onDone: () => { useStore.getState().refreshToys(); },
             })}
             onReconcile={toy => setReconcileTarget(toy)}
           />
@@ -3066,7 +3323,14 @@ export default function Warehouse() {
           >
             ◀ 上一页
           </button>
-          <span className="text-xs text-[#6b7085]">{page} / {totalPages}</span>
+          <span className="flex items-center gap-1.5 text-xs text-[#6b7085]">
+            {page} / {totalPages}
+            <input
+              className="w-14 bg-white/5 border border-white/10 rounded px-1.5 py-1 text-center text-xs text-white"
+              type="number" min={1} max={totalPages} placeholder="跳页"
+              onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(e.target.value, 10); if (v >= 1 && v <= totalPages) setPage(v); e.target.value = ''; } }}
+            />
+          </span>
           <button
             className="btn-ghost text-xs px-3 py-1.5"
             disabled={page >= totalPages}
@@ -3110,8 +3374,8 @@ export default function Warehouse() {
       {pendingDelete && (
         <ConfirmModal
           title="删除商品"
-          message={`确认删除「${pendingDelete}」吗？此操作不可恢复。`}
-          onConfirm={async () => { await deleteToy(pendingDelete); setPendingDelete(null); setEditing(null); }}
+          message={`确认删除「${pendingDelete.name_zh || pendingDelete.name || pendingDelete.id}」吗？此操作不可恢复。`}
+          onConfirm={async () => { await deleteToy(pendingDelete.id); setPendingDelete(null); setEditing(null); }}
           onCancel={() => setPendingDelete(null)}
         />
       )}
@@ -3200,8 +3464,8 @@ export default function Warehouse() {
           onCategoryCreated={(cat) => {
             setCategories(prev => prev.some(c => c.id === cat.id) ? prev : [...prev, cat]);
             // 也刷一下 useStore 的全局 categories
-            const { loadAll } = useStore.getState();
-            loadAll();
+            const { refreshToys } = useStore.getState();
+            refreshToys();
           }}
         />
       )}
@@ -3279,7 +3543,7 @@ export default function Warehouse() {
       {reconcileTarget && (
         <ReconcileModal
           toy={reconcileTarget}
-          onDone={() => { useStore.getState().loadAll(); setReconcileTarget(null); }}
+          onDone={() => { useStore.getState().refreshToys(); setReconcileTarget(null); }}
           onCancel={() => setReconcileTarget(null)}
         />
       )}
@@ -3359,7 +3623,7 @@ function ReconcileModal({ toy, onDone, onCancel }) {
         <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
           <div className="flex-1 min-w-0">
             <div className="text-sm font-bold">📊 物流费对账</div>
-            <div className="text-[10px] text-[#6b7085] truncate">{toy.name_zh || toy.name}</div>
+            <div className="text-xs text-[#6b7085] truncate">{toy.name_zh || toy.name}</div>
           </div>
           <button className="text-[#6b7085] hover:text-white text-xl leading-none" onClick={onCancel}>✕</button>
         </div>
@@ -3373,8 +3637,8 @@ function ReconcileModal({ toy, onDone, onCancel }) {
             return (
               <div key={f.key}>
                 <div className="flex items-baseline justify-between mb-1">
-                  <label className="text-[10px] text-[#d0d4e8] font-medium">{f.label}</label>
-                  <span className="text-[10px] text-[#6b7085]">预估 ¥{est.toFixed(0)}</span>
+                  <label className="text-xs text-[#d0d4e8] font-medium">{f.label}</label>
+                  <span className="text-xs text-[#6b7085]">预估 ¥{est.toFixed(0)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
@@ -3387,7 +3651,7 @@ function ReconcileModal({ toy, onDone, onCancel }) {
                     disabled={busy}
                   />
                   {actNum > 0 && (
-                    <span className={`text-[10px] tabular-nums w-14 text-right ${diff > 0 ? 'text-red-400' : diff < 0 ? 'text-emerald-400' : 'text-[#6b7085]'}`}>
+                    <span className={`text-xs tabular-nums w-14 text-right ${diff > 0 ? 'text-red-400' : diff < 0 ? 'text-emerald-400' : 'text-[#6b7085]'}`}>
                       {diff > 0 ? '+' : ''}¥{diff.toFixed(0)}
                     </span>
                   )}
@@ -3397,11 +3661,11 @@ function ReconcileModal({ toy, onDone, onCancel }) {
           })}
 
           <div className="pt-2 border-t border-white/5">
-            <div className="flex justify-between text-[11px] mb-1">
+            <div className="flex justify-between text-xs mb-1">
               <span className="text-[#6b7085]">预估合计</span>
               <span className="text-[#d0d4e8] tabular-nums">¥{totalEst.toFixed(0)}</span>
             </div>
-            <div className="flex justify-between text-[11px] mb-1">
+            <div className="flex justify-between text-xs mb-1">
               <span className="text-[#6b7085]">实际合计</span>
               <span className="text-[#d0d4e8] tabular-nums">¥{totalAct.toFixed(0)}</span>
             </div>

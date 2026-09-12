@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import useStore from '../stores/useStore';
 import { sourceLabel } from '../lib/sources';
@@ -67,7 +66,7 @@ function KpiPrimary({ icon: Icon, label, value, sub, color = 'accent' }) {
         <span>{label}</span>
       </div>
       <div className="num text-2xl md:text-3xl font-bold text-white mt-2">{value}</div>
-      {sub && <div className="text-muted-2 text-[10px] mt-2">{sub}</div>}
+      {sub && <div className="text-muted-2 text-xs mt-2">{sub}</div>}
     </div>
   );
 }
@@ -75,9 +74,9 @@ function KpiPrimary({ icon: Icon, label, value, sub, color = 'accent' }) {
 function KpiSecondary({ label, value, sub, valueClass = 'text-white' }) {
   return (
     <div className="kpi-secondary">
-      <div className="text-muted text-[10px]">{label}</div>
+      <div className="text-muted text-xs">{label}</div>
       <div className={`num text-lg font-semibold mt-1 ${valueClass}`}>{value}</div>
-      {sub && <div className="text-muted-2 text-[10px] mt-0.5">{sub}</div>}
+      {sub && <div className="text-muted-2 text-xs mt-0.5">{sub}</div>}
     </div>
   );
 }
@@ -99,7 +98,7 @@ function StockDistribution({ stats }) {
     <div className="card">
       <div className="flex items-baseline justify-between mb-4">
         <div className="text-white text-sm font-semibold">库存分布</div>
-        <div className="text-muted-2 text-[10px]">共 {stats.counts?.total || 0} 件</div>
+        <div className="text-muted-2 text-xs">共 {stats.counts?.total || 0} 件</div>
       </div>
 
       <div className="space-y-3">
@@ -169,10 +168,10 @@ function RecentList({ toys }) {
               <div className="flex-1 min-w-0">
                 <div className="text-white text-sm truncate">{t.name}</div>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-muted">
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-white/5 text-muted">
                     {t.category || 'other'}
                   </span>
-                  <span className="text-[10px] text-muted-2">
+                  <span className="text-xs text-muted-2">
                     {t.source ? sourceLabel(t.source) : '淘淘 · 任你购'}
                   </span>
                 </div>
@@ -181,7 +180,7 @@ function RecentList({ toys }) {
                 <div className="num text-sm font-semibold text-accent">
                   ¥{(t.total_cost || 0).toFixed(0)}
                 </div>
-                <div className="text-[10px] text-muted-2 mt-0.5">
+                <div className="text-xs text-muted-2 mt-0.5">
                   {t.created_at ? new Date(t.created_at).toLocaleDateString('zh-CN') : '—'}
                 </div>
               </div>
@@ -197,12 +196,10 @@ function RecentList({ toys }) {
 }
 
 export default function Dashboard() {
-  const { stats, toys, loadAll } = useStore();
+  const { stats, toys } = useStore();
 
-  useEffect(() => {
-    loadAll();
-  }, []);
-
+  // 不再挂载时 loadAll：启动时 App 已加载全量数据，此处重复拉 8 个接口是双份开销；
+  // 操作后的数据更新由各页面的 refreshToys 负责
   if (!stats) {
     return (
       <div className="text-center text-muted-2 py-20 text-sm">加载中...</div>

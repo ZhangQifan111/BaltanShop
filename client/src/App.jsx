@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Procurement from './pages/Procurement';
 import Warehouse from './pages/Warehouse';
 import Estimate from './pages/Estimate';
+import SalesLedger from './pages/SalesLedger';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import Monster from './pages/Monster';
@@ -16,7 +17,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import {
   LayoutGrid, ShoppingCart, Package, Calculator, Heart,
   BarChart3, ClipboardList, Settings as SettingsIcon,
-  User, Rocket, Lock, LogOut, X as XIcon
+  User, Rocket, Lock, LogOut, X as XIcon, Receipt
 } from 'lucide-react';
 
 // 8-tab 完整导航：总览 / 采购 / 仓库 / 估价 / 收藏 / 分析 / 任你购 / 设置
@@ -86,7 +87,7 @@ function UserMenu({ username, onChangePassword }) {
       >
         <User className="w-4 h-4" />
         <span>{username}</span>
-        <span className="text-[10px]">▼</span>
+        <span className="text-xs">▼</span>
       </button>
       {open && (
         <>
@@ -129,6 +130,14 @@ function Layout({ children }) {
             <span>秘密基地</span>
           </h1>
           <div className="flex items-center gap-3">
+            <NavLink to="/sales" title="销售记录"
+              className={({ isActive }) =>
+                `text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                  isActive ? 'bg-accent text-[#0f1117] border-accent font-semibold' : 'border-white/15 text-[#9ba0b5] hover:bg-white/5'
+                }`
+              }>
+              <Receipt className="w-3.5 h-3.5 inline-block mr-1" />销售记录
+            </NavLink>
             {me && <UserMenu username={me.username} onChangePassword={() => setShowChangePw(true)} />}
           </div>
         </div>
@@ -148,7 +157,7 @@ function Layout({ children }) {
               to={path}
               title={label}
               className={({ isActive }) =>
-                `flex-1 flex flex-col items-center py-2 gap-0.5 text-[10px] transition-colors min-w-0 ${
+                `flex-1 flex flex-col items-center py-2 gap-0.5 text-xs transition-colors min-w-0 ${
                   isActive ? 'text-accent' : 'text-[#6b7085]'
                 }`
               }
@@ -172,7 +181,7 @@ function Layout({ children }) {
                 {bulkImport.phase === 'import' && `入库中 ${bulkImport.done}/${bulkImport.total}`}
               </div>
               {bulkImport.skippedCount > 0 && (
-                <span className="text-[10px] text-[#8b90a5]">跳过 {bulkImport.skippedCount}</span>
+                <span className="text-xs text-[#8b90a5]">跳过 {bulkImport.skippedCount}</span>
               )}
               <button
                 onClick={dismissBulkImport}
@@ -188,7 +197,7 @@ function Layout({ children }) {
                 />
               </div>
             )}
-            <div className="text-[10px] text-[#6b7085] mt-1.5">可切到其他页面，进度不丢失</div>
+            <div className="text-xs text-[#6b7085] mt-1.5">可切到其他页面，进度不丢失</div>
           </div>
         </div>
       )}
@@ -255,6 +264,7 @@ export default function App() {
                   <Route path="/procurement" element={<Procurement />} />
                   <Route path="/warehouse" element={<Warehouse />} />
                   <Route path="/estimate" element={<Estimate />} />
+                  <Route path="/sales" element={<SalesLedger />} />
                   <Route path="/monster" element={<Monster />} />
                   <Route path="/analytics" element={<Analytics />} />
                   <Route path="/renrigou" element={<Renrigou />} />

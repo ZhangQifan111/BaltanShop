@@ -8,6 +8,8 @@ dist.before-estimate/
 
 # Database & runtime data
 data.db
+data.db.before_*
+db/backups/*.db
 backups/*
 !backups/data-dump-*.sql
 data/

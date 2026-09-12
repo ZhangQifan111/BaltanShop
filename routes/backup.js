@@ -4,8 +4,22 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../db/database');
 
-const BACKUP_DIR = '/opt/buy-ledger-v2/backups';
+const BACKUP_DIR = path.join(__dirname, '..', 'db', 'backups');
 const MAX_BACKUPS = 10;
+
+// 每日自动备份（server.js 启动时调用一次即可）
+let autoBackupTimer = null;
+function startAutoBackup() {
+  if (autoBackupTimer) return;
+  autoBackupTimer = setInterval(() => {
+    try {
+      const b = createBackup();
+      console.log(`[backup] 每日自动备份完成: ${b.filename} (${(b.size / 1024).toFixed(0)} KB)`);
+    } catch (e) {
+      console.error('[backup] 每日自动备份失败:', e.message);
+    }
+  }, 24 * 60 * 60 * 1000);
+}
 
 function ensureBackupDir() {
   if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
@@ -36,7 +50,7 @@ function createBackup() {
   return { filename, size };
 }
 
-module.exports = { createBackup, router };
+module.exports = { createBackup, startAutoBackup, router };
 
 // GET /api/backups - list backups
 router.get('/', (req, res) => {

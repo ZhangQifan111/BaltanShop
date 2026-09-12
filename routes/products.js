@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db/database');
 const { calcTotalCost } = require('../utils/calcCost');
 const { fetchAndSaveImage } = require('../utils/downloadImage');
+const { makeThumb } = require('../utils/thumbnail');
 const path = require('path');
 const fs = require('fs');
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
@@ -280,7 +281,9 @@ router.post('/:id/image-base64', async (req, res) => {
               : '.jpg';
     const safeName = filename ? filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-40) : '';
     const fname = `pool_manual_${prod.id}_${Date.now()}${safeName ? '_' + safeName : ''}${ext}`;
-    fs.writeFileSync(path.join(UPLOADS_DIR, fname), buf);
+    const dest = path.join(UPLOADS_DIR, fname);
+    fs.writeFileSync(dest, buf);
+    makeThumb(dest); // 生成缩略图供列表使用
     const localPath = '/uploads/' + fname;
 
     db.update('UPDATE products SET image = ? WHERE id = ?', [localPath, prod.id]);

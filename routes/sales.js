@@ -3,28 +3,80 @@ const router = express.Router();
 const db = require('../db/database');
 const { enrichToy } = require('../utils/calcCost');
 
-// POST /api/sales — 卖出 N 件，FIFO 从最早批次扣减
+// POST /api/sales — 卖出 N 件（支持池商品 product_id 非空 + 单品 product_id 为空）
+// 单品模式：toy_id 必填、product_id 为 null、quantity 必须等于该 toy 的 remaining（一次性售罄该单品）
 router.post('/', async (req, res) => {
   try {
     const t = req.body;
-    const productId = Number(t.product_id);
+    const productId = t.product_id != null ? Number(t.product_id) : null;
+    const toyId = t.toy_id ? Number(t.toy_id) : null;
     const sellQty = Number(t.quantity) || 1;
     const sellPricePerUnit = Number(t.sell_price);
 
-    if (!productId || sellQty <= 0) {
-      return res.status(400).json({ error: 'product_id and quantity (>0) required' });
+    if (sellQty <= 0) {
+      return res.status(400).json({ error: 'quantity (>0) required' });
     }
     if (!Number.isFinite(sellPricePerUnit) || sellPricePerUnit <= 0) {
       return res.status(400).json({ error: 'sell_price must be a positive number' });
     }
 
+    // === 单品路径（product_id 为空 + toy_id 必填）===
+    if (productId === null) {
+      if (!toyId) return res.status(400).json({ error: 'toy_id required for single-item sale' });
+      const toy = await db.get(`SELECT * FROM toys WHERE id = ?`, [toyId]);
+      if (!toy) return res.status(400).json({ error: '玩具不存在' });
+      if (toy.product_id != null) return res.status(400).json({ error: '此玩具属于池商品，请用池商品售出路径（POST /sales 需传 product_id）' });
+
+      // 校验售出件数必须等于在库件数（单品是整件售罄，卖 N 件就清 N 件，防止多余库存被静默清零）
+      if (toy.remaining != null && Number(toy.remaining) > 0 && sellQty !== Number(toy.remaining)) {
+        return res.status(400).json({ error: `售出件数(${sellQty})与在库件数(${toy.remaining})不一致，单品需整件售出` });
+      }
+
+      const sellDate = t.sell_date || new Date().toISOString().slice(0, 10);
+      const totalRevenue = sellPricePerUnit * sellQty;
+
+      // 单品一笔写一条 sales 记录（quantity 通常 = toy.quantity 一次性售罄）
+      const saleSql = `INSERT INTO sales (product_id, toy_id, quantity, sell_price, total_revenue,
+        huabei, software_service_fee, basic_software_service_fee, worry_free_service_fee,
+        refund_amount, logistics_fee, box_fee, packing_fee,
+        logistics_region, logistics_weight, sell_date, notes)
+        VALUES (?,?,?,?,?, ?,?,?,?, ?,?,?,?, ?,?,?,?)`;
+      const saleId = await db.insert(saleSql, [
+        null, toyId, sellQty, sellPricePerUnit, totalRevenue,
+        Number(t.huabei) || 0, Number(t.software_service_fee) || 0,
+        Number(t.basic_software_service_fee) || 0, Number(t.worry_free_service_fee) || 0,
+        Number(t.refund_amount) || 0, Number(t.logistics_fee) || 0,
+        Number(t.box_fee) || 0, Number(t.packing_fee) || 0,
+        t.logistics_region || '', Number(t.logistics_weight) || 0,
+        sellDate, t.notes || null,
+      ]);
+
+      // 更新玩具：标 done，写售价/日期
+      db.update(
+        `UPDATE toys SET remaining = 0, status = 'done', sell_price = ?, sell_date = ? WHERE id = ?`,
+        [totalRevenue, sellDate, toyId]
+      );
+
+      return res.json({
+        ok: true,
+        sale_ids: [saleId],
+        product_id: null,
+        toy_id: toyId,
+        quantity: sellQty,
+        sell_price_per_unit: sellPricePerUnit,
+        total_revenue: totalRevenue,
+        sell_date: sellDate,
+      });
+    }
+
+    // === 池商品路径（product_id 非空，FIFO 扣库存）===
     // 查出该 product 下所有有库存的批次，按创建时间升序（FIFO）
     // 如果指定了 toy_id，只从该批次扣减
     let batches;
-    if (t.toy_id) {
+    if (toyId) {
       const batch = await db.get(
         `SELECT * FROM toys WHERE id = ? AND product_id = ? AND status = 'stock' AND remaining > 0`,
-        [Number(t.toy_id), productId]
+        [toyId, productId]
       );
       if (!batch) {
         return res.status(400).json({ error: '指定批次不可用（已售罄或不属于该商品）' });
