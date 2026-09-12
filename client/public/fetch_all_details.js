@@ -444,7 +444,7 @@
   try {
     var resp = await fetch(BATAN + "/api/ingest-renrigou", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Ingest-Key": "__INGEST_KEY__" },
       body: JSON.stringify({ orders: orders, status: status })
     });
     var json = await resp.json();

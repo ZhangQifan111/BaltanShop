@@ -102,6 +102,7 @@ const CATEGORIES = [
 
 export default function OrderAnalyzer() {
   const navigate = useNavigate();
+  const setToast = useStore(s => s.setToast);
   const [raw, setRaw] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
@@ -177,7 +178,12 @@ export default function OrderAnalyzer() {
 
   const copyFetcherScript = async () => {
     try {
-      const res = await fetch('/fetch_all_details.js');
+      // 脚本模板里的导入密钥是占位符，由后端接口按需填入（密钥只存服务器 ingest.key，不进仓库）
+      const res = await fetch('/api/ingest-script', api.authHeaders());
+      if (!res.ok) {
+        setToast('获取脚本失败：' + (res.status === 503 ? '服务器未配置导入密钥' : res.status));
+        return;
+      }
       const text = await res.text();
       try { await navigator.clipboard.writeText(text); } catch(_) {}
 

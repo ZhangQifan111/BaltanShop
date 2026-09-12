@@ -70,6 +70,7 @@ app.use('/api/backup', backupRouter);
 app.use('/api/order-data', require('./routes/orderData'));
 app.use('/api/fetch-renrigou', require('./routes/renrigou'));
 app.use('/api/ingest-renrigou', require('./routes/ingestRenrigou'));
+app.use('/api/ingest-script', require('./routes/ingestScript'));
 app.use('/api/import-renrigou', require('./routes/importRenrigou'));
 app.use('/api/fix-renrigou-images', require('./routes/fixRenrigouImages'));
 app.use('/api/translate', require('./routes/translate'));
