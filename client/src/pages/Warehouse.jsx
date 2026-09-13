@@ -2,6 +2,7 @@ import { useState, useEffect, memo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import ConfirmModal from '../components/ConfirmModal';
 import ImageUploadModal from '../components/ImageUploadModal';
+import CostDetailModal from '../components/CostDetailModal';
 import CategoryPicker from '../components/CategoryPicker';
 import useStore from '../stores/useStore';
 import { api } from '../lib/api';
@@ -26,7 +27,7 @@ const FILTERS = [
   { key: 'done', label: '已完成' },
 ];
 
-const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn, onDone, onUnsell, onPoolify, onPreviewImage, onUploadImage, onReconcile }) {
+const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn, onDone, onUnsell, onPoolify, onPreviewImage, onUploadImage, onReconcile, onCostDetail }) {
   const isTouch = useIsTouchDevice(); // 触屏设备没有 hover，换图按钮常显
   const [doneLoading, setDoneLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -97,7 +98,13 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
           </span>
         </div>
         <div className="text-right space-y-0.5">
-          <div className="text-xs text-[#6b7085]">成本</div>
+          <div className="text-xs text-[#6b7085]">成本
+            <button
+              className="ml-1 text-accent underline decoration-dotted underline-offset-2"
+              onClick={e => { e.stopPropagation(); onCostDetail && onCostDetail(toy); }}
+              title="查看成本明细"
+            >明细</button>
+          </div>
           <div className="text-sm font-bold text-accent">¥{toy.total_cost?.toFixed(0) || 0}</div>
           {toy.sell_price > 0 && (
             <>
@@ -2301,6 +2308,7 @@ export default function Warehouse() {
   const [imageFilter, setImageFilter] = useState(null); // null | 'noImage' | 'hasImage'
   const [imageUploadTarget, setImageUploadTarget] = useState(null); // { endpoint, id, label, currentImage, onDone }
   const [reconcileTarget, setReconcileTarget] = useState(null); // toy 对象
+  const [costDetailToy, setCostDetailToy] = useState(null); // 成本明细弹窗目标 toy 对象
 
   useEffect(() => {
     api.get('/settings/categories').then(data => setCategories(data.flat || data)).catch(() => {});
@@ -3309,6 +3317,7 @@ export default function Warehouse() {
               onDone: () => { useStore.getState().refreshToys(); },
             })}
             onReconcile={toy => setReconcileTarget(toy)}
+            onCostDetail={toy => setCostDetailToy(toy)}
           />
         ))}
       </div>
@@ -3546,6 +3555,10 @@ export default function Warehouse() {
           onDone={() => { useStore.getState().refreshToys(); setReconcileTarget(null); }}
           onCancel={() => setReconcileTarget(null)}
         />
+      )}
+
+      {costDetailToy && (
+        <CostDetailModal toy={costDetailToy} onClose={() => setCostDetailToy(null)} />
       )}
     </div>
   );
