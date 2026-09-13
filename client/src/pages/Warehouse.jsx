@@ -98,9 +98,9 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
           </span>
         </div>
         <div className="text-right space-y-0.5">
-          <div className="text-xs text-[#6b7085]">成本
+          <div className="text-xs text-[#6b7085] flex items-center justify-end gap-1">成本
             <button
-              className="ml-1 text-accent underline decoration-dotted underline-offset-2"
+              className="px-1.5 py-0.5 rounded border border-accent/40 text-accent leading-none"
               onClick={e => { e.stopPropagation(); onCostDetail && onCostDetail(toy); }}
               title="查看成本明细"
             >明细</button>
@@ -253,7 +253,15 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
 });
 
 /* ─── 池详情弹窗 ─── */
-function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify, onBatchTransferPool, onTransferPool, categories, onPreviewImage, onProductsChange }) {
+function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify, onBatchTransferPool, onTransferPool, categories, onPreviewImage, onProductsChange, onCostDetail }) {
+  const toys = useStore(s => s.toys); // 完整玩具数据（含成本构成字段），批次行"明细"用
+  const setToast = useStore(s => s.setToast);
+  // 批次"明细"：从 toys 里按 id 找完整数据，交给外层弹成本明细
+  const openCostDetail = (b) => {
+    const t = toys.find(x => String(x.id) === String(b.id));
+    if (t) onCostDetail(t);
+    else setToast('该商品记录已不在商品列表中，无法查看明细');
+  };
   const [curProd, setCurProd] = useState(group.product); // 本地 product 快照，改名后即时更新
   const avgCost = group.totalQty > 0 ? group.totalCost / group.totalQty : 0;
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -449,7 +457,12 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
                           <span className="text-emerald-300 shrink-0 font-semibold">售出 {b.quantity} 件</span>
                         </div>
                         <div className="flex justify-between text-xs text-[#6b7085]">
-                          <span>批次成本 ¥{(b.total_cost || 0).toFixed(0)} · 单价 ¥{(b.unit_cost || 0).toFixed(0)}/件</span>
+                          <span>批次成本 ¥{(b.total_cost || 0).toFixed(0)} · 单价 ¥{(b.unit_cost || 0).toFixed(0)}/件
+                            <button
+                              className="ml-1.5 text-accent underline decoration-dotted underline-offset-2"
+                              onClick={() => openCostDetail(b)}
+                            >明细</button>
+                          </span>
                           <span>{b.purchase_date || b.created_at?.slice(0, 10)}</span>
                         </div>
                       </div>
@@ -486,6 +499,10 @@ function PoolDetailModal({ group, onClose, onSell, onUnpoolify, onBatchUnpoolify
                   <span>入库日 {b.purchase_date || b.created_at?.slice(0, 10)}</span>
                 </div>
                 <div className="flex justify-end gap-1.5">
+                  <button className="text-xs px-2.5 py-1.5 rounded border border-white/15 bg-white/5 text-[#c8ccd8] hover:bg-white/10"
+                    onClick={() => openCostDetail(b)}>
+                    明细
+                  </button>
                   <button className="text-xs px-2.5 py-1.5 rounded border border-accent/40 bg-accent/10 text-accent hover:bg-accent/20"
                     onClick={() => onSell(group, b.id)}>
                     出售
@@ -3491,6 +3508,7 @@ export default function Warehouse() {
           onTransferPool={(b) => { setTransferPool({ batch: b, sourceProduct: viewingPool }); }}
           onPreviewImage={setPreviewImage}
           onProductsChange={setProducts}
+          onCostDetail={t => setCostDetailToy(t)}
         />
       )}
 
