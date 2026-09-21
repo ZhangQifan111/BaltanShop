@@ -202,9 +202,13 @@
             var feeBlock = null;
             for (var dii = 0; dii < di.length; dii++) { if (di[dii].sign === "feeInfo") { feeBlock = di[dii]; break; } }
             if (feeBlock && feeBlock.data) {
-              var fees = { pf:0, pfRmb:0, sf:0, sfRmb:0, ds:0, dsRmb:0, coupon:0 };
+              var fees = { pf:0, pfRmb:0, sf:0, sfRmb:0, ds:0, dsRmb:0, coupon:0, all:[] };
               for (var fi = 0; fi < feeBlock.data.length; fi++) {
                 var f = feeBlock.data[fi];
+                // 所有费用项原样带回：以前只认下面 4 个名字，其它（如「商品补款」）被静默丢弃，
+                // 导致到手成本算少。这里全量记录，由导入端决定哪些计入成本。
+                var _pr = parseFee(f.titleValue);
+                fees.all.push({ t: f.title, jpy: _pr[0], rmb: _pr[1] });
                 if (f.title === "付款手续费") { var pr = parseFee(f.titleValue); fees.pf = pr[0]; fees.pfRmb = pr[1]; }
                 else if (f.title === "代购手续费") { var pr = parseFee(f.titleValue); fees.sf = pr[0]; fees.sfRmb = pr[1]; }
                 else if (f.title === "日本国内运费") { var pr = parseFee(f.titleValue); fees.ds = pr[0]; fees.dsRmb = pr[1]; }
@@ -243,7 +247,7 @@
           var r = await fetch(BASE + "getDetails?service=package&itemId=" + oid, { headers: H });
           var d = JSON.parse(await r.text());
           if (d.code === 0 && d.data) {
-            var pkg = { is:0, isRmb:0, pf:0, pfRmb:0, en:"", eno:"", wt:0, itemPrices:{} };
+            var pkg = { is:0, isRmb:0, pf:0, pfRmb:0, en:"", eno:"", wt:0, itemPrices:{}, all:[] };
 
             // extract product RMB prices
             var prods = d.data.product || [];
@@ -259,6 +263,9 @@
             if (feeBlock && feeBlock.data) {
               for (var fi = 0; fi < feeBlock.data.length; fi++) {
                 var f = feeBlock.data[fi];
+                // 包裹级费用同样全量带回（补款有时记在包裹这一层）
+                var _ppr = parseFee(f.titleValue);
+                pkg.all.push({ t: f.title, jpy: _ppr[0], rmb: _ppr[1] });
                 if (f.title === "国际运费") { var pr = parseFee(f.titleValue); pkg.is = pr[0]; pkg.isRmb = pr[1]; }
                 else if (f.title === "包装手续费") { var pr = parseFee(f.titleValue); pkg.pf = pr[0]; pkg.pfRmb = pr[1]; }
               }
@@ -299,6 +306,7 @@
         bd[n]._domesticShipping = f.ds;
         bd[n]._domesticShippingRmb = f.dsRmb;
         bd[n]._coupon = f.coupon;
+        bd[n]._fees = f.all;   // 该商品的全部费用项（含补款等未列名费用）
         merged++;
       }
       // merge product RMB price from package data
@@ -323,7 +331,8 @@
         packagingFeeRmb: p.pfRmb,
         expressName: p.en,
         expressNo: p.eno,
-        weight: p.wt
+        weight: p.wt,
+        feesAll: p.all || []   // 包裹级全部费用项（导入端按件数分摊）
       };
       pkgMerged++;
     }

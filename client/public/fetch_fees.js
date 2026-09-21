@@ -41,10 +41,13 @@
           var r2 = await fetch(BASE + "getDetails?service=item&itemId=" + itemId, { headers: H });
           var d = JSON.parse(await r2.text());
           if (d.code === 0 && d.data) {
-            var fees = { paymentFee:0, serviceFee:0, domesticShipping:0 };
+            var fees = { paymentFee:0, serviceFee:0, domesticShipping:0, all:[] };
             var feeBlock = (d.data.detailedInfo || []).find(function(x) { return x.sign === "feeInfo"; });
             var feeInfo = (feeBlock || {}).data || [];
             feeInfo.forEach(function(f) {
+              // 全量带回：以前只认 3 个名字，其它费用（如「商品补款」）被静默丢弃
+              var pr = parseFee(f.titleValue);
+              fees.all.push({ t: f.title, jpy: pr[0], rmb: pr[1] });
               if (f.title === "付款手续费") fees.paymentFee = parseFee(f.titleValue);
               if (f.title === "代购手续费") fees.serviceFee = parseFee(f.titleValue);
               if (f.title === "日本国内运费") fees.domesticShipping = parseFee(f.titleValue);
@@ -63,7 +66,7 @@
   orders.forEach(function(ord) {
     (ord.body || []).forEach(function(it) {
       var fees = results[it.item_id];
-      if (fees) { it._paymentFee = fees.paymentFee; it._serviceFee = fees.serviceFee; it._domesticShipping = fees.domesticShipping; }
+      if (fees) { it._paymentFee = fees.paymentFee; it._serviceFee = fees.serviceFee; it._domesticShipping = fees.domesticShipping; it._fees = fees.all; }
     });
   });
 

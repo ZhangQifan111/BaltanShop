@@ -18,8 +18,10 @@ function calcTotalCost(toy) {
   const stages = (toy.stage1_amount || 0) + (toy.stage2_amount || 0) + (toy.stage3_amount || 0);
   const logistics_fee = pickActual(toy, 'logistics_fee', 'logistics_fee_actual');
   const logistics = logistics_fee + (toy.box_fee || 0) + (toy.packing_fee || 0);
+  // 商品补款：本体价格之外追加付的钱，属于到手成本的一部分，两种计价模式都要加
+  const supplement = toy.supplement_amount || 0;
 
-  if (stages > 0) return stages + logistics;
+  if (stages > 0) return stages + supplement + logistics;
 
   let base = 0;
   if (toy.source === 'direct') {
@@ -39,7 +41,7 @@ function calcTotalCost(toy) {
     + (toy.japan_consumption_tax || 0);
   const intlFees = pickActual(toy, 'intl_shipping', 'intl_shipping_actual')
     + (toy.import_duty || 0);
-  return base + japanFees + intlFees + logistics;
+  return base + japanFees + intlFees + supplement + logistics;
 }
 
 /**

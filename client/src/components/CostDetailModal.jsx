@@ -51,6 +51,8 @@ function detailRows(toy) {
   add('物流费', pickActual('logistics_fee', 'logistics_fee_actual'));
   add('纸箱费', toy.box_fee);
   add('打包费', toy.packing_fee);
+  // 商品补款：本体价之外追加付的钱（如任你购「商品补款」）
+  add('商品补款', toy.supplement_amount);
   return rows;
 }
 
@@ -96,6 +98,12 @@ export default function CostDetailModal({ toy, onClose }) {
               <div className="flex items-baseline justify-between text-xs">
                 <span className="text-[#9ba0b5]">其他 / 未细分</span>
                 <span className="num shrink-0 text-[#9ba0b5]">¥{unallocated.toFixed(2)}</span>
+              </div>
+            )}
+            {/* 补款明细：这笔钱是怎么来的（哪些费用项、各多少） */}
+            {Number(toy.supplement_amount) > 0 && toy.supplement_note && (
+              <div className="mt-2 pt-2 border-t border-white/10 text-xs text-[#6b7085] leading-relaxed">
+                <span className="text-[#9ba0b5]">补款构成：</span>{toy.supplement_note}
               </div>
             )}
           </div>

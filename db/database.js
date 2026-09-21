@@ -70,6 +70,14 @@ function migrate() {
   if (!colNames.has('stage3_tax_mode')) {
     changes.push("ALTER TABLE toys ADD COLUMN stage3_tax_mode TEXT DEFAULT 'normal'");
   }
+  // 商品补款（本体价格之外追加付的钱，如任你购「商品补款」）——必须计入到手成本
+  if (!colNames.has('supplement_amount')) {
+    changes.push("ALTER TABLE toys ADD COLUMN supplement_amount REAL DEFAULT 0");
+  }
+  // 补款的文字说明（哪些费用项、各多少钱），成本明细里展示用于核对
+  if (!colNames.has('supplement_note')) {
+    changes.push("ALTER TABLE toys ADD COLUMN supplement_note TEXT DEFAULT ''");
+  }
   if (!colNames.has('name_zh')) {
     changes.push("ALTER TABLE toys ADD COLUMN name_zh TEXT DEFAULT ''");
   }

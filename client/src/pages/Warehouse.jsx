@@ -1345,9 +1345,8 @@ function SellModal({ toy, onConfirm, onCancel }) {
     sell_price: toy.sell_price || '',
     dispute_fee: '',
     bao_you: toy.logistics_fee > 0 || toy.box_fee > 0 || toy.packing_fee > 0 ? true : false,
-    carrier: toy.logistics_fee > 0 ? 'zto' : '',
-    logistics_region: toy.logistics_region || '',
-    logistics_weight: toy.logistics_weight || '',
+    carrier: toy.logistics_fee > 0 ? 'xianyu' : '',
+    logistics_fee_manual: toy.logistics_fee > 0 ? String(toy.logistics_fee) : '5.5',
     selected_boxes: [],
     software_service_fee: initSoftware,
     basic_software_service_fee: initBasic,
@@ -1355,7 +1354,6 @@ function SellModal({ toy, onConfirm, onCancel }) {
     huabei: initHuabei,
   });
 
-  const [calcLogisticsFee, setCalcLogisticsFee] = useState(toy.logistics_fee || 0);
   const [calcBoxFee, setCalcBoxFee] = useState(toy.box_fee || 0);
   const [packingFee, setPackingFee] = useState(toy.packing_fee || 0);
 
@@ -1368,24 +1366,6 @@ function SellModal({ toy, onConfirm, onCancel }) {
       basic_software_service_fee: Math.round(price * 0.006 * 100) / 100,
     }));
   }, [form.sell_price]);
-
-  // 重量或地区变化 → 中通自动查运费
-  useEffect(() => {
-    if (!form.bao_you || form.carrier !== 'zto' || !form.logistics_region || !form.logistics_weight) {
-      setCalcLogisticsFee(0);
-      return;
-    }
-    const w = parseFloat(form.logistics_weight) || 0;
-    if (w <= 0) { setCalcLogisticsFee(0); return; }
-    api.get(`/shipping-rules/calculate?province=${encodeURIComponent(form.logistics_region)}&weight=${w}`)
-      .then(r => setCalcLogisticsFee(r.fee || 0))
-      .catch(() => setCalcLogisticsFee(0));
-  }, [form.logistics_region, form.logistics_weight, form.bao_you, form.carrier]);
-
-  // carrier 切换 → 顺丰清零
-  useEffect(() => {
-    if (form.carrier === 'sf') setCalcLogisticsFee(0);
-  }, [form.carrier]);
 
   // 箱型勾选变化 → 自动算箱规费
   useEffect(() => {
@@ -1412,6 +1392,8 @@ function SellModal({ toy, onConfirm, onCancel }) {
   const huabeiFee = +form.huabei || 0;
   const disputeFee = +form.dispute_fee || 0;
   const totalFees = softwareFee + basicFee + worryFreeFee + huabeiFee;
+  // 咸鱼包邮：运费默认 5.5，可手动改；顺丰：待设置，暂记 0
+  const calcLogisticsFee = form.carrier === 'xianyu' ? (parseFloat(form.logistics_fee_manual) || 0) : 0;
   const totalLogistics = form.bao_you ? (calcLogisticsFee + calcBoxFee + packingFee) : 0;
   const netProfit = price - totalFees - totalLogistics - disputeFee - toy.total_cost;
 
@@ -1426,8 +1408,8 @@ function SellModal({ toy, onConfirm, onCancel }) {
       worry_free_service_fee: Math.round(worryFreeFee * 100) / 100,
       huabei: Math.round(huabeiFee * 100) / 100,
       logistics_fee: form.bao_you ? calcLogisticsFee : 0,
-      logistics_region: form.bao_you ? form.logistics_region : '',
-      logistics_weight: form.bao_you ? (parseFloat(form.logistics_weight) || 0) : 0,
+      logistics_region: '',
+      logistics_weight: 0,
       box_fee: form.bao_you ? calcBoxFee : 0,
       packing_fee: form.bao_you ? packingFee : 0,
       status: nextStatus,
@@ -1456,8 +1438,7 @@ function SellModal({ toy, onConfirm, onCancel }) {
                   checked={form.bao_you}
                   onChange={e => {
                     const checked = e.target.checked;
-                    setForm(f => ({ ...f, bao_you: checked, carrier: checked ? (f.carrier || 'zto') : '' }));
-                    if (!checked) { setCalcLogisticsFee(0); }
+                    setForm(f => ({ ...f, bao_you: checked, carrier: checked ? (f.carrier || 'xianyu') : '' }));
                   }} />
                 <span className="text-xs text-[#d0d4e8]">包邮（买家无需支付运费）</span>
               </label>
@@ -1470,13 +1451,13 @@ function SellModal({ toy, onConfirm, onCancel }) {
                     <label className="text-xs text-[#6b7085] block mb-1">快递平台</label>
                     <div className="flex gap-2">
                       <button type="button"
-                        onClick={() => setForm(f => ({ ...f, carrier: 'zto' }))}
+                        onClick={() => setForm(f => ({ ...f, carrier: 'xianyu', logistics_fee_manual: f.logistics_fee_manual || '5.5' }))}
                         className={`text-xs px-3 py-1.5 rounded border flex-1 transition-colors ${
-                          form.carrier === 'zto'
+                          form.carrier === 'xianyu'
                             ? 'border-orange-500 bg-orange-500/20 text-[#d0d4e8]'
                             : 'border-white/10 text-[#6b7085]'
                         }`}>
-                        中通
+                        咸鱼包邮
                       </button>
                       <button type="button"
                         onClick={() => setForm(f => ({ ...f, carrier: 'sf' }))}
@@ -1490,36 +1471,14 @@ function SellModal({ toy, onConfirm, onCancel }) {
                     </div>
                   </div>
 
-                  {/* 中通：地区 + 重量 */}
-                  {form.carrier === 'zto' && (
-                    <>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-xs text-[#6b7085] block mb-1">目的地省份</label>
-                          <select className="input text-xs" value={form.logistics_region}
-                            onChange={e => setForm(f => ({ ...f, logistics_region: e.target.value }))}>
-                            <option value="">— 选择省份 —</option>
-                            {shippingRules.flatMap(r =>
-                              (r.provinces || '').split(',').map(p => p.trim()).filter(Boolean).map(p => (
-                                <option key={`${r.id}-${p}`} value={p}>{p}（{r.name}）</option>
-                              ))
-                            )}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-xs text-[#6b7085] block mb-1">重量 (kg)</label>
-                          <input className="input text-xs" type="text" inputmode="decimal" min="0" step="0.1" placeholder="0"
-                            value={form.logistics_weight}
-                            onChange={e => setForm(f => ({ ...f, logistics_weight: e.target.value }))} />
-                        </div>
-                      </div>
-
-                      {/* 估算快递费 */}
-                      <div className="flex justify-between text-xs">
-                        <span className="text-[#6b7085]">快递费估算</span>
-                        <span className="text-[#d0d4e8] font-bold">¥{calcLogisticsFee.toFixed(2)}</span>
-                      </div>
-                    </>
+                  {/* 咸鱼包邮：运费默认 5.5，可手动改 */}
+                  {form.carrier === 'xianyu' && (
+                    <div>
+                      <label className="text-xs text-[#6b7085] block mb-1">快递费 (¥)</label>
+                      <input className="input text-xs" type="text" inputmode="decimal" placeholder="5.5"
+                        value={form.logistics_fee_manual}
+                        onChange={e => setForm(f => ({ ...f, logistics_fee_manual: e.target.value }))} />
+                    </div>
                   )}
 
                   {/* 顺丰：待设置提示 */}
@@ -1785,6 +1744,7 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
     stage2_amount: toy.stage2_amount ?? '',
     stage2_handling: toy.stage2_handling ?? '',
     stage2_domestic_ship: toy.stage2_domestic_ship ?? '',
+    supplement_amount: toy.supplement_amount ?? '',
     stage3_intl_ship: toy.stage3_intl_ship ?? '',
     stage3_tax: (toy.stage3_tax ?? ((toy.stage3_amount || 0) - (toy.stage3_intl_ship || 0))) || '',
     stage3_tax_mode: toy.stage3_tax_mode || 'normal',
@@ -1805,6 +1765,8 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
     if (!form.name.trim()) return;
     const updates = { name: form.name.trim(), category: form.category, notes: form.notes };
     if (form.stage1_amount !== '') updates.stage1_amount = +form.stage1_amount;
+    // 商品补款：清空即 0（后端会用 calcTotalCost 重算 total_cost）
+    updates.supplement_amount = form.supplement_amount === '' ? 0 : +form.supplement_amount;
     // 阶段 2：拆分手续费 / 国内物流；总额由两者自动求和
     const s2h = form.stage2_handling === '' ? 0 : +form.stage2_handling;
     const s2s = form.stage2_domestic_ship === '' ? 0 : +form.stage2_domestic_ship;
@@ -1887,6 +1849,14 @@ function EditModal({ toy, onConfirm, onCancel, categories }) {
             <div>
               <label className="text-xs text-[#6b7085] block mb-1">③税费</label>
               <input className="input text-xs" type="text" inputmode="decimal" placeholder="0" value={form.stage3_tax} onChange={e => setForm({ ...form, stage3_tax: e.target.value })} />
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs text-[#6b7085] block mb-1">
+                商品补款
+                <span className="ml-1 text-[#4a4f63]">本体价之外追加付的钱（如任你购「商品补款」），会计入总成本</span>
+              </label>
+              <input className="input text-xs" type="text" inputmode="decimal" placeholder="0"
+                value={form.supplement_amount} onChange={e => setForm({ ...form, supplement_amount: e.target.value })} />
             </div>
             {sourceGroup(toy.source) !== 'proxy' && (
               <div className="col-span-2 mt-1">
@@ -2101,9 +2071,8 @@ function PoolSellModal({ group, onConfirm, onCancel, shippingRules, supplies, pr
     quantity: '1',
     sell_price: '',
     bao_you: false,
-    carrier: 'zto',
-    logistics_region: '',
-    logistics_weight: '',
+    carrier: 'xianyu',
+    logistics_fee_manual: '5.5',
     selected_boxes: [],
     software_service_fee: 0,
     basic_software_service_fee: 0,
@@ -2111,7 +2080,6 @@ function PoolSellModal({ group, onConfirm, onCancel, shippingRules, supplies, pr
     huabei: 0,
     notes: '',
   });
-  const [calcLogisticsFee, setCalcLogisticsFee] = useState(0);
   const [calcBoxFee, setCalcBoxFee] = useState(0);
   const [packingFee, setPackingFee] = useState(0);
 
@@ -2131,20 +2099,6 @@ function PoolSellModal({ group, onConfirm, onCancel, shippingRules, supplies, pr
       basic_software_service_fee: Math.round(p * qty * 0.006 * 100) / 100,
     }));
   }, [form.sell_price, qty]);
-
-  useEffect(() => {
-    if (!form.bao_you || form.carrier !== 'zto' || !form.logistics_region || !form.logistics_weight) {
-      setCalcLogisticsFee(0);
-      return;
-    }
-    const w = parseFloat(form.logistics_weight) || 0;
-    if (w <= 0) { setCalcLogisticsFee(0); return; }
-    api.get(`/shipping-rules/calculate?province=${encodeURIComponent(form.logistics_region)}&weight=${w}`)
-      .then(r => setCalcLogisticsFee(r.fee || 0))
-      .catch(() => setCalcLogisticsFee(0));
-  }, [form.logistics_region, form.logistics_weight, form.bao_you, form.carrier]);
-
-  useEffect(() => { if (form.carrier === 'sf') setCalcLogisticsFee(0); }, [form.carrier]);
 
   useEffect(() => {
     const total = form.selected_boxes.reduce((sum, id) => {
@@ -2168,6 +2122,8 @@ function PoolSellModal({ group, onConfirm, onCancel, shippingRules, supplies, pr
   const worryFreeFee = +form.worry_free_service_fee || 0;
   const huabeiFee = +form.huabei || 0;
   const totalFees = softwareFee + basicFee + worryFreeFee + huabeiFee;
+  // 咸鱼包邮：运费默认 5.5，可手动改；顺丰：待设置，暂记 0
+  const calcLogisticsFee = form.carrier === 'xianyu' ? (parseFloat(form.logistics_fee_manual) || 0) : 0;
   const totalLogistics = form.bao_you ? (calcLogisticsFee + calcBoxFee + packingFee) : 0;
   const batchUnitCost = selectedBatch ? (selectedBatch.unit_cost || 0) : avgCost;
   const estimatedProfit = totalRevenue - totalFees - totalLogistics - (batchUnitCost * qty);
@@ -2186,8 +2142,8 @@ function PoolSellModal({ group, onConfirm, onCancel, shippingRules, supplies, pr
       worry_free_service_fee: Math.round(worryFreeFee * 100) / 100,
       huabei: Math.round(huabeiFee * 100) / 100,
       logistics_fee: form.bao_you ? calcLogisticsFee : 0,
-      logistics_region: form.bao_you ? form.logistics_region : '',
-      logistics_weight: form.bao_you ? (parseFloat(form.logistics_weight) || 0) : 0,
+      logistics_region: '',
+      logistics_weight: 0,
       box_fee: form.bao_you ? calcBoxFee : 0,
       packing_fee: form.bao_you ? packingFee : 0,
       notes: form.notes || '',
@@ -2238,28 +2194,24 @@ function PoolSellModal({ group, onConfirm, onCancel, shippingRules, supplies, pr
                 checked={form.bao_you}
                 onChange={e => {
                   const checked = e.target.checked;
-                  setForm(f => ({ ...f, bao_you: checked, carrier: checked ? (f.carrier || 'zto') : '' }));
-                  if (!checked) setCalcLogisticsFee(0);
+                  setForm(f => ({ ...f, bao_you: checked, carrier: checked ? (f.carrier || 'xianyu') : '' }));
                 }} />
               <span className="text-xs text-[#d0d4e8]">包邮</span>
             </label>
             {form.bao_you && (
               <>
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => setForm(f => ({ ...f, carrier: 'zto' }))}
-                    className={`text-xs px-3 py-1.5 rounded border flex-1 ${form.carrier === 'zto' ? 'border-orange-500 bg-orange-500/20' : 'border-white/10'}`}>中通</button>
+                  <button type="button" onClick={() => setForm(f => ({ ...f, carrier: 'xianyu', logistics_fee_manual: f.logistics_fee_manual || '5.5' }))}
+                    className={`text-xs px-3 py-1.5 rounded border flex-1 ${form.carrier === 'xianyu' ? 'border-orange-500 bg-orange-500/20' : 'border-white/10'}`}>咸鱼包邮</button>
                   <button type="button" onClick={() => setForm(f => ({ ...f, carrier: 'sf' }))}
                     className={`text-xs px-3 py-1.5 rounded border flex-1 ${form.carrier === 'sf' ? 'border-orange-500 bg-orange-500/20' : 'border-white/10'}`}>顺丰</button>
                 </div>
-                {form.carrier === 'zto' && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <select className="input text-xs" value={form.logistics_region}
-                      onChange={e => setForm(f => ({ ...f, logistics_region: e.target.value }))}>
-                      <option value="">省份</option>
-                      {shippingRules.flatMap(r => (r.provinces||'').split(',').map(p=>p.trim()).filter(Boolean).map(p=>(<option key={p} value={p}>{p}</option>)))}
-                    </select>
-                    <input className="input text-xs" type="text" inputmode="decimal" placeholder="重量kg" value={form.logistics_weight}
-                      onChange={e => setForm(f => ({ ...f, logistics_weight: e.target.value }))} />
+                {form.carrier === 'xianyu' && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-[#6b7085] whitespace-nowrap">快递费 ¥</span>
+                    <input className="input text-xs" type="text" inputmode="decimal" placeholder="5.5"
+                      value={form.logistics_fee_manual}
+                      onChange={e => setForm(f => ({ ...f, logistics_fee_manual: e.target.value }))} />
                   </div>
                 )}
               </>

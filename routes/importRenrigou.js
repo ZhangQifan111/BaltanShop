@@ -13,6 +13,7 @@ router.post('/', async (req, res) => {
 
   const created = [];
   const skipped = [];
+  const skippedSupplement = []; // 已存在但补上了补款的商品
   let imagesOk = 0, imagesFail = 0;
 
   // 1) 先处理已存在的（顺序处理，避免和并发写冲突）
@@ -25,6 +26,17 @@ router.post('/', async (req, res) => {
         ['%renrigou_item_id:' + match[1] + '%']
       );
       if (existing) {
+        // 补款回填：老数据在抓取环节把补款丢了（脚本只认 4 个费用名），
+        // 重新抓取导入时补上。只补「原来没有、现在有」的，不覆盖用户已核对的成本。
+        const newSup = Number(it.supplement_amount) || 0;
+        if (newSup > 0) {
+          const cur = await db.get('SELECT * FROM toys WHERE id = ?', [existing.id]);
+          if (cur && !(Number(cur.supplement_amount) > 0)) {
+            db.update('UPDATE toys SET supplement_amount = ?, supplement_note = ?, total_cost = ? WHERE id = ?',
+              [newSup, it.supplement_note || '', calcTotalCost({ ...cur, supplement_amount: newSup }), existing.id]);
+            skippedSupplement.push({ title: it.name, itemId: match[1], amount: newSup });
+          }
+        }
         let imageFixed = false;
         if (it.image_url) {
           const result = await fetchAndSaveImage(it.image_url, it.item_id || match[1]);
@@ -76,6 +88,7 @@ router.post('/', async (req, res) => {
       'stage1_date','stage1_amount','stage1_note','stage1_jpy','stage1_handling','stage1_domestic_ship',
       'stage2_date','stage2_amount','stage2_note','stage2_handling','stage2_domestic_ship',
       'stage3_date','stage3_amount','stage3_note','stage3_intl_ship','stage3_tax','stage3_tax_mode',
+      'supplement_amount','supplement_note',
       'expected_arrival_date',
       'shipment_id','total_cost','profit','baltan_ref_id','notes','image','image_url','image_fetched_at'
     ];
@@ -107,6 +120,7 @@ router.post('/', async (req, res) => {
     total: items.length,
     createdCount: created.length,
     skippedCount: skipped.length,
+    supplementFixed: skippedSupplement, // 已存在商品中补上补款的
     images: { ok: imagesOk, fail: imagesFail }
   });
 });

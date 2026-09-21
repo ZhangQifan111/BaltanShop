@@ -23,6 +23,44 @@ function guessCategory(title) {
   return 'other';
 }
 
+// 已单独入账的费用名（各有对应字段，不能再重复计入补款）
+const ACCOUNTED_FEE_TITLES = ['付款手续费', '代购手续费', '日本国内运费', '国际运费', '包装手续费'];
+// 折扣类：是减项，不算追加成本
+const isDiscountFee = (title) => /优惠|折扣|抵扣|减免|返现/.test(title);
+// 本体价类：已由 _priceRmb 计入①买价，避免重复计算
+const isPriceLikeFee = (title) => /商品价格|商品金额|商品总价|货款|商品费/.test(title);
+
+/**
+ * 从抓取脚本带回的「全量费用项」里算出补款。
+ *
+ * 背景：抓取脚本以前写死 4 个费用名，其余费用（如任你购「商品补款」）被静默丢弃，
+ * 导致到手成本算少、利润虚高。现在抓取端全量带回，这里做归类。
+ *
+ * 规则：除「已入账项 / 折扣项 / 本体价项」之外的所有费用，都算追加成本（补款）。
+ * 包裹级费用按该包裹的件数分摊到每一件。
+ * 返回 { amount, note }，amount 单位人民币，note 为明细文字供成本明细弹窗展示。
+ */
+function computeSupplement(itemFees, packageFees, itemCount) {
+  const picked = [];
+  const take = (fees, divisor) => {
+    (Array.isArray(fees) ? fees : []).forEach(f => {
+      const title = String((f && f.t) || '').trim();
+      const rmb = Number(f && f.rmb) || 0;
+      if (!title || !rmb) return;
+      if (isDiscountFee(title) || isPriceLikeFee(title)) return;
+      if (ACCOUNTED_FEE_TITLES.some(k => title.indexOf(k) !== -1)) return;
+      const d = divisor > 1 ? divisor : 1;
+      picked.push({ title, rmb: Math.round((rmb / d) * 100) / 100 });
+    });
+  };
+  take(itemFees, 1);
+  take(packageFees, itemCount || 1);
+  if (picked.length === 0) return { amount: 0, note: '' };
+  const amount = Math.round(picked.reduce((s, p) => s + p.rmb, 0) * 100) / 100;
+  const note = picked.map(p => p.title + ' ¥' + p.rmb.toFixed(2)).join('；');
+  return { amount, note };
+}
+
 function mapItemToToy(it, ord) {
   const jpy = it.price || 0;
   const sf = it.serviceFee || 0;
@@ -32,6 +70,8 @@ function mapItemToToy(it, ord) {
   const pf = it.paymentFee || 0;
   const pfRmb = it.paymentFeeRmb || 0;
   const pkg = ord._package || {};
+  // 补款：本体价之外追加付的钱（抓取端全量带回的费用里，未被单独入账的部分）
+  const sup = computeSupplement(it.fees, pkg.feesAll, ord.itemCount);
 
   const t = {
     name: (it.title || '').trim(),
@@ -59,6 +99,9 @@ function mapItemToToy(it, ord) {
     stage2_handling: sfRmb,
     stage2_domestic_ship: dsRmb,
     stage2_amount: sfRmb + dsRmb,
+    // 商品补款：计入到手成本（utils/calcCost.js 会加进 total_cost）
+    supplement_amount: sup.amount,
+    supplement_note: sup.note,
     notes: 'renrigou_item_id:' + it.itemId
   };
 
@@ -424,7 +467,8 @@ export default function OrderAnalyzer() {
         itemId: it.item_id,
         paymentFee: it._paymentFee||0,
         paymentFeeRmb: it._paymentFeeRmb||0,
-        product_main_img: it.product_main_img || ''
+        product_main_img: it.product_main_img || '',
+        fees: it._fees || []   // 全量费用项（含补款），供 computeSupplement 归类
       }));
       const pkg = ord._package || {};
       batchMap[ord.id] = {
