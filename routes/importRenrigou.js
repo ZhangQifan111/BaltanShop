@@ -6,7 +6,7 @@ const { fetchAndSaveImage, runWithConcurrency, decodeRngImg } = require('../util
 const { ensureCategoryExists } = require('./toys');
 
 router.post('/', async (req, res) => {
-  const { items } = req.body || {};
+  const { items, supplementOnly } = req.body || {};
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'items array required' });
   }
@@ -38,7 +38,8 @@ router.post('/', async (req, res) => {
           }
         }
         let imageFixed = false;
-        if (it.image_url) {
+        // supplementOnly：只给老商品回填补款，跳过图片下载（几百件重下图会很慢）
+        if (it.image_url && !supplementOnly) {
           const result = await fetchAndSaveImage(it.image_url, it.item_id || match[1]);
           if (result.ok) {
             db.update('UPDATE toys SET image = ?, image_url = ?, image_fetched_at = ? WHERE id = ?',

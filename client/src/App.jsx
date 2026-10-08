@@ -119,6 +119,14 @@ function Layout({ children }) {
     auth.me().then(r => setMe(r.user)).catch(() => setMe(null));
   }, []);
 
+  // 每次切换页面刷新统计。各页面的写操作只更新自己那部分数据，
+  // store 里的 stats 会过期——以前切回总览看到的还是旧利润，得按 F5 才对。
+  // 只拉 /stats 一个聚合接口（很轻），不是 loadAll 的 8 个。
+  const loadStats = useStore(s => s.loadStats);
+  useEffect(() => {
+    if (auth.isLoggedIn()) loadStats().catch(() => {});
+  }, [location.pathname, loadStats]);
+
   return (
     <div className="min-h-screen bg-bg text-[#d0d4e8] font-mono relative">
       <BackgroundDecoration />

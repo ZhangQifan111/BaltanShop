@@ -319,6 +319,19 @@ router.put('/:id', async (req, res) => {
     const vals = [...cols.map(c => merged[c] ?? null), req.params.id];
 
     db.update(sql, vals);
+
+    // 「退回仓库」= 撤销这笔销售：状态从已售(sold/done)回退到在库(stock)时，
+    // 同步删掉该玩具的销售记录。否则 Dashboard 的总利润/销售额（按 sales 表算，
+    // 见 routes/stats.js）不会回落，货还会变成「既在库、又算卖过」的双重计数。
+    // 仅限非池商品：池批次的部分售出回滚走池的路径，这里不碰。
+    const wasSold = existing.status === 'sold' || existing.status === 'done';
+    if (wasSold && merged.status === 'stock' && !existing.product_id) {
+      db.update('DELETE FROM sales WHERE toy_id = ?', [req.params.id]);
+      // 库存回到整件：售出流程会把 remaining 清零，退回时不回填的话
+      // 卡片会显示「在库 0 件」，而且因为校验 sellQty === remaining 导致再也卖不出去
+      db.update('UPDATE toys SET remaining = COALESCE(quantity, 1) WHERE id = ?', [req.params.id]);
+    }
+
     const toy = await db.get(
       `SELECT t.*, c.name AS category_name FROM toys t LEFT JOIN categories c ON c.id = t.category_id WHERE t.id = ?`,
       [req.params.id]

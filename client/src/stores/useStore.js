@@ -69,6 +69,9 @@ const useStore = create((set, get) => ({
   updateToy: async (id, toy) => {
     const updated = await api.put(`/toys/${id}`, toy);
     set(s => ({ toys: s.toys.map(t => t.id == id ? updated : t) }));
+    // 改动会牵动总利润/销售额等 KPI，顺手刷一下，免得切回总览看到旧数字。
+    // 后台进行、失败不阻塞本次更新（切页时还会再刷一次，见 App.jsx 的 Layout）
+    get().loadStats().catch(() => {});
     return updated;
   },
 
@@ -154,9 +157,26 @@ const useStore = create((set, get) => ({
     });
     const skippedCount = items.length - newItems.length;
 
+    // 已存在的商品同样要送一遍导入接口：后端会给缺「商品补款」的老商品回填。
+    // supplementOnly 让后端跳过图片下载，只做补款归类，几百件也很快。
+    const skippedItems = items.filter(p => {
+      const id = p.item && p.item.itemId ? String(p.item.itemId) : null;
+      return id && existingIds.has(id);
+    });
+    let supplementFixed = 0;
+    if (skippedItems.length > 0) {
+      try {
+        const r = await api.post('/import-renrigou', { items: skippedItems.map(p => p.toy), supplementOnly: true });
+        supplementFixed = (r.supplementFixed || []).length;
+      } catch (e) {
+        console.warn('补款回填失败:', e.message);
+      }
+    }
+
     if (newItems.length === 0) {
       set({ bulkImport: { active: false, phase: '', done: 0, total: 0, skippedCount, createdCount: 0, error: null } });
-      get().setToast('全部 ' + items.length + ' 件都已存在，无新增');
+      get().setToast('全部 ' + items.length + ' 件都已存在，无新增'
+        + (supplementFixed > 0 ? '；已回填 ' + supplementFixed + ' 件商品补款' : ''));
       return;
     }
 
@@ -206,7 +226,9 @@ const useStore = create((set, get) => ({
         set(s => ({ toys: [...allCreated, ...s.toys] }));
       }
       set({ bulkImport: { active: false, phase: '', done: 0, total: 0, skippedCount, createdCount: allCreated.length, error: null } });
-      get().setToast('✅ 导入完成：新建 ' + allCreated.length + ' 件' + (skippedCount > 0 ? '，跳过 ' + skippedCount + ' 件已存在' : ''));
+      get().setToast('✅ 导入完成：新建 ' + allCreated.length + ' 件'
+        + (skippedCount > 0 ? '，跳过 ' + skippedCount + ' 件已存在' : '')
+        + (supplementFixed > 0 ? '，回填补款 ' + supplementFixed + ' 件' : ''));
     }
   },
 

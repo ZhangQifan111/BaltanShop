@@ -61,6 +61,9 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
   const totalDiff = reconciliationFields.reduce((s, f) => s + (f.act > 0 ? f.act - f.est : 0), 0);
   const reconciledCount = reconciliationFields.filter(f => f.act > 0).length;
 
+  // 有阶段付款数据时只列①②③，不再列来源分支的价格（japan_price_cny 和 stage1_amount 是同一笔钱，会重复）
+  const stageTotal = (toy.stage1_amount || 0) + (toy.stage2_amount || 0) + (toy.stage3_amount || 0);
+
   const statusBadge = {
     stock: { label: '在库', bg: 'rgba(74,222,128,0.15)', color: '#34d399' },
     sold: { label: '已发货', bg: 'rgba(96,165,250,0.15)', color: '#60a5fa' },
@@ -133,31 +136,35 @@ const ToyCard = memo(function ToyCard({ toy, onSell, onEdit, onDelete, onReturn,
 
       {expanded && (
         <div className="border-t border-white/5 pt-3 mt-3 space-y-1 text-xs">
-          {sourceGroup(toy.source) === 'direct' && (
+          {stageTotal > 0 ? (
             <>
-              {toy.japan_price_cny > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">本体价</span><span>¥{toy.japan_price_cny} <span className="text-xs text-[#6b7085]">RMB</span></span></div>}
-              {toy.japan_price_jpy > 0 && toy.japan_price_cny !== toy.japan_price_jpy && <div className="flex justify-between"><span className="text-[#6b7085]">本体价(日元)</span><span>¥{toy.japan_price_jpy} <span className="text-xs text-[#6b7085]">JPY</span></span></div>}
-              {toy.handling_fee > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">代购手续费</span><span>¥{toy.handling_fee} <span className="text-xs text-[#6b7085]">JPY</span></span></div>}
-              {toy.japan_domestic_shipping > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">日本运费</span><span>¥{toy.japan_domestic_shipping} <span className="text-xs text-[#6b7085]">JPY</span></span></div>}
-              {toy.japan_consumption_tax > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">日本消费税</span><span>¥{toy.japan_consumption_tax} <span className="text-xs text-[#6b7085]">JPY</span></span></div>}
-              {toy.intl_shipping > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">国际运费</span><span>¥{toy.intl_shipping} <span className="text-xs text-[#6b7085]">RMB</span></span></div>}
-              {toy.tax > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">税费</span><span>¥{toy.tax} <span className="text-xs text-[#6b7085]">RMB</span></span></div>}
+              {toy.stage1_amount > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">①买价</span><span>¥{toy.stage1_amount}</span></div>}
+              {toy.stage2_amount > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">②转运</span><span>¥{toy.stage2_amount}</span></div>}
+              {toy.stage3_intl_ship > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">③国际运费</span><span>¥{toy.stage3_intl_ship}</span></div>}
+              {toy.stage3_tax > 0 && <div className="flex justify-between pl-2"><span className="text-[#6b7085]">③税费</span><span>¥{toy.stage3_tax}</span></div>}
             </>
-          )}
-          {sourceGroup(toy.source) === 'proxy' && (
+          ) : (
             <>
-              {toy.proxy_price > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">代购价</span><span>¥{toy.proxy_price}</span></div>}
-              {toy.proxy_intl_shipping > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">国际运费</span><span>¥{toy.proxy_intl_shipping}</span></div>}
-              {toy.proxy_domestic_shipping > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">国内运费</span><span>¥{toy.proxy_domestic_shipping}</span></div>}
+              {sourceGroup(toy.source) === 'direct' && (
+                <>
+                  {toy.japan_price_cny > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">本体价</span><span>¥{toy.japan_price_cny} <span className="text-xs text-[#6b7085]">RMB</span></span></div>}
+                  {toy.intl_shipping > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">国际运费</span><span>¥{toy.intl_shipping} <span className="text-xs text-[#6b7085]">RMB</span></span></div>}
+                  {toy.tax > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">税费</span><span>¥{toy.tax} <span className="text-xs text-[#6b7085]">RMB</span></span></div>}
+                </>
+              )}
+              {sourceGroup(toy.source) === 'proxy' && (
+                <>
+                  {toy.proxy_price > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">代购价</span><span>¥{toy.proxy_price}</span></div>}
+                  {toy.proxy_intl_shipping > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">国际运费</span><span>¥{toy.proxy_intl_shipping}</span></div>}
+                  {toy.proxy_domestic_shipping > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">国内运费</span><span>¥{toy.proxy_domestic_shipping}</span></div>}
+                </>
+              )}
             </>
           )}
           {toy.logistics_fee > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">国内运费</span><span>¥{toy.logistics_fee}</span></div>}
           {toy.box_fee > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">箱费</span><span>¥{toy.box_fee}</span></div>}
           {toy.packing_fee > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">包装费</span><span>¥{toy.packing_fee}</span></div>}
-          {toy.stage1_amount > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">①买价</span><span>¥{toy.stage1_amount}</span></div>}
-          {toy.stage2_amount > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">②转运</span><span>¥{toy.stage2_amount}</span></div>}
-          {toy.stage3_intl_ship > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">③国际运费</span><span>¥{toy.stage3_intl_ship}</span></div>}
-          {toy.stage3_tax > 0 && <div className="flex justify-between pl-2"><span className="text-[#6b7085]">③税费</span><span>¥{toy.stage3_tax}</span></div>}
+          {toy.supplement_amount > 0 && <div className="flex justify-between"><span className="text-[#6b7085]">商品补款</span><span>¥{toy.supplement_amount}</span></div>}
           {toy.logistics_type && (
             <div className="flex justify-between">
               <span className="text-[#6b7085]">路线</span>
@@ -1208,9 +1215,16 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
                             ) : line.showDropdown && ddRects[idx] && (
                             <div className="fixed z-[110] bg-[#0f1117]/95 backdrop-blur-sm border border-white/10 rounded-xl overflow-y-auto shadow-2xl shadow-black/60"
                               style={{ top: ddRects[idx].top, left: ddRects[idx].left, width: ddRects[idx].width, maxHeight: Math.max(160, Math.min(480, window.innerHeight - ddRects[idx].top - 8)) }}>
+                              {/* 新建商品放列表最上面：进池的新面孔比老池更常选 */}
+                              <button type="button"
+                                className="w-full text-left px-3 py-3 text-base hover:bg-orange-500/10 text-orange-400 border-b border-white/[0.08] flex items-center gap-2"
+                                onPointerDown={() => { updateLine(idx, 'product_id', '__new__'); updateLine(idx, 'search', ''); updateLine(idx, 'showDropdown', false); }}>
+                                <span className="text-base leading-none">＋</span>
+                                <span>新建商品</span>
+                              </button>
                               {filtered.length === 0 ? (
                                 <div className="px-3 py-3 text-xs text-[#6b7085] text-center">
-                                  没有匹配的池 · 点下方新建
+                                  没有匹配的池 · 点上方新建
                                 </div>
                               ) : (
                                 <>
@@ -1232,12 +1246,6 @@ function PoolifyModal({ toy, products, categories, catIdToRoot, onConfirm, onCan
                                 ))}
                               </>
                               )}
-                              <button type="button"
-                                className="w-full text-left px-3 py-3 text-base hover:bg-orange-500/10 text-orange-400 border-t border-white/[0.08] flex items-center gap-2"
-                                onPointerDown={() => { updateLine(idx, 'product_id', '__new__'); updateLine(idx, 'search', ''); updateLine(idx, 'showDropdown', false); }}>
-                                <span className="text-base leading-none">＋</span>
-                                <span>新建商品</span>
-                              </button>
                             </div>
                           )}
                           </div>

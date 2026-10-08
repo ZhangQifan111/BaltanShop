@@ -222,13 +222,20 @@ export default function OrderAnalyzer() {
   const copyFetcherScript = async () => {
     try {
       // 脚本模板里的导入密钥是占位符，由后端接口按需填入（密钥只存服务器 ingest.key，不进仓库）
-      const res = await fetch('/api/ingest-script', api.authHeaders());
+      const res = await fetch('/api/ingest-script', { headers: api.authHeaders() });
       if (!res.ok) {
         setToast('获取脚本失败：' + (res.status === 503 ? '服务器未配置导入密钥' : res.status));
         return;
       }
       const text = await res.text();
-      try { await navigator.clipboard.writeText(text); } catch(_) {}
+      // 非 HTTPS 访问时浏览器不提供剪贴板 API，自动复制会失败，靠弹窗里的文本框手动复制
+      let autoCopied = false;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          autoCopied = true;
+        }
+      } catch(_) {}
 
       // 弹一个可关闭的预览浮层：含 textarea + 关闭按钮
       const overlay = document.createElement('div');
@@ -277,7 +284,7 @@ export default function OrderAnalyzer() {
       overlay.onclick = (e) => { if (e.target === overlay) closeOverlay(); };
       document.addEventListener('keydown', onEsc);
 
-      setSaveMsg('✅ 抓取脚本已复制到剪贴板');
+      setSaveMsg(autoCopied ? '✅ 抓取脚本已复制到剪贴板' : '脚本已打开，请在弹窗里点「📋 复制」或长按文本框全选');
     } catch (e) {
       setSaveMsg('复制失败: ' + e.message);
     }
@@ -634,18 +641,20 @@ export default function OrderAnalyzer() {
       const selected = preview.items.filter(p => !p.removed).map(p => p.toy);
       const allCreated = [];
       let totalSkipped = 0;
+      let totalSupFixed = 0;
       let totalImgOk = 0, totalImgFail = 0;
 
       for (let i = 0; i < selected.length; i += IMP_BATCH) {
         const batch = selected.slice(i, i + IMP_BATCH);
         const r = await fetch('/api/import-renrigou', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: api.authHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ items: batch })
         });
         const j = await r.json();
         if (j.created) allCreated.push(...j.created);
         totalSkipped += j.skippedCount || 0;
+        totalSupFixed += (j.supplementFixed || []).length;
         if (j.images) { totalImgOk += j.images.ok || 0; totalImgFail += j.images.fail || 0; }
         setImportProgress({ done: Math.min(i + IMP_BATCH, selected.length), total: selected.length });
       }
@@ -657,8 +666,9 @@ export default function OrderAnalyzer() {
       const imgText = (totalImgOk + totalImgFail) > 0
         ? ` · 🖼 图 ${totalImgOk} 成功${totalImgFail > 0 ? ` / ❌ ${totalImgFail} 失败` : ''}`
         : '';
+      const supText = totalSupFixed > 0 ? ' · 💰 回填补款 ' + totalSupFixed + ' 件' : '';
       setImportMsg({
-        text: '创建 ' + allCreated.length + ' 件' + (totalSkipped > 0 ? '，跳过 ' + totalSkipped + ' 件（已存在）' : '') + imgText,
+        text: '创建 ' + allCreated.length + ' 件' + (totalSkipped > 0 ? '，跳过 ' + totalSkipped + ' 件（已存在）' : '') + supText + imgText,
         ok: true,
         imgFail: totalImgFail
       });
